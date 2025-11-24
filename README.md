@@ -95,7 +95,7 @@ Les volumes bind-mount sont configurés dans `docker-compose.yml` :
 - **Backend:** Modification Python → reload automatique uvicorn
 - **Frontend:** Modification React/Next.js → fast refresh
 
-### Installer dépendances backend
+### Installer dépendances backend sans reconstruire l'image (pas recommandé)
 
 ```bash
 docker-compose exec backend pip install <package>
@@ -104,13 +104,13 @@ docker-compose exec backend pip install <package>
 docker-compose exec backend pip freeze > backend/requirements.txt
 ```
 
-### Installer dépendances frontend
+### Installer dépendances frontend sans reconstruire l'image (pas recommandé)
 
 ```bash
 docker-compose exec frontend npm install <package>
 ```
 
-### Logs en temps réel
+### Logs en temps réel 
 
 ```bash
 # Tous les services
@@ -119,31 +119,6 @@ docker-compose logs -f
 # Service spécifique
 docker-compose logs -f backend
 docker-compose logs -f frontend
-```
-
-## API Backend
-
-### Authentification
-
-```bash
-# Inscription
-curl -X POST http://localhost:8000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "securepass"}'
-
-# Connexion
-curl -X POST http://localhost:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "securepass"}'
-```
-
-### Upload graphe
-
-```bash
-# Upload fichier CSV (requiert authentification)
-curl -X POST http://localhost:8000/files/upload \
-  -H "Authorization: Bearer <access_token>" \
-  -F "file=@graph.csv"
 ```
 
 ## Algorithmes de Spatialisation 3D
