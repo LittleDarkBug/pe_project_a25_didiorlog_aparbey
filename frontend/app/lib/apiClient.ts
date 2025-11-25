@@ -40,14 +40,30 @@ class ApiClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+    const headers: HeadersInit = { ...fetchOptions.headers };
+
+    // Ajouter le token d'authentification si disponible
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      // @ts-ignore
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Définir Content-Type à json uniquement si le body n'est PAS FormData
+    if (!(fetchOptions.body instanceof FormData)) {
+      // @ts-ignore
+      headers['Content-Type'] = 'application/json';
+    } else {
+      // Laisser le navigateur définir Content-Type avec boundary pour FormData
+      // @ts-ignore
+      delete headers['Content-Type'];
+    }
+
     try {
       const response = await fetch(url, {
         ...fetchOptions,
         signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...fetchOptions.headers,
-        },
+        headers,
       });
 
       clearTimeout(timeoutId);
@@ -55,7 +71,7 @@ class ApiClient {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new ApiError(
-          errorData.message || 'Une erreur est survenue',
+          errorData.detail || errorData.message || 'Une erreur est survenue',
           response.status,
           errorData
         );
@@ -64,15 +80,15 @@ class ApiClient {
       return await response.json();
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       if (error instanceof Error && error.name === 'AbortError') {
         throw new ApiError('La requête a expiré');
       }
-      
+
       throw new ApiError('Erreur réseau');
     }
   }
@@ -84,28 +100,31 @@ class ApiClient {
 
   /** Requête POST */
   async post<T>(endpoint: string, data?: unknown, options?: FetchOptions): Promise<T> {
+    const isFormData = data instanceof FormData;
     return this.request<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: JSON.stringify(data),
+      body: isFormData ? (data as BodyInit) : JSON.stringify(data),
     });
   }
 
   /** Requête PUT */
   async put<T>(endpoint: string, data?: unknown, options?: FetchOptions): Promise<T> {
+    const isFormData = data instanceof FormData;
     return this.request<T>(endpoint, {
       ...options,
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: isFormData ? (data as BodyInit) : JSON.stringify(data),
     });
   }
 
   /** Requête PATCH */
   async patch<T>(endpoint: string, data?: unknown, options?: FetchOptions): Promise<T> {
+    const isFormData = data instanceof FormData;
     return this.request<T>(endpoint, {
       ...options,
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: isFormData ? (data as BodyInit) : JSON.stringify(data),
     });
   }
 

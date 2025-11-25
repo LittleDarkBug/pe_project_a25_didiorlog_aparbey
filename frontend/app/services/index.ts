@@ -1,2 +1,4 @@
-export * from './userService';
-export * from './authService';
+export { authService } from './authService';
+export { userService } from './userService';
+export { filesService } from './filesService';
+export { projectsService } from './projectsService';

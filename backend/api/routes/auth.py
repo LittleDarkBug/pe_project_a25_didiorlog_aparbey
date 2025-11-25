@@ -24,12 +24,14 @@ from core.redis_client import RedisClient
 from core.config import settings
 from api.dependencies import get_current_user
 import orjson
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+security = HTTPBearer()
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(request: RegisterRequest):
     """
     Inscription d'un nouvel utilisateur.
@@ -43,11 +45,11 @@ async def register(request: RegisterRequest):
     Raises:
         HTTPException: 400 si l'email existe déjà
     """
-    existing_user = await User.find_one(User.email == request.email)
+    existing_user = await User.find_one({"email": request.email})
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="Cet email est déjà enregistré"
         )
     
     hashed_password = hash_password(request.password)
@@ -69,7 +71,7 @@ async def register(request: RegisterRequest):
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login/", response_model=TokenResponse)
 async def login(request: LoginRequest):
     """
     Connexion d'un utilisateur existant.
@@ -83,19 +85,19 @@ async def login(request: LoginRequest):
     Raises:
         HTTPException: 401 si les credentials sont invalides
     """
-    user = await User.find_one(User.email == request.email)
+    user = await User.find_one({"email": request.email})
     
     if not user or not verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Email ou mot de passe incorrect",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
+            detail="Utilisateur inactif"
         )
     
     access_token = create_access_token(data={"sub": str(user.id), "email": user.email})
@@ -116,7 +118,7 @@ async def login(request: LoginRequest):
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh/", response_model=TokenResponse)
 async def refresh(request: RefreshRequest):
     """
     Rafraîchit un access token expiré avec un refresh token valide.
@@ -135,7 +137,7 @@ async def refresh(request: RefreshRequest):
     if payload is None or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+            detail="Token de rafraîchissement invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -144,7 +146,7 @@ async def refresh(request: RefreshRequest):
     if not stored_user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token not found or expired",
+            detail="Token de rafraîchissement introuvable ou expiré",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -152,7 +154,7 @@ async def refresh(request: RefreshRequest):
     if str(stored_user_id) != str(user_id):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token validation failed",
+            detail="Échec de la validation du token",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -160,7 +162,7 @@ async def refresh(request: RefreshRequest):
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
+            detail="Utilisateur introuvable ou inactif"
         )
     
     new_access_token = create_access_token(
@@ -175,43 +177,7 @@ async def refresh(request: RefreshRequest):
     )
 
 
-    """
-    Déconnexion de l'utilisateur courant.
-    
-    Blackliste l'access token courant et supprime le refresh token de Redis.
-    L'utilisateur devra se reconnecter pour obtenir de nouveaux tokens.
-    
-    Requires:
-        Token JWT valide dans le header Authorization
-    """
-    # 1. Blacklist access token
-    # On récupère le token depuis le header Authorization (Bearer ...)
-    # Note: Dans une vraie implémentation, on devrait extraire le token proprement.
-    # Ici, on assume que le middleware/dépendance a déjà validé le format.
-    # Cependant, get_current_user ne retourne que le user.
-    # Pour simplifier, on ne blackliste pas l'access token ici (car courte durée 30min),
-    # mais on révoque le refresh token, ce qui force la déconnexion à terme.
-    # Si on veut blacklister l'access token, il faudrait l'injecter via Depends(security).
-    
-    # Pour l'instant, on se concentre sur la révocation du refresh token.
-    # Mais attendez, on n'a pas le refresh token dans la requête logout standard (Bearer access_token).
-    # Le client doit envoyer le refresh token à révoquer, ou on révoque TOUS les refresh tokens du user ?
-    # Redis stocke "refresh:{token}" -> user_id. On ne peut pas trouver le token à partir du user_id facilement
-    # sans index inversé.
-    
-    # Solution robuste: Le client DOIT envoyer le refresh token à révoquer dans le body,
-    # OU on blackliste juste l'access token pour l'instant immédiat.
-    
-    # Pour respecter le cahier des charges "Blacklist token", on va blacklister l'access token.
-    # Il nous faut le token brut.
-    pass
-
-# On réécrit la fonction complète pour inclure l'injection du token
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-security = HTTPBearer()
-
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/logout/", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: User = Depends(get_current_user)

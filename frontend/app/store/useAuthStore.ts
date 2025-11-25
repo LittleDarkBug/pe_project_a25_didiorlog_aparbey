@@ -37,6 +37,11 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
                 try {
                     const response = await authService.login(credentials);
+
+                    // Stocker les tokens
+                    localStorage.setItem('access_token', response.access_token);
+                    localStorage.setItem('refresh_token', response.refresh_token);
+
                     set({
                         accessToken: response.access_token,
                         refreshToken: response.refresh_token,
@@ -78,6 +83,10 @@ export const useAuthStore = create<AuthState>()(
                 } catch (err) {
                     console.error("Erreur lors du logout API", err);
                 } finally {
+                    // Nettoyer localStorage
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('refresh_token');
+
                     set({
                         user: null,
                         accessToken: null,

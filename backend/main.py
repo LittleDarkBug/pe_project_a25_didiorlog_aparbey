@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from core.config import settings
-from api.routes import auth, files
+from api.routes import auth, files, projects
 
 
 @asynccontextmanager
@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
         await RedisClient.connect()
         logger.success("Redis connected")
     except Exception as e:
-        logger.error(f"Failed to connect to databases: {e}")
+        logger.exception(f"Failed to connect to databases: {e}")
         logger.warning("Application will start but database features are disabled")
     
     yield
@@ -70,6 +70,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(files.router)
+app.include_router(projects.router)
 
 
 @app.get("/", tags=["Root"])

@@ -1,0 +1,109 @@
+'use client';
+
+import { useState } from 'react';
+import ImportWizard from '@/app/components/dashboard/ImportWizard';
+
+// Mock data for now
+const MOCK_PROJECTS = [
+    { id: '1', name: 'Réseau Social', nodes: 1250, edges: 5400, date: 'Il y a 2h' },
+    { id: '2', name: 'Interactions Protéines', nodes: 340, edges: 890, date: 'Il y a 1j' },
+];
+
+export default function DashboardPage() {
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [projects, setProjects] = useState(MOCK_PROJECTS);
+
+    const handleProjectCreated = () => {
+        setProjects(prev => [
+            { id: Date.now().toString(), name: 'Nouveau Projet', nodes: 0, edges: 0, date: 'À l\'instant' },
+            ...prev
+        ]);
+    };
+
+    return (
+        <div className="space-y-8 animate-fade-in">
+            {/* Header */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-up">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Mes Projets</h1>
+                    <p className="text-gray-400">Gérez et visualisez vos graphes.</p>
+                </div>
+                <button
+                    onClick={() => setIsWizardOpen(true)}
+                    className="group flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-3 font-semibold text-white transition-all hover:from-blue-500 hover:to-blue-400 hover-glow-blue btn-press"
+                >
+                    <svg className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Nouveau Projet
+                </button>
+            </div>
+
+            {/* Projects Grid */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {projects.map((project, index) => (
+                    <div
+                        key={project.id}
+                        className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6 card-hover hover:border-blue-500/50 hover:bg-blue-500/5 hover-glow-blue animate-scale-in cursor-pointer"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                        {/* Animated Background Gradient */}
+                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 blur-3xl transition-all duration-500 group-hover:scale-150 group-hover:from-blue-500/20 group-hover:to-purple-500/20"></div>
+
+                        <div className="relative z-10">
+                            <div className="mb-4 flex items-start justify-between">
+                                <div className="rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 p-3 text-blue-400 transition-transform duration-300 group-hover:scale-110">
+                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                    </svg>
+                                </div>
+                                <button className="text-gray-400 transition-colors hover:text-white">
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <h3 className="mb-1 text-xl font-bold text-white transition-colors group-hover:text-blue-400">{project.name}</h3>
+                            <p className="mb-4 text-sm text-gray-400">{project.date}</p>
+
+                            <div className="flex items-center gap-4 border-t border-white/10 pt-4">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                    <span className="font-medium">{project.nodes.toLocaleString()}</span> Nœuds
+                                </div>
+                                <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                                    <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" style={{ animationDelay: '0.3s' }}></span>
+                                    <span className="font-medium">{project.edges.toLocaleString()}</span> Liens
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+
+                {/* New Project Card */}
+                <button
+                    onClick={() => setIsWizardOpen(true)}
+                    className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-transparent p-6 transition-all hover:border-blue-500/50 hover:bg-blue-500/5 card-hover animate-scale-in"
+                    style={{ animationDelay: `${projects.length * 0.1}s` }}
+                >
+                    <div className="mb-4 rounded-full bg-white/5 p-4 text-gray-400 transition-all duration-300 group-hover:bg-blue-500/20 group-hover:text-blue-400 group-hover:scale-110">
+                        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                    </div>
+                    <span className="font-semibold text-gray-400 transition-colors group-hover:text-white">Créer un projet</span>
+                    <span className="mt-1 text-sm text-gray-500 transition-colors group-hover:text-gray-400">Import CSV/JSON</span>
+                </button>
+            </div>
+
+            {/* Wizard Modal */}
+            {isWizardOpen && (
+                <ImportWizard
+                    onClose={() => setIsWizardOpen(false)}
+                    onSuccess={handleProjectCreated}
+                />
+            )}
+        </div>
+    );
+}

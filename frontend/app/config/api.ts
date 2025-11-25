@@ -1,24 +1,24 @@
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   TIMEOUT: 30000,
 } as const;
 
 export const API_ENDPOINTS = {
   AUTH: {
-    LOGIN: '/auth/login',
-    LOGOUT: '/auth/logout',
-    REGISTER: '/auth/register',
-    REFRESH: '/auth/refresh',
+    LOGIN: '/auth/login/',
+    REGISTER: '/auth/register/',
+    LOGOUT: '/auth/logout/',
+    REFRESH: '/auth/refresh/',
   },
   USERS: {
-    BASE: '/users',
-    BY_ID: (id: string) => `/users/${id}`,
-    PROFILE: '/users/profile',
+    BASE: '/users/',
+    BY_ID: (id: string) => `/users/${id}/`,
+    PROFILE: '/users/profile/',
   },
   SCENES: {
-    BASE: '/scenes',
-    BY_ID: (id: string) => `/scenes/${id}`,
-    SAVE: '/scenes/save',
+    BASE: '/scenes/',
+    BY_ID: (id: string) => `/scenes/${id}/`,
+    SAVE: '/scenes/save/',
   },
 } as const;
 
