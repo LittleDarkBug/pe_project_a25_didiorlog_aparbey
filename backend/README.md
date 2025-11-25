@@ -125,15 +125,32 @@ backend/
 
 ### Authentification
 
-- `POST /auth/register` - Inscription
+- `POST /auth/register` - Inscription (avec consentement RGPD)
 - `POST /auth/login` - Connexion
 - `POST /auth/refresh` - Rafraîchir token
-- `POST /auth/logout` - Déconnexion
+- `POST /auth/logout` - Déconnexion (Blacklist token)
+- `POST /auth/forgot-password` - Demande de réinitialisation (TODO)
+- `POST /auth/reset-password` - Réinitialisation mot de passe (TODO)
+
+### Utilisateurs & Admin
+
+- `GET /users/me` - Profil utilisateur courant
+- `PATCH /users/me` - Mise à jour profil
+- `GET /admin/users` - Liste utilisateurs (Admin only)
+- `DELETE /admin/users/{id}` - Supprimer utilisateur (Admin only)
+
+### Projets
+
+- `GET /projects` - Liste des projets utilisateur
+- `POST /projects` - Créer un projet
+- `GET /projects/{id}` - Détails projet (Public ou Owner)
+- `PUT /projects/{id}` - Modifier projet
+- `DELETE /projects/{id}` - Supprimer projet
 
 ### Fichiers
 
-- `POST /files/upload` - Upload CSV (traitement graphe non implémenté)
-- `GET /files/graphs/{graph_id}` - Récupération graphe (non implémenté)
+- `POST /files/upload` - Upload CSV/JSON (Analyse colonnes)
+- `GET /files/graphs/{graph_id}` - Récupération graphe
 
 ### Health
 

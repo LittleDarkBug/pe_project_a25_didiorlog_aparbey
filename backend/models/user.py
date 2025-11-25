@@ -22,6 +22,8 @@ class User(Document):
     full_name: Optional[str] = None
     is_active: bool = True
     is_superuser: bool = False
+    role: str = "user"  # "admin" or "user"
+    preferences: dict = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
     

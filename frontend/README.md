@@ -49,38 +49,47 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ```
 app/
+├── (auth)/                  # Pages d'authentification
+│   ├── login/               # Page de connexion
+│   └── register/            # Page d'inscription (avec RGPD)
+├── (dashboard)/             # Espace utilisateur connecté
+│   ├── page.tsx             # Liste des projets
+│   └── profile/             # Gestion du profil
+├── (workspace)/             # Espace de travail projet
+│   └── project/[id]/        # Visualisation 3D
 ├── components/              # Composants React réutilisables
 │   ├── 3DandXRComponents/   # Composants liés à la 3D et XR
-│   │   └── Scene/           # Composant wrapper Babylon.js (NE PAS MODIFIER sauf bug)
-│   └── webComponents/       # Composants web classiques (ajoutez vos composants ici)
+│   │   └── Scene/           # Composant wrapper Babylon.js
+│   ├── ui/                  # Composants UI génériques
+│   │   └── ToastContainer.tsx # Système de notifications
+│   └── webComponents/       # Composants web classiques
+│       └── Hero3D.tsx       # Héros 3D de la landing page
 │
 ├── config/                  # Configuration centralisée
-│   └── api.ts               # Endpoints API et clés React Query (MODIFIABLE - ajoutez vos endpoints)
+│   └── api.ts               # Endpoints API (Auth, Users, Projects)
 │
 ├── lib/                     # Bibliothèques et utilitaires
-│   └── apiClient.ts         # Client HTTP central (NE PAS MODIFIER - utilisez-le tel quel)
+│   └── apiClient.ts         # Client HTTP central
 │
 ├── providers/               # Context providers React
-│   ├── QueryProvider.tsx    # Config React Query (NE PAS MODIFIER sauf changement de stratégie cache)
-│   └── index.tsx            # Combine tous les providers (MODIFIABLE - ajoutez vos providers ici)
+│   ├── QueryProvider.tsx    # Config React Query
+│   └── index.tsx            # Combine tous les providers
 │
 ├── services/                # Services pour les appels API
-│   ├── userService.ts       # EXEMPLE - Service utilisateur (supprimable si pas besoin)
-│   └── index.ts             # Exports des services (MODIFIABLE - ajoutez vos services ici)
+│   ├── authService.ts       # Authentification (Login, Register, Logout)
+│   ├── userService.ts       # Service utilisateur
+│   └── index.ts             # Exports des services
 │
 ├── store/                   # Stores Zustand pour l'état client
-│   ├── useAppStore.ts       # EXEMPLE - Store global (MODIFIABLE - adaptez à vos besoins)
-│   ├── useScene3DStore.ts   # EXEMPLE - Store pour config 3D (MODIFIABLE ou supprimable)
-│   └── index.ts             # Exports des stores (MODIFIABLE)
+│   ├── useAuthStore.ts      # Gestion session utilisateur
+│   ├── useToastStore.ts     # Gestion notifications
+│   └── index.ts             # Exports des stores
 │
 ├── types/                   # Déclarations TypeScript
-│   └── css.d.ts             # Permet d'importer des fichiers CSS (NE PAS MODIFIER)
+│   └── css.d.ts             # Permet d'importer des fichiers CSS
 │
-├── test-scene/              # EXEMPLE - Page de test Babylon.js (supprimable en production)
-│   └── page.tsx             # Démo avec objets 3D animés
-│
-├── layout.tsx               # Layout racine avec Providers (IMPORTANT - ne pas casser la structure)
-└── page.tsx                 # Page d'accueil (MODIFIABLE - votre contenu ici)
+├── layout.tsx               # Layout racine avec ToastContainer
+└── page.tsx                 # Landing Page Premium
 ```
 
 ### Que pouvez-vous modifier ?

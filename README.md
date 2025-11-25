@@ -7,14 +7,14 @@ Plateforme de visualisation 3D immersive de graphes avec spatialisation performa
 ```
 PE_Def_Project/
 ├── backend/          # FastAPI + Python
-│   ├── api/         # Routes et endpoints
-│   ├── core/        # Configuration et sécurité
-│   ├── models/      # Modèles Beanie (MongoDB)
-│   ├── services/    # Logique métier (spatialisation graphes)
+│   ├── api/         # Routes (Auth, Projects, Users, Files)
+│   ├── core/        # Configuration, Sécurité, Redis
+│   ├── models/      # Modèles Beanie (User, Project, Graph)
+│   ├── services/    # Logique métier (Auth, Graphes)
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/         # Next.js + React + Three.js
-│   ├── app/          # App Router Next.js
+│   ├── app/          # App Router (Auth, Dashboard, Workspace)
 │   ├── Dockerfile
 │   └── package.json
 ├── docker-compose.yml
@@ -25,8 +25,8 @@ PE_Def_Project/
 
 ### Backend
 - **FastAPI** 0.121.3 - API REST haute performance
-- **MongoDB** 7 (Motor + Beanie) - Base de données
-- **Redis** 7 - Cache et sessions
+- **MongoDB** 7 (Motor + Beanie) - Base de données (Users, Projects, Graphs)
+- **Redis** 7 - Cache, Sessions, Blacklist Tokens
 - **NetworkX** 3.5 - Graphes Python
 - **igraph** 0.11.8 - Calculs performants (C avec bindings Python)
   - Fruchterman-Reingold 3D (5-20k nœuds)
@@ -37,7 +37,9 @@ PE_Def_Project/
 
 ### Frontend
 - **Next.js** 15 - Framework React
-- **Three.js** / **React Three Fiber** - Rendu 3D
+- **Three.js** / **React Three Fiber** / **Babylon.js** - Rendu 3D & WebXR
+- **Zustand** - Gestion d'état (Auth, Toast, UI)
+- **Tailwind CSS** - Design Premium (Glassmorphism)
 - **WebXR** - VR/AR immersif
 
 ### Infrastructure

@@ -175,10 +175,6 @@ async def refresh(request: RefreshRequest):
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(
-    current_user: User = Depends(get_current_user)
-):
     """
     Déconnexion de l'utilisateur courant.
     
@@ -188,4 +184,54 @@ async def logout(
     Requires:
         Token JWT valide dans le header Authorization
     """
+    # 1. Blacklist access token
+    # On récupère le token depuis le header Authorization (Bearer ...)
+    # Note: Dans une vraie implémentation, on devrait extraire le token proprement.
+    # Ici, on assume que le middleware/dépendance a déjà validé le format.
+    # Cependant, get_current_user ne retourne que le user.
+    # Pour simplifier, on ne blackliste pas l'access token ici (car courte durée 30min),
+    # mais on révoque le refresh token, ce qui force la déconnexion à terme.
+    # Si on veut blacklister l'access token, il faudrait l'injecter via Depends(security).
+    
+    # Pour l'instant, on se concentre sur la révocation du refresh token.
+    # Mais attendez, on n'a pas le refresh token dans la requête logout standard (Bearer access_token).
+    # Le client doit envoyer le refresh token à révoquer, ou on révoque TOUS les refresh tokens du user ?
+    # Redis stocke "refresh:{token}" -> user_id. On ne peut pas trouver le token à partir du user_id facilement
+    # sans index inversé.
+    
+    # Solution robuste: Le client DOIT envoyer le refresh token à révoquer dans le body,
+    # OU on blackliste juste l'access token pour l'instant immédiat.
+    
+    # Pour respecter le cahier des charges "Blacklist token", on va blacklister l'access token.
+    # Il nous faut le token brut.
     pass
+
+# On réécrit la fonction complète pour inclure l'injection du token
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+security = HTTPBearer()
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Déconnexion de l'utilisateur courant.
+    
+    Blackliste l'access token courant.
+    """
+    token = credentials.credentials
+    
+    # Calculer le temps restant avant expiration
+    payload = decode_token(token)
+    if payload:
+        # On utilise une expiration par défaut si 'exp' n'est pas présent (ne devrait pas arriver)
+        # exp est un timestamp unix
+        import time
+        exp = payload.get("exp")
+        if exp:
+            now = time.time()
+            ttl = int(exp - now)
+            if ttl > 0:
+                await RedisClient.blacklist_token(token, ttl)
