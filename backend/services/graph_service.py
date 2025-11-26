@@ -213,6 +213,18 @@ async def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[s
         "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0
     }
     
+    # Calcul du layout 3D
+    if G.number_of_nodes() > 0:
+        # Spring layout en 3D (dim=3)
+        pos = nx.spring_layout(G, dim=3, seed=42)
+        
+        # Normalisation des positions pour l'affichage (échelle -50 à 50 par exemple)
+        scale = 50
+        for node_id, (x, y, z) in pos.items():
+            G.nodes[node_id]['x'] = float(x) * scale
+            G.nodes[node_id]['y'] = float(y) * scale
+            G.nodes[node_id]['z'] = float(z) * scale
+    
     graph_data = nx.node_link_data(G)
     
     return {
@@ -259,6 +271,15 @@ async def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[
             "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0
         }
         
+        # Calcul du layout 3D
+        if G.number_of_nodes() > 0:
+            pos = nx.spring_layout(G, dim=3, seed=42)
+            scale = 50
+            for node_id, (x, y, z) in pos.items():
+                G.nodes[node_id]['x'] = float(x) * scale
+                G.nodes[node_id]['y'] = float(y) * scale
+                G.nodes[node_id]['z'] = float(z) * scale
+        
         graph_data = nx.node_link_data(G)
         
         return {
@@ -301,6 +322,15 @@ async def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]
         "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
         "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0
     }
+    
+    # Calcul du layout 3D
+    if G.number_of_nodes() > 0:
+        pos = nx.spring_layout(G, dim=3, seed=42)
+        scale = 50
+        for node_id, (x, y, z) in pos.items():
+            G.nodes[node_id]['x'] = float(x) * scale
+            G.nodes[node_id]['y'] = float(y) * scale
+            G.nodes[node_id]['z'] = float(z) * scale
     
     graph_data = nx.node_link_data(G)
     

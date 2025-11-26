@@ -23,6 +23,8 @@ class Project(Document):
     is_public: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
+    graph_data: Optional[dict] = None
+    metadata: Optional[dict] = None
     
     class Settings:
         name = "projects"

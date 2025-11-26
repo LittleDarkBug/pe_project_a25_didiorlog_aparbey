@@ -30,10 +30,11 @@ class MongoDB:
         cls.client = AsyncIOMotorClient(settings.MONGODB_URI)
         
         from models.user import User
+        from models.project import Project
         
         await init_beanie(
             database=cls.client[settings.DATABASE_NAME],
-            document_models=[User]
+            document_models=[User, Project]
         )
     
     @classmethod

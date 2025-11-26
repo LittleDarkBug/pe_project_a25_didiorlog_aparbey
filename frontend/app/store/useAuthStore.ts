@@ -78,8 +78,10 @@ export const useAuthStore = create<AuthState>()(
             logout: async () => {
                 set({ isLoading: true });
                 try {
+                    console.log("[useAuthStore] Début du logout, token présent:", !!localStorage.getItem('access_token'));
                     // On tente le logout API mais on nettoie le store quoi qu'il arrive
                     await authService.logout();
+                    console.log("[useAuthStore] Logout API réussi");
                 } catch (err) {
                     console.error("Erreur lors du logout API", err);
                 } finally {
@@ -95,6 +97,7 @@ export const useAuthStore = create<AuthState>()(
                         isLoading: false,
                         error: null
                     });
+                    console.log("[useAuthStore] Store et localStorage nettoyés");
                 }
             },
 

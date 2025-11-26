@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import ImportWizard from '@/app/components/dashboard/ImportWizard';
+import { projectsService } from '@/app/services/projectsService';
 
 // Mock data for now
 const MOCK_PROJECTS = [
@@ -11,17 +13,60 @@ const MOCK_PROJECTS = [
 
 export default function DashboardPage() {
     const [isWizardOpen, setIsWizardOpen] = useState(false);
-    const [projects, setProjects] = useState(MOCK_PROJECTS);
+    const [projects, setProjects] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const router = useRouter();
+
+    const fetchProjects = async () => {
+        try {
+            setIsLoading(true);
+            const data = await projectsService.list();
+            // Formatter les dates et données pour l'affichage
+            const formatted = data.map(p => ({
+                id: p.id,
+                name: p.name,
+                nodes: p.stats?.nodes || 0,
+                edges: p.stats?.edges || 0,
+                date: new Date(p.created_at || Date.now()).toLocaleDateString('fr-FR', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                })
+            }));
+            setProjects(formatted);
+        } catch (error) {
+            console.error("Erreur chargement projets", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProjects();
+    }, []);
 
     const handleProjectCreated = () => {
-        setProjects(prev => [
-            { id: Date.now().toString(), name: 'Nouveau Projet', nodes: 0, edges: 0, date: 'À l\'instant' },
-            ...prev
-        ]);
+        fetchProjects();
+    };
+
+    const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation(); // Empêcher la navigation
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce projet ?')) {
+            try {
+                await projectsService.delete(id);
+                fetchProjects();
+            } catch (error) {
+                console.error("Erreur suppression", error);
+                alert("Erreur lors de la suppression");
+            }
+        }
+    };
+
+    const handleCardClick = (id: string) => {
+        router.push(`/projects/${id}`);
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in" onClick={() => setOpenMenuId(null)}>
             {/* Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-up">
                 <div>
@@ -41,50 +86,81 @@ export default function DashboardPage() {
 
             {/* Projects Grid */}
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project, index) => (
-                    <div
-                        key={project.id}
-                        className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6 card-hover hover:border-blue-500/50 hover:bg-blue-500/5 hover-glow-blue animate-scale-in cursor-pointer"
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                    >
-                        {/* Animated Background Gradient */}
-                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 blur-3xl transition-all duration-500 group-hover:scale-150 group-hover:from-blue-500/20 group-hover:to-purple-500/20"></div>
+                {isLoading ? (
+                    // Skeleton loading
+                    [...Array(3)].map((_, i) => (
+                        <div key={i} className="h-48 rounded-2xl border border-white/10 bg-white/5 animate-pulse"></div>
+                    ))
+                ) : (
+                    projects.map((project, index) => (
+                        <div
+                            key={project.id}
+                            onClick={() => handleCardClick(project.id)}
+                            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6 card-hover hover:border-blue-500/50 hover:bg-blue-500/5 hover-glow-blue animate-scale-in cursor-pointer"
+                            style={{ animationDelay: `${index * 0.1}s` }}
+                        >
+                            {/* Animated Background Gradient */}
+                            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 blur-3xl transition-all duration-500 group-hover:scale-150 group-hover:from-blue-500/20 group-hover:to-purple-500/20"></div>
 
-                        <div className="relative z-10">
-                            <div className="mb-4 flex items-start justify-between">
-                                <div className="rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 p-3 text-blue-400 transition-transform duration-300 group-hover:scale-110">
-                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                    </svg>
+                            <div className="relative z-10">
+                                <div className="mb-4 flex items-start justify-between">
+                                    <div className="rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 p-3 text-blue-400 transition-transform duration-300 group-hover:scale-110">
+                                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                        </svg>
+                                    </div>
+
+                                    <div className="relative">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === project.id ? null : project.id); }}
+                                            className="text-gray-400 transition-colors hover:text-white p-1 rounded-full hover:bg-white/10"
+                                        >
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                            </svg>
+                                        </button>
+
+                                        {openMenuId === project.id && (
+                                            <div className="absolute right-0 top-8 z-20 w-32 rounded-lg border border-white/10 bg-[#1A1A1A] py-1 shadow-xl">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleCardClick(project.id); }}
+                                                    className="block w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 hover:text-white"
+                                                >
+                                                    Ouvrir
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteProject(e, project.id)}
+                                                    className="block w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                                                >
+                                                    Supprimer
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <button className="text-gray-400 transition-colors hover:text-white">
-                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                    </svg>
-                                </button>
-                            </div>
 
-                            <h3 className="mb-1 text-xl font-bold text-white transition-colors group-hover:text-blue-400">{project.name}</h3>
-                            <p className="mb-4 text-sm text-gray-400">{project.date}</p>
+                                <h3 className="mb-1 text-xl font-bold text-white transition-colors group-hover:text-blue-400">{project.name}</h3>
+                                <p className="mb-4 text-sm text-gray-400">{project.date}</p>
 
-                            <div className="flex items-center gap-4 border-t border-white/10 pt-4">
-                                <div className="flex items-center gap-1.5 text-sm text-gray-300">
-                                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-                                    <span className="font-medium">{project.nodes.toLocaleString()}</span> Nœuds
-                                </div>
-                                <div className="flex items-center gap-1.5 text-sm text-gray-300">
-                                    <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" style={{ animationDelay: '0.3s' }}></span>
-                                    <span className="font-medium">{project.edges.toLocaleString()}</span> Liens
+                                <div className="flex items-center gap-4 border-t border-white/10 pt-4">
+                                    <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                                        <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                        <span className="font-medium">{project.nodes.toLocaleString()}</span> Nœuds
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                                        <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" style={{ animationDelay: '0.3s' }}></span>
+                                        <span className="font-medium">{project.edges.toLocaleString()}</span> Liens
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
 
                 {/* New Project Card */}
                 <button
                     onClick={() => setIsWizardOpen(true)}
-                    className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-transparent p-6 transition-all hover:border-blue-500/50 hover:bg-blue-500/5 card-hover animate-scale-in"
+                    className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-transparent p-6 transition-all hover:border-blue-500/50 hover:bg-blue-500/5 card-hover animate-scale-in h-full min-h-[200px]"
                     style={{ animationDelay: `${projects.length * 0.1}s` }}
                 >
                     <div className="mb-4 rounded-full bg-white/5 p-4 text-gray-400 transition-all duration-300 group-hover:bg-blue-500/20 group-hover:text-blue-400 group-hover:scale-110">
