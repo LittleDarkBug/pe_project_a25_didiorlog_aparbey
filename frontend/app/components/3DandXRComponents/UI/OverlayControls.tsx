@@ -5,11 +5,12 @@ interface OverlayControlsProps {
     onToggleVR: () => void;
     onShare: () => void;
     onEdit: () => void;
+    children?: React.ReactNode;
 }
 
-export default function OverlayControls({ onResetCamera, onToggleVR, onShare, onEdit }: OverlayControlsProps) {
+export default function OverlayControls({ onResetCamera, onToggleVR, onShare, onEdit, children }: OverlayControlsProps) {
     return (
-        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl">
+        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl items-center">
             <button
                 onClick={onResetCamera}
                 className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-blue-500/20 hover:text-white hover:scale-105 cursor-pointer"
@@ -21,7 +22,11 @@ export default function OverlayControls({ onResetCamera, onToggleVR, onShare, on
                 <span className="hidden sm:inline">Reset</span>
             </button>
 
-            <div className="w-px bg-white/10"></div>
+            <div className="w-px h-6 bg-white/10"></div>
+
+            {children}
+
+            {children && <div className="w-px h-6 bg-white/10"></div>}
 
             <button
                 onClick={onToggleVR}

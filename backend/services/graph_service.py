@@ -5,6 +5,7 @@ Service de traitement de graphes.
 import polars as pl
 import orjson
 import networkx as nx
+import igraph as ig
 from typing import Dict, Any, List
 from pathlib import Path
 import asyncio
@@ -234,7 +235,8 @@ def _suggest_mapping(columns: List[str]) -> Dict[str, str]:
 
 async def process_graph_file(
     file_path: Path,
-    mapping: Dict[str, str]
+    mapping: Dict[str, str],
+    algorithm: str = "auto"
 ) -> Dict[str, Any]:
     """
     Traite un fichier de graphe (CSV ou JSON) en fonction du mapping fourni.
@@ -242,6 +244,7 @@ async def process_graph_file(
     Args:
         file_path: Chemin du fichier
         mapping: Dictionnaire de mapping (source, target, weight)
+        algorithm: Algorithme de spatialisation (auto, spring, circular, random, shell, spectral)
         
     Returns:
         Graphe au format JSON compatible avec la visualisation 3D
@@ -250,18 +253,18 @@ async def process_graph_file(
     
     try:
         if file_ext == '.csv':
-            return await asyncio.to_thread(_process_csv_graph, file_path, mapping)
+            return await asyncio.to_thread(_process_csv_graph, file_path, mapping, algorithm)
         elif file_ext == '.json':
-            return await asyncio.to_thread(_process_json_graph, file_path, mapping)
+            return await asyncio.to_thread(_process_json_graph, file_path, mapping, algorithm)
         elif file_ext == '.gexf':
-            return await asyncio.to_thread(_process_gexf_graph, file_path, mapping)
+            return await asyncio.to_thread(_process_gexf_graph, file_path, mapping, algorithm)
         else:
             raise ValueError(f"Format de fichier non supporté: {file_ext}")
     except Exception as e:
         raise ValueError(f"Erreur traitement graphe: {str(e)}")
 
 
-def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str = "auto") -> Dict[str, Any]:
     """Traite un fichier CSV pour créer un graphe."""
     df = _read_csv_safe(file_path)
     
@@ -301,16 +304,7 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, An
     }
     
     # Calcul du layout 3D
-    if G.number_of_nodes() > 0:
-        # Spring layout en 3D (dim=3)
-        pos = nx.spring_layout(G, dim=3, seed=42)
-        
-        # Normalisation des positions pour l'affichage (échelle -50 à 50 par exemple)
-        scale = 50
-        for node_id, (x, y, z) in pos.items():
-            G.nodes[node_id]['x'] = float(x) * scale
-            G.nodes[node_id]['y'] = float(y) * scale
-            G.nodes[node_id]['z'] = float(z) * scale
+    apply_layout(G, algorithm=algorithm)
     
     graph_data = nx.node_link_data(G)
     
@@ -322,7 +316,7 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, An
     }
 
 
-def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_json_graph(file_path: Path, mapping: Dict[str, str], algorithm: str = "auto") -> Dict[str, Any]:
     """Traite un fichier JSON pour créer un graphe."""
     with open(file_path, 'rb') as f:
         content = orjson.loads(f.read())
@@ -363,13 +357,7 @@ def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, A
         }
         
         # Calcul du layout 3D
-        if G.number_of_nodes() > 0:
-            pos = nx.spring_layout(G, dim=3, seed=42)
-            scale = 50
-            for node_id, (x, y, z) in pos.items():
-                G.nodes[node_id]['x'] = float(x) * scale
-                G.nodes[node_id]['y'] = float(y) * scale
-                G.nodes[node_id]['z'] = float(z) * scale
+        apply_layout(G, algorithm=algorithm)
         
         graph_data = nx.node_link_data(G)
         
@@ -387,7 +375,7 @@ def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, A
         raise ValueError("Format JSON non reconnu. Utilisez le format node-link {nodes: [...], edges: [...]}")
 
 
-def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str], algorithm: str = "auto") -> Dict[str, Any]:
     """Traite une liste d'objets JSON comme des edges."""
     src_col = mapping.get('source')
     tgt_col = mapping.get('target')
@@ -419,13 +407,7 @@ def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]) -> D
     }
     
     # Calcul du layout 3D
-    if G.number_of_nodes() > 0:
-        pos = nx.spring_layout(G, dim=3, seed=42)
-        scale = 50
-        for node_id, (x, y, z) in pos.items():
-            G.nodes[node_id]['x'] = float(x) * scale
-            G.nodes[node_id]['y'] = float(y) * scale
-            G.nodes[node_id]['z'] = float(z) * scale
+    apply_layout(G, algorithm=algorithm)
     
     graph_data = nx.node_link_data(G)
     
@@ -437,7 +419,7 @@ def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]) -> D
     }
 
 
-def _process_gexf_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_gexf_graph(file_path: Path, mapping: Dict[str, str], algorithm: str = "auto") -> Dict[str, Any]:
     """Traite un fichier GEXF pour créer un graphe."""
     # Tentative de lecture directe
     try:
@@ -475,16 +457,8 @@ def _process_gexf_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, A
         "columns": []
     }
     
-    # Calcul du layout 3D si pas déjà présent ou si forcé
-    # Note: GEXF peut contenir des positions (viz:position), on pourrait les utiliser
-    # Pour l'instant on recalcule pour être sûr d'avoir du 3D
-    if G.number_of_nodes() > 0:
-        pos = nx.spring_layout(G, dim=3, seed=42)
-        scale = 50
-        for node_id, (x, y, z) in pos.items():
-            G.nodes[node_id]['x'] = float(x) * scale
-            G.nodes[node_id]['y'] = float(y) * scale
-            G.nodes[node_id]['z'] = float(z) * scale
+    # Calcul du layout 3D
+    apply_layout(G, algorithm=algorithm)
     
     graph_data = nx.node_link_data(G)
     
@@ -494,3 +468,85 @@ def _process_gexf_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, A
         "edges": graph_data["links"],
         "format": "gexf"
     }
+
+def apply_layout(G: nx.Graph, algorithm: str = "auto", scale: float = 50.0):
+    """
+    Applique un algorithme de spatialisation au graphe en utilisant igraph pour la performance et la 3D native.
+    Modifie le graphe en place en ajoutant les attributs x, y, z aux nœuds.
+    """
+    if G.number_of_nodes() == 0:
+        return
+
+    # Conversion NetworkX -> iGraph pour la performance
+    # On map les IDs de noeuds vers des indices entiers pour igraph
+    node_keys = list(G.nodes())
+    node_map = {k: i for i, k in enumerate(node_keys)}
+    
+    ig_graph = ig.Graph(len(node_keys))
+    ig_graph.add_edges([(node_map[u], node_map[v]) for u, v in G.edges()])
+    
+    # Auto-sélection de l'algorithme
+    if algorithm == "auto":
+        if G.number_of_nodes() > 2000:
+            algorithm = "drl" # DrL est très rapide pour les grands graphes
+        else:
+            algorithm = "fruchterman_reingold"
+
+    layout = None
+    
+    try:
+        # Algorithmes 3D natifs de igraph
+        if algorithm == "fruchterman_reingold" or algorithm == "spring":
+            layout = ig_graph.layout_fruchterman_reingold_3d()
+        elif algorithm == "kamada_kawai":
+            layout = ig_graph.layout_kamada_kawai_3d()
+        elif algorithm == "drl":
+            layout = ig_graph.layout_drl(dim=3)
+        elif algorithm == "random":
+            layout = ig_graph.layout_random_3d()
+        elif algorithm == "sphere":
+            layout = ig_graph.layout_sphere() # Sphérique 3D
+        elif algorithm == "grid":
+            layout = ig_graph.layout_grid_3d()
+        else:
+            # Fallback sur Fruchterman Reingold 3D
+            layout = ig_graph.layout_fruchterman_reingold_3d()
+            
+        # Application des positions normalisées
+        # igraph retourne une liste de tuples (x, y, z)
+        
+        # Normalisation manuelle pour s'assurer que ça rentre dans l'échelle
+        coords = list(layout)
+        xs = [c[0] for c in coords]
+        ys = [c[1] for c in coords]
+        zs = [c[2] for c in coords]
+        
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        min_z, max_z = min(zs), max(zs)
+        
+        range_x = max_x - min_x if max_x != min_x else 1
+        range_y = max_y - min_y if max_y != min_y else 1
+        range_z = max_z - min_z if max_z != min_z else 1
+        
+        for i, (x, y, z) in enumerate(coords):
+            node_id = node_keys[i]
+            
+            # Normalisation entre -0.5 et 0.5 puis mise à l'échelle
+            norm_x = (x - min_x) / range_x - 0.5
+            norm_y = (y - min_y) / range_y - 0.5
+            norm_z = (z - min_z) / range_z - 0.5
+            
+            G.nodes[node_id]['x'] = float(norm_x * scale * 2)
+            G.nodes[node_id]['y'] = float(norm_y * scale * 2)
+            G.nodes[node_id]['z'] = float(norm_z * scale * 2)
+            
+    except Exception as e:
+        print(f"Erreur layout igraph {algorithm}: {e}. Fallback to NetworkX random.")
+        # Fallback ultime si igraph échoue
+        pos = nx.random_layout(G, dim=3)
+        for node_id, (x, y, z) in pos.items():
+            G.nodes[node_id]['x'] = float(x) * scale
+            G.nodes[node_id]['y'] = float(y) * scale
+            G.nodes[node_id]['z'] = float(z) * scale
+

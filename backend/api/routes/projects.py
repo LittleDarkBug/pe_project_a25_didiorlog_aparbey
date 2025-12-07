@@ -38,6 +38,9 @@ class ProjectUpdate(BaseModel):
     temp_file_id: Optional[str] = None
     mapping: Optional[Dict[str, str]] = None
 
+class LayoutUpdate(BaseModel):
+    algorithm: str
+
 @router.post("/", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
 async def create_project(
     file: UploadFile = File(...),
@@ -45,6 +48,7 @@ async def create_project(
     description: Optional[str] = Form(None),
     is_public: bool = Form(False),
     mapping: Optional[str] = Form(None),
+    algorithm: str = Form("auto"),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -70,12 +74,15 @@ async def create_project(
             try:
                 parsed_mapping = json.loads(mapping)
             except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Format de mapping invalide")
+                # Si c'est vide ou null, on garde {}
+                if mapping.strip() and mapping != "null":
+                    raise HTTPException(status_code=400, detail="Format de mapping invalide")
 
         # 1. Traiter le graphe
         graph_data = await process_graph_file(
             file_path,
-            mapping=parsed_mapping
+            mapping=parsed_mapping,
+            algorithm=algorithm
         )
         
         # 2. Créer le projet en BDD
@@ -109,6 +116,54 @@ async def create_project(
         if file_path.exists():
             file_path.unlink()
         raise HTTPException(status_code=500, detail=f"Erreur lors de la création du projet: {str(e)}")
+
+@router.post("/{project_id}/layout", response_model=Dict[str, Any])
+async def update_project_layout(
+    project_id: str,
+    layout_update: LayoutUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Recalcule le layout du graphe."""
+    try:
+        project = await Project.get(PydanticObjectId(project_id))
+    except:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if project.owner.ref.id != current_user.id:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    if not project.source_file_path:
+        raise HTTPException(status_code=400, detail="Fichier source manquant")
+        
+    file_path = Path(project.source_file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier source introuvable sur le disque")
+
+    try:
+        # Recalculer le graphe avec le nouvel algorithme
+        graph_data = await process_graph_file(
+            file_path,
+            mapping=project.mapping or {},
+            algorithm=layout_update.algorithm
+        )
+        
+        project.graph_data = graph_data
+        project.metadata = graph_data.get("metadata", {})
+        project.updated_at = datetime.now(timezone.utc)
+        
+        await project.save()
+        
+        return clean_nans({
+            "message": "Layout mis à jour",
+            "graph_data": project.graph_data
+        })
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors du recalcul du layout: {str(e)}")
+
 
 @router.put("/{project_id}", response_model=Dict[str, Any])
 async def update_project(

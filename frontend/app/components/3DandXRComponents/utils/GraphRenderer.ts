@@ -1,4 +1,4 @@
-import { Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Scene, Mesh, ActionManager, ExecuteCodeAction, InstancedMesh, PBRMaterial } from '@babylonjs/core';
+import { Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Scene, Mesh, ActionManager, ExecuteCodeAction, InstancedMesh, PBRMaterial, Quaternion, Matrix } from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
 
 interface GraphData {
@@ -45,7 +45,16 @@ export class GraphRenderer {
         masterMesh.registerInstancedBuffer("color", 4);
         masterMesh.instancedBuffers.color = new Color4(0.1, 0.6, 0.9, 1);
 
+        // OPTIMIZATION: Single UI Texture for all tooltips
         const labelTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        const tooltip = new GUI.TextBlock();
+        tooltip.text = "";
+        tooltip.color = "white";
+        tooltip.fontSize = 14;
+        tooltip.outlineWidth = 2;
+        tooltip.outlineColor = "black";
+        tooltip.isVisible = false;
+        labelTexture.addControl(tooltip);
 
         data.nodes.forEach(node => {
             // Create an instance instead of a clone or new mesh
@@ -56,18 +65,6 @@ export class GraphRenderer {
             if (node.color) {
                 const c = Color3.FromHexString(node.color);
                 instance.instancedBuffers.color = new Color4(c.r, c.g, c.b, 1);
-            }
-
-            if (node.label || node.id) {
-                const label = new GUI.TextBlock();
-                label.text = node.label || node.id;
-                label.color = "white";
-                label.fontSize = 14;
-                label.outlineWidth = 2;
-                label.outlineColor = "black";
-                labelTexture.addControl(label);
-                label.linkWithMesh(instance);
-                label.linkOffsetY = -30;
             }
 
             instance.actionManager = new ActionManager(scene);
@@ -83,6 +80,14 @@ export class GraphRenderer {
                     instance.outlineWidth = 0.1;
                     // Bright white/cyan on hover
                     instance.instancedBuffers.color = new Color4(0.8, 1, 1, 1);
+
+                    // Show Tooltip
+                    if (node.label || node.id) {
+                        tooltip.text = node.label || node.id;
+                        tooltip.linkWithMesh(instance);
+                        tooltip.linkOffsetY = -30;
+                        tooltip.isVisible = true;
+                    }
                 })
             );
             instance.actionManager.registerAction(
@@ -98,6 +103,9 @@ export class GraphRenderer {
                     } else {
                         instance.instancedBuffers.color = new Color4(0.1, 0.6, 0.9, 1);
                     }
+
+                    // Hide Tooltip
+                    tooltip.isVisible = false;
                 })
             );
             instance.actionManager.registerAction(
@@ -128,52 +136,79 @@ export class GraphRenderer {
         onVRSelect?: (data: any, type: string) => void,
         xrHelperRef?: { current: any }
     ) {
+        // OPTIMIZATION: Use Instanced Meshes (Cylinders) for Edges
+        // This allows 1 draw call while keeping individual interactivity (picking/hover)
+        
+        // 1. Create Master Edge (Cylinder aligned with Z axis for easier lookAt)
+        const masterEdge = MeshBuilder.CreateCylinder("master_edge_cylinder", {
+            height: 1,
+            diameter: 0.05, // Thin line
+            tessellation: 6 // Low poly for performance
+        }, scene);
+        
+        // Rotate geometry so cylinder aligns with Z axis (default is Y)
+        masterEdge.rotation.x = Math.PI / 2;
+        masterEdge.bakeCurrentTransformIntoVertices();
+
+        const edgeMaterial = new PBRMaterial("edgeMat", scene);
+        edgeMaterial.albedoColor = Color3.White();
+        edgeMaterial.emissiveColor = new Color3(0.5, 0.2, 0.5);
+        edgeMaterial.metallic = 0.0;
+        edgeMaterial.roughness = 1.0;
+        edgeMaterial.alpha = 0.4;
+        masterEdge.material = edgeMaterial;
+        masterEdge.isVisible = false;
+
+        // Register instanced buffer for individual colors
+        masterEdge.registerInstancedBuffer("color", 4);
+        masterEdge.instancedBuffers.color = new Color4(0.8, 0.4, 0.8, 0.4);
+
         data.edges.forEach(edge => {
             const sourceMesh = nodeMeshes.get(edge.source);
             const targetMesh = nodeMeshes.get(edge.target);
 
             if (sourceMesh && targetMesh) {
-                const points = [sourceMesh.position, targetMesh.position];
+                const instance = masterEdge.createInstance(`edge_${edge.source}_${edge.target}`);
                 
-                // Create the visual line
-                const line = MeshBuilder.CreateLines(`edge_${edge.source}_${edge.target}`, { 
-                    points,
-                    updatable: false 
-                }, scene);
+                const p1 = sourceMesh.position;
+                const p2 = targetMesh.position;
                 
-                // Distinct color for edges (Purple/Pink to contrast with Blue nodes)
-                line.color = new Color3(0.8, 0.4, 0.8);
-                line.alpha = 0.4;
+                // Position at midpoint
+                instance.position = Vector3.Center(p1, p2);
                 
-                // Optimization: Use the line itself for picking with a threshold
-                // instead of creating a separate tube mesh
-                line.isPickable = true;
-                line.intersectionThreshold = 0.5; // Makes the line easier to click
+                // Scale Z to length
+                const distance = Vector3.Distance(p1, p2);
+                instance.scaling.z = distance;
+                
+                // Rotate to look at target
+                instance.lookAt(p2);
 
-                line.actionManager = new ActionManager(scene);
-                
-                // Highlight on hover
-                line.actionManager.registerAction(
+                // Interactions
+                instance.actionManager = new ActionManager(scene);
+                instance.isPickable = true;
+
+                instance.actionManager.registerAction(
                     new ExecuteCodeAction(ActionManager.OnPointerOverTrigger, () => {
-                        line.color = new Color3(1, 0.6, 1); // Brighter pink on hover
-                        line.alpha = 1;
-                    })
-                );
-                
-                line.actionManager.registerAction(
-                    new ExecuteCodeAction(ActionManager.OnPointerOutTrigger, () => {
-                        line.color = new Color3(0.8, 0.4, 0.8); // Reset to base color
-                        line.alpha = 0.4;
+                        instance.instancedBuffers.color = new Color4(1, 0.6, 1, 1); // Highlight
+                        instance.scaling.x = 4; // Thicker on hover
+                        instance.scaling.y = 4;
                     })
                 );
 
-                line.actionManager.registerAction(
+                instance.actionManager.registerAction(
+                    new ExecuteCodeAction(ActionManager.OnPointerOutTrigger, () => {
+                        instance.instancedBuffers.color = new Color4(0.8, 0.4, 0.8, 0.4); // Reset
+                        instance.scaling.x = 1;
+                        instance.scaling.y = 1;
+                    })
+                );
+
+                instance.actionManager.registerAction(
                     new ExecuteCodeAction(ActionManager.OnPickTrigger, () => {
-                        // Visual feedback on click (Flash white)
-                        line.color = Color3.White();
-                        line.alpha = 1;
+                        // Visual feedback
+                        instance.instancedBuffers.color = new Color4(1, 1, 1, 1);
                         setTimeout(() => {
-                            line.color = new Color3(1, 0.6, 1); // Return to hover state
+                            instance.instancedBuffers.color = new Color4(1, 0.6, 1, 1);
                         }, 200);
 
                         if (onSelect) onSelect(edge, 'edge');
@@ -220,16 +255,28 @@ export class GraphRenderer {
             masterMesh.dispose();
         }
 
+        // Dispose master edge mesh
+        const masterEdge = scene.getMeshByName("master_edge_cylinder");
+        if (masterEdge) {
+            masterEdge.dispose();
+        }
+
         // Dispose node material
         const nodeMaterial = scene.getMaterialByName("nodeMat");
         if (nodeMaterial) {
             nodeMaterial.dispose();
         }
 
-        // Dispose all edge meshes (lines)
+        // Dispose edge material
+        const edgeMaterial = scene.getMaterialByName("edgeMat");
+        if (edgeMaterial) {
+            edgeMaterial.dispose();
+        }
+
+        // Dispose all edge meshes (instances)
         // Iterate over a copy of the meshes array to avoid issues when modifying the array during iteration
         [...scene.meshes].forEach(mesh => {
-            if (mesh.name.startsWith('edge_') || mesh.name.startsWith('tube_')) {
+            if (mesh.name.startsWith('edge_') || mesh.name === 'edges_system') {
                 mesh.dispose();
             }
         });

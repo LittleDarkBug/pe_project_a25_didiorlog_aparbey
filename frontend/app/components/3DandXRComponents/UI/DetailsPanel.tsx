@@ -11,10 +11,10 @@ export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps)
 
     return (
         <div
-            className="fixed z-50 w-80 max-h-[60vh] overflow-y-auto animate-slide-up rounded-xl border border-surface-50/10 bg-surface-950/95 p-6 backdrop-blur-xl shadow-2xl"
+            className="fixed z-50 w-80 flex flex-col max-h-[60vh] animate-slide-up rounded-xl border border-surface-50/10 bg-surface-950/95 backdrop-blur-xl shadow-2xl"
             style={{ right: '2rem', bottom: '6rem', left: 'auto', top: 'auto' }}
         >
-            <div className="mb-4 flex items-center justify-between sticky top-0 bg-surface-950/95 pb-2 z-10 border-b border-surface-50/10">
+            <div className="flex items-center justify-between p-4 border-b border-surface-50/10 bg-surface-950/95 rounded-t-xl shrink-0">
                 <h3 className={`text-lg font-bold ${type === 'node' ? 'text-blue-400' : 'text-purple-400'}`}>
                     {type === 'node' ? 'Détails du Nœud' : 'Détails du Lien'}
                 </h3>
@@ -28,7 +28,7 @@ export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps)
                 </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 {type === 'node' ? (
                     // Node specific view
                     <>
@@ -83,13 +83,13 @@ export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps)
                                         <span className={`inline-block w-1 h-4 rounded ${type === 'node' ? 'bg-blue-400' : 'bg-purple-400'}`}></span>
                                         {key}
                                     </p>
-                                    <div className={`ml-3 space-y-1.5 border-l-2 pl-3 ${type === 'node' ? 'border-blue-500/30' : 'border-purple-500/30'}`}>
+                                    <div className={`ml-3 space-y-2 border-l-2 pl-3 ${type === 'node' ? 'border-blue-500/30' : 'border-purple-500/30'}`}>
                                         {Object.entries(parsedValue).map(([nestedKey, nestedValue]) => (
-                                            <div key={`${key}.${nestedKey}`} className="text-sm">
-                                                <span className="text-surface-400">{nestedKey}:</span>{' '}
-                                                <span className="text-surface-50 font-medium">
+                                            <div key={`${key}.${nestedKey}`} className="flex flex-col gap-1 text-sm">
+                                                <span className="text-surface-400 text-xs">{nestedKey}</span>
+                                                <span className="text-surface-50 font-medium break-words whitespace-pre-wrap bg-surface-50/5 p-1.5 rounded text-xs font-mono max-h-24 overflow-y-auto custom-scrollbar">
                                                     {typeof nestedValue === 'object'
-                                                        ? JSON.stringify(nestedValue)
+                                                        ? JSON.stringify(nestedValue, null, 2)
                                                         : String(nestedValue)}
                                                 </span>
                                             </div>
@@ -109,7 +109,7 @@ export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps)
                                     </p>
                                     <div className="ml-3 space-y-1">
                                         {parsedValue.map((item, idx) => (
-                                            <div key={`${key}.${idx}`} className="text-sm text-surface-300">
+                                            <div key={`${key}.${idx}`} className="text-sm text-surface-300 break-words whitespace-pre-wrap bg-surface-50/5 p-1.5 rounded mb-1 font-mono text-xs">
                                                 • {typeof item === 'object' ? JSON.stringify(item) : String(item)}
                                             </div>
                                         ))}
@@ -122,9 +122,9 @@ export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps)
                         const displayValue = (parsedValue === null || parsedValue === undefined) ? 'N/A' : String(parsedValue);
 
                         return (
-                            <div key={key} className="flex justify-between gap-2 py-2 border-b border-surface-50/5 text-sm">
-                                <span className="text-surface-400 font-medium min-w-[80px]">{key}:</span>
-                                <span className="text-surface-50 text-right break-words flex-1" title={displayValue}>
+                            <div key={key} className="flex flex-col gap-1 py-2 border-b border-surface-50/5 text-sm">
+                                <span className="text-surface-400 font-medium text-xs uppercase tracking-wider">{key}</span>
+                                <span className="text-surface-50 break-words whitespace-pre-wrap bg-surface-50/5 p-2 rounded-md text-xs font-mono max-h-32 overflow-y-auto custom-scrollbar" title={displayValue}>
                                     {displayValue}
                                 </span>
                             </div>

@@ -3,6 +3,7 @@
 import { QueryProvider } from './QueryProvider';
 import { ThemeProvider } from './ThemeProvider';
 import { SessionProvider } from 'next-auth/react';
+import { SessionManager } from './SessionManager';
 import type { ReactNode } from 'react';
 
 interface ProvidersProps {
@@ -13,9 +14,11 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
-      <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem={false}>
-        <QueryProvider>{children}</QueryProvider>
-      </ThemeProvider>
+      <SessionManager>
+        <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem={false}>
+          <QueryProvider>{children}</QueryProvider>
+        </ThemeProvider>
+      </SessionManager>
     </SessionProvider>
   );
 }

@@ -70,15 +70,19 @@ export default function GraphScene({ data, onSelect }: GraphSceneProps) {
         const canvas = sceneInstance.getEngine().getRenderingCanvas();
 
         camera.attachControl(canvas, true);
-        camera.wheelPrecision = 50;
-        camera.lowerRadiusLimit = null;
-        camera.upperRadiusLimit = null;
-        camera.panningSensibility = 50;
-        camera.pinchPrecision = 50;
-        camera.wheelDeltaPercentage = 0.01;
-        camera.inertia = 0.9;
-        camera.angularSensibilityX = 1000;
-        camera.angularSensibilityY = 1000;
+        
+        // OPTIMIZATION: Faster and smoother navigation
+        camera.wheelPrecision = 10; // Lower = Faster zoom
+        camera.pinchPrecision = 10; // Lower = Faster pinch
+        camera.panningSensibility = 20; // Lower = Faster panning
+        camera.wheelDeltaPercentage = 0.05; // 5% zoom per scroll (was 1%) - Makes zoom much faster on large scales
+        
+        camera.lowerRadiusLimit = 0.1; // Allow getting very close
+        camera.upperRadiusLimit = 10000; // Allow seeing huge graphs
+        
+        camera.inertia = 0.9; // High inertia for fluid movement
+        camera.angularSensibilityX = 800; // Faster rotation
+        camera.angularSensibilityY = 800;
 
         // Prevent page zoom
         if (canvas) {

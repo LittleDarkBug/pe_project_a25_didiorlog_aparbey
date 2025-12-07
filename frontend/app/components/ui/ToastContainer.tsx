@@ -46,14 +46,14 @@ export default function ToastContainer() {
 function getToastStyles(type: ToastType): string {
     switch (type) {
         case 'success':
-            return 'bg-green-500 text-white';
+            return 'bg-green-500/90 backdrop-blur-md border border-green-400/30 text-white shadow-lg shadow-green-500/20';
         case 'error':
-            return 'bg-red-500 text-white';
+            return 'bg-red-500/90 backdrop-blur-md border border-red-400/30 text-white shadow-lg shadow-red-500/20';
         case 'warning':
-            return 'bg-yellow-500 text-white';
+            return 'bg-yellow-500/90 backdrop-blur-md border border-yellow-400/30 text-white shadow-lg shadow-yellow-500/20';
         case 'info':
-            return 'bg-blue-500 text-white';
+            return 'bg-blue-500/90 backdrop-blur-md border border-blue-400/30 text-white shadow-lg shadow-blue-500/20';
         default:
-            return 'bg-gray-800 text-white';
+            return 'bg-surface-800/90 backdrop-blur-md border border-surface-700/30 text-white shadow-lg';
     }
 }

@@ -7,6 +7,7 @@ import GraphScene from '@/app/components/3DandXRComponents/Graph/GraphScene';
 import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
 import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
+import LayoutSelector from '@/app/components/project/LayoutSelector';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -53,6 +54,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         if (updatedProject) {
             setProject(updatedProject);
         }
+    }, []);
+
+    const handleLayoutUpdate = useCallback((newGraphData: any) => {
+        setProject((prev: any) => ({
+            ...prev,
+            graph_data: newGraphData,
+            updated_at: new Date().toISOString()
+        }));
     }, []);
 
     if (isLoading) {
@@ -128,12 +137,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </svg>
             </button>
 
-            {/* Floating Project Info - Top Right */}
-            <div className="fixed right-4 top-4 z-20 rounded-xl bg-black/30 px-4 py-2 backdrop-blur-xl border border-white/10">
-                <p className="text-sm font-medium text-white">{project.name}</p>
-                <p className="text-xs text-gray-400">
-                    {project.metadata?.node_count || 0}N • {project.metadata?.edge_count || 0}L
-                </p>
+            {/* Top Right Controls */}
+            <div className="fixed right-4 top-4 z-20 flex flex-col gap-2 items-end">
+                <div className="rounded-xl bg-black/30 px-4 py-2 backdrop-blur-xl border border-white/10">
+                    <p className="text-sm font-medium text-white">{project.name}</p>
+                    <p className="text-xs text-gray-400">
+                        {project.metadata?.node_count || 0}N • {project.metadata?.edge_count || 0}L
+                    </p>
+                </div>
             </div>
 
             {/* Details Panel Overlay */}
@@ -185,7 +196,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         alert("Lien de partage copié ! (Simulation)");
                     }}
                     onEdit={() => setIsEditModalOpen(true)}
-                />
+                >
+                    <LayoutSelector 
+                        projectId={id} 
+                        onLayoutUpdate={handleLayoutUpdate} 
+                    />
+                </OverlayControls>
             </div>
         </div>
     );
