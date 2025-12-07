@@ -12,8 +12,8 @@ export const API_ENDPOINTS = {
   },
   USERS: {
     BASE: '/users/',
-    BY_ID: (id: string) => `/users/${id}/`,
-    PROFILE: '/users/profile/',
+    BY_ID: (id: string) => `/users/${id}`,
+    ME: '/users/me',
   },
   SCENES: {
     BASE: '/scenes/',

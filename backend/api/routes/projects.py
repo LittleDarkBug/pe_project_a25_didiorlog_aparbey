@@ -1,14 +1,30 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from pathlib import Path
 import uuid
+import json
+import shutil
+from datetime import datetime, timezone
 from beanie import PydanticObjectId
 
 from models.user import User
 from models.project import Project
 from api.dependencies import get_current_user
 from services.graph_service import process_graph_file
+import math
+
+def clean_nans(obj):
+    """Remplace les NaN et Inf par 0 pour la sérialisation JSON."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0.0
+        return obj
+    elif isinstance(obj, dict):
+        return {k: clean_nans(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nans(v) for v in obj]
+    return obj
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -17,49 +33,150 @@ class ProjectCreate(BaseModel):
     temp_file_id: str
     mapping: Dict[str, str]
 
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    temp_file_id: Optional[str] = None
+    mapping: Optional[Dict[str, str]] = None
+
 @router.post("/", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
 async def create_project(
-    project_in: ProjectCreate,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    is_public: bool = Form(False),
+    mapping: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Crée un nouveau projet à partir d'un fichier temporaire et d'un mapping.
+    Crée un nouveau projet à partir d'un fichier uploadé et d'un mapping.
     """
     upload_dir = Path("uploads")
-    # Sécurisation basique du chemin
-    safe_filename = Path(project_in.temp_file_id).name
-    file_path = upload_dir / safe_filename
+    upload_dir.mkdir(exist_ok=True)
     
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Fichier introuvable ou expiré")
-        
+    # Générer un nom de fichier unique pour éviter les collisions
+    file_extension = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+    file_path = upload_dir / unique_filename
+    
     try:
+        # Sauvegarder le fichier
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Parser le mapping
+        parsed_mapping = {}
+        if mapping:
+            try:
+                parsed_mapping = json.loads(mapping)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Format de mapping invalide")
+
         # 1. Traiter le graphe
         graph_data = await process_graph_file(
             file_path,
-            mapping=project_in.mapping
+            mapping=parsed_mapping
         )
         
         # 2. Créer le projet en BDD
         project = Project(
-            name=project_in.name,
+            name=name,
+            description=description,
             owner=current_user,
             graph_data=graph_data,  # On stocke tout le graphe (nodes/edges)
             metadata=graph_data.get("metadata", {}),
-            is_public=False
+            mapping=parsed_mapping,
+            source_file_path=str(file_path),
+            is_public=is_public
         )
         
         await project.insert()
         
-        return {
+        response_data = {
             "id": str(project.id),
             "name": project.name,
-            "stats": project.metadata,
+            "created_at": project.created_at,
+            "updated_at": project.updated_at,
+            "metadata": project.metadata or {},
+            "graph_data": project.graph_data or {},
+            "mapping": project.mapping or {},
             "message": "Projet créé avec succès"
         }
+        return clean_nans(response_data)
         
     except Exception as e:
+        # Clean up file if error
+        if file_path.exists():
+            file_path.unlink()
         raise HTTPException(status_code=500, detail=f"Erreur lors de la création du projet: {str(e)}")
+
+@router.put("/{project_id}", response_model=Dict[str, Any])
+async def update_project(
+    project_id: str,
+    project_update: ProjectUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Met à jour un projet (nom, fichier ou mapping)."""
+    try:
+        project = await Project.get(PydanticObjectId(project_id))
+    except:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if project.owner.ref.id != current_user.id:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Update name
+    if project_update.name:
+        project.name = project_update.name
+
+    # Handle file/mapping update
+    if project_update.temp_file_id or project_update.mapping:
+        file_path = None
+        
+        # Case 1: New file provided
+        if project_update.temp_file_id:
+            upload_dir = Path("uploads")
+            safe_filename = Path(project_update.temp_file_id).name
+            file_path = upload_dir / safe_filename
+            if not file_path.exists():
+                raise HTTPException(status_code=404, detail="Nouveau fichier introuvable")
+            project.source_file_path = str(file_path)
+            
+        # Case 2: No new file, use existing
+        elif project.source_file_path:
+            file_path = Path(project.source_file_path)
+            if not file_path.exists():
+                raise HTTPException(status_code=404, detail="Fichier source original introuvable")
+        
+        # If we have a file to process
+        if file_path and project_update.mapping:
+            try:
+                graph_data = await process_graph_file(
+                    file_path,
+                    mapping=project_update.mapping
+                )
+                project.graph_data = graph_data
+                project.metadata = graph_data.get("metadata", {})
+                project.mapping = project_update.mapping  # Save the new mapping
+                project.updated_at = datetime.now(timezone.utc)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du graphe: {str(e)}")
+
+    await project.save()
+    
+    response_data = {
+        "id": str(project.id),
+        "name": project.name,
+        "created_at": project.created_at,
+        "updated_at": project.updated_at,
+        "metadata": project.metadata or {},
+        "graph_data": project.graph_data or {},
+        "mapping": project.mapping or {},
+        "message": "Projet mis à jour avec succès"
+    }
+    return clean_nans(response_data)
 
 @router.get("/", response_model=List[Dict[str, Any]])
 async def list_projects(current_user: User = Depends(get_current_user)):
@@ -78,20 +195,6 @@ async def list_projects(current_user: User = Depends(get_current_user)):
         }
         for p in projects
     ]
-
-import math
-
-def clean_nans(obj):
-    """Remplace les NaN et Inf par 0 pour la sérialisation JSON."""
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return 0.0
-        return obj
-    elif isinstance(obj, dict):
-        return {k: clean_nans(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [clean_nans(v) for v in obj]
-    return obj
 
 @router.get("/{project_id}", response_model=Dict[str, Any])
 async def get_project(
@@ -115,8 +218,10 @@ async def get_project(
             "id": str(project.id),
             "name": project.name,
             "created_at": project.created_at,
+            "updated_at": project.updated_at,
             "metadata": project.metadata or {},
-            "graph_data": project.graph_data or {}
+            "graph_data": project.graph_data or {},
+            "mapping": project.mapping or {}
         }
         return clean_nans(response_data)
     except Exception as e:

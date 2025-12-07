@@ -4,54 +4,23 @@ interface DetailsPanelProps {
     data: any;
     type: 'node' | 'edge' | null;
     onClose: () => void;
-    mouseX?: number;
-    mouseY?: number;
 }
 
-export default function DetailsPanel({ data, type, onClose, mouseX, mouseY }: DetailsPanelProps) {
+export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps) {
     if (!data || !type) return null;
-
-    const calculatePosition = () => {
-        if (mouseX === undefined || mouseY === undefined) {
-            return { left: 'auto', right: '1rem', bottom: '6rem', top: 'auto' };
-        }
-
-        const offsetX = 20;
-        const offsetY = 20;
-        const panelWidth = 320;
-        const panelHeight = 400;
-
-        let left = mouseX + offsetX;
-        let top = mouseY + offsetY;
-
-        if (left + panelWidth > window.innerWidth) {
-            left = mouseX - panelWidth - offsetX;
-        }
-
-        if (top + panelHeight > window.innerHeight) {
-            top = window.innerHeight - panelHeight - 20;
-        }
-
-        if (left < 20) left = 20;
-        if (top < 20) top = 20;
-
-        return { left: `${left}px`, top: `${top}px`, right: 'auto', bottom: 'auto' };
-    };
-
-    const position = calculatePosition();
 
     return (
         <div
-            className="fixed z-50 w-80 max-h-[80vh] overflow-y-auto animate-fade-in rounded-xl border border-white/10 bg-black/90 p-6 backdrop-blur-xl shadow-2xl"
-            style={position}
+            className="fixed z-50 w-80 max-h-[60vh] overflow-y-auto animate-slide-up rounded-xl border border-surface-50/10 bg-surface-950/95 p-6 backdrop-blur-xl shadow-2xl"
+            style={{ right: '2rem', bottom: '6rem', left: 'auto', top: 'auto' }}
         >
-            <div className="mb-4 flex items-center justify-between sticky top-0 bg-black/90 pb-2">
-                <h3 className="text-lg font-bold text-white">
+            <div className="mb-4 flex items-center justify-between sticky top-0 bg-surface-950/95 pb-2 z-10 border-b border-surface-50/10">
+                <h3 className={`text-lg font-bold ${type === 'node' ? 'text-blue-400' : 'text-purple-400'}`}>
                     {type === 'node' ? 'Détails du Nœud' : 'Détails du Lien'}
                 </h3>
                 <button
                     onClick={onClose}
-                    className="rounded-full p-1 text-gray-400 hover:bg-white/10 hover:text-white cursor-pointer"
+                    className="rounded-full p-1 text-surface-400 hover:bg-surface-50/10 hover:text-surface-50 cursor-pointer transition-colors"
                 >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -60,15 +29,41 @@ export default function DetailsPanel({ data, type, onClose, mouseX, mouseY }: De
             </div>
 
             <div className="space-y-4">
-                <div>
-                    <p className="text-sm text-gray-400">Identifiant</p>
-                    <p className="font-mono text-white break-words">{data.id || 'N/A'}</p>
-                </div>
+                {type === 'node' ? (
+                    // Node specific view
+                    <>
+                        <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
+                            <p className="text-xs text-blue-400 font-semibold mb-1">Identifiant</p>
+                            <p className="font-mono text-surface-50 break-words text-lg">{data.id || 'N/A'}</p>
+                        </div>
+                        
+                        {data.label && (
+                            <div>
+                                <p className="text-sm text-surface-400">Label</p>
+                                <p className="text-surface-50 font-medium">{data.label}</p>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    // Edge specific view
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 p-3">
+                            <p className="text-xs text-purple-400 font-semibold mb-1">Source</p>
+                            <p className="text-sm text-surface-50 font-mono break-words">{data.source}</p>
+                        </div>
+                        <div className="rounded-lg bg-gradient-to-br from-pink-500/10 to-pink-600/5 border border-pink-500/20 p-3">
+                            <p className="text-xs text-pink-400 font-semibold mb-1">Cible</p>
+                            <p className="text-sm text-surface-50 font-mono break-words">{data.target}</p>
+                        </div>
+                    </div>
+                )}
 
-                <div className="space-y-3">
-                    <p className="text-sm font-semibold text-gray-300">Propriétés</p>
+                <div className="space-y-3 pt-2">
+                    <p className="text-sm font-semibold text-surface-300 border-b border-surface-50/10 pb-1">
+                        Propriétés {type === 'node' ? 'du Nœud' : 'du Lien'}
+                    </p>
                     {Object.entries(data).map(([key, value]) => {
-                        if (['id', 'x', 'y', 'z', 'source', 'target'].includes(key)) return null;
+                        if (['id', 'x', 'y', 'z', 'source', 'target', 'label'].includes(key)) return null;
 
                         // Try to parse JSON strings
                         let parsedValue = value;
@@ -84,15 +79,15 @@ export default function DetailsPanel({ data, type, onClose, mouseX, mouseY }: De
                         if (typeof parsedValue === 'object' && parsedValue !== null && !Array.isArray(parsedValue)) {
                             return (
                                 <div key={key} className="space-y-2">
-                                    <p className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                                        <span className="inline-block w-1 h-4 bg-blue-400 rounded"></span>
+                                    <p className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${type === 'node' ? 'text-blue-400' : 'text-purple-400'}`}>
+                                        <span className={`inline-block w-1 h-4 rounded ${type === 'node' ? 'bg-blue-400' : 'bg-purple-400'}`}></span>
                                         {key}
                                     </p>
-                                    <div className="ml-3 space-y-1.5 border-l-2 border-blue-500/30 pl-3">
+                                    <div className={`ml-3 space-y-1.5 border-l-2 pl-3 ${type === 'node' ? 'border-blue-500/30' : 'border-purple-500/30'}`}>
                                         {Object.entries(parsedValue).map(([nestedKey, nestedValue]) => (
                                             <div key={`${key}.${nestedKey}`} className="text-sm">
-                                                <span className="text-gray-400">{nestedKey}:</span>{' '}
-                                                <span className="text-white font-medium">
+                                                <span className="text-surface-400">{nestedKey}:</span>{' '}
+                                                <span className="text-surface-50 font-medium">
                                                     {typeof nestedValue === 'object'
                                                         ? JSON.stringify(nestedValue)
                                                         : String(nestedValue)}
@@ -108,13 +103,13 @@ export default function DetailsPanel({ data, type, onClose, mouseX, mouseY }: De
                         if (Array.isArray(parsedValue)) {
                             return (
                                 <div key={key} className="space-y-2">
-                                    <p className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-                                        <span className="inline-block w-1 h-4 bg-purple-400 rounded"></span>
+                                    <p className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${type === 'node' ? 'text-green-400' : 'text-pink-400'}`}>
+                                        <span className={`inline-block w-1 h-4 rounded ${type === 'node' ? 'bg-green-400' : 'bg-pink-400'}`}></span>
                                         {key}
                                     </p>
                                     <div className="ml-3 space-y-1">
                                         {parsedValue.map((item, idx) => (
-                                            <div key={`${key}.${idx}`} className="text-sm text-gray-300">
+                                            <div key={`${key}.${idx}`} className="text-sm text-surface-300">
                                                 • {typeof item === 'object' ? JSON.stringify(item) : String(item)}
                                             </div>
                                         ))}
@@ -127,28 +122,15 @@ export default function DetailsPanel({ data, type, onClose, mouseX, mouseY }: De
                         const displayValue = (parsedValue === null || parsedValue === undefined) ? 'N/A' : String(parsedValue);
 
                         return (
-                            <div key={key} className="flex justify-between gap-2 py-2 border-b border-white/5 text-sm">
-                                <span className="text-gray-400 font-medium min-w-[80px]">{key}:</span>
-                                <span className="text-white text-right break-words flex-1" title={displayValue}>
+                            <div key={key} className="flex justify-between gap-2 py-2 border-b border-surface-50/5 text-sm">
+                                <span className="text-surface-400 font-medium min-w-[80px]">{key}:</span>
+                                <span className="text-surface-50 text-right break-words flex-1" title={displayValue}>
                                     {displayValue}
                                 </span>
                             </div>
                         );
                     })}
                 </div>
-
-                {type === 'edge' && (
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                        <div className="rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 p-3">
-                            <p className="text-xs text-blue-400 font-semibold mb-1">Source</p>
-                            <p className="text-sm text-white font-mono break-words">{data.source}</p>
-                        </div>
-                        <div className="rounded-lg bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 p-3">
-                            <p className="text-xs text-green-400 font-semibold mb-1">Cible</p>
-                            <p className="text-sm text-white font-mono break-words">{data.target}</p>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

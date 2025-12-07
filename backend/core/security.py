@@ -37,6 +37,11 @@ def hash_password(password: str) -> str:
     return ph.hash(password)
 
 
+def get_password_hash(password: str) -> str:
+    """Alias pour hash_password pour compatibilité."""
+    return hash_password(password)
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Vérifie qu'un mot de passe correspond à son hash Argon2id.

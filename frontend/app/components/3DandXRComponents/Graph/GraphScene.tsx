@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import {
     Vector3,
     Color3,
@@ -10,7 +10,8 @@ import {
     ArcRotateCamera,
     HemisphericLight,
     Mesh,
-    GlowLayer
+    GlowLayer,
+    InstancedMesh
 } from '@babylonjs/core';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
@@ -38,32 +39,40 @@ interface GraphData {
 
 interface GraphSceneProps {
     data: GraphData;
-    onSelect?: (data: any, type: 'node' | 'edge' | null, x?: number, y?: number) => void;
+    onSelect?: (data: any, type: 'node' | 'edge' | null) => void;
 }
 
 export default function GraphScene({ data, onSelect }: GraphSceneProps) {
-    const sceneRef = useRef<Scene | null>(null);
+    const [scene, setScene] = useState<Scene | null>(null);
     const xrHelperRef = useRef<any>(null);
     const detailsPanelRef = useRef(new VRDetailsPanel());
+    const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
 
     const { createVRMenu } = useVRMenu();
     const { setupLocomotion } = useVRLocomotion();
+    
+    // Use refs for VR hooks to keep onSceneReady stable
+    const vrUtilsRef = useRef({ createVRMenu, setupLocomotion });
+    useEffect(() => {
+        vrUtilsRef.current = { createVRMenu, setupLocomotion };
+    });
+
     const graphRenderer = useRef(new GraphRenderer());
 
-    const onSceneReady = async (scene: Scene) => {
-        sceneRef.current = scene;
+    const onSceneReady = useCallback(async (sceneInstance: Scene) => {
+        setScene(sceneInstance);
 
         // Scene setup
-        scene.clearColor = new Color3(0.01, 0.01, 0.03).toColor4();
+        sceneInstance.clearColor = new Color3(0.01, 0.01, 0.03).toColor4();
 
         // Camera setup
-        const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 100, Vector3.Zero(), scene);
-        const canvas = scene.getEngine().getRenderingCanvas();
+        const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 100, Vector3.Zero(), sceneInstance);
+        const canvas = sceneInstance.getEngine().getRenderingCanvas();
 
         camera.attachControl(canvas, true);
         camera.wheelPrecision = 50;
-        camera.lowerRadiusLimit = 10;
-        camera.upperRadiusLimit = 500;
+        camera.lowerRadiusLimit = null;
+        camera.upperRadiusLimit = null;
         camera.panningSensibility = 50;
         camera.pinchPrecision = 50;
         camera.wheelDeltaPercentage = 0.01;
@@ -89,32 +98,32 @@ export default function GraphScene({ data, onSelect }: GraphSceneProps) {
         }
 
         // Lighting
-        const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
+        const light = new HemisphericLight("light", new Vector3(0, 1, 0), sceneInstance);
         light.intensity = 0.4;
         light.diffuse = new Color3(0.9, 0.9, 1);
         light.specular = new Color3(1, 1, 1);
         light.groundColor = new Color3(0.05, 0.05, 0.1);
 
         const { DirectionalLight } = await import('@babylonjs/core');
-        const dirLight = new DirectionalLight("dirLight", new Vector3(-1, -2, -1), scene);
+        const dirLight = new DirectionalLight("dirLight", new Vector3(-1, -2, -1), sceneInstance);
         dirLight.intensity = 0.2;
         dirLight.diffuse = new Color3(0.8, 0.8, 0.9);
 
         // Space background
-        const spaceSphere = MeshBuilder.CreateSphere("spaceSphere", { diameter: 1000 }, scene);
-        const spaceMat = new StandardMaterial("spaceMat", scene);
+        const spaceSphere = MeshBuilder.CreateSphere("spaceSphere", { diameter: 1000 }, sceneInstance);
+        const spaceMat = new StandardMaterial("spaceMat", sceneInstance);
         spaceMat.backFaceCulling = false;
         spaceMat.disableLighting = true;
         spaceMat.emissiveColor = new Color3(0.01, 0.02, 0.05);
         spaceSphere.material = spaceMat;
 
         // Stars
-        const starMat = new StandardMaterial("starMat", scene);
+        const starMat = new StandardMaterial("starMat", sceneInstance);
         starMat.emissiveColor = new Color3(0.8, 0.8, 1);
         starMat.disableLighting = true;
 
         for (let i = 0; i < 200; i++) {
-            const star = MeshBuilder.CreateSphere(`star_${i}`, { diameter: 0.3 }, scene);
+            const star = MeshBuilder.CreateSphere(`star_${i}`, { diameter: 0.3 }, sceneInstance);
             const radius = 300 + Math.random() * 400;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.random() * Math.PI;
@@ -131,31 +140,12 @@ export default function GraphScene({ data, onSelect }: GraphSceneProps) {
             star.material = starMatClone;
         }
 
-        const gl = new GlowLayer("glow", scene);
+        const gl = new GlowLayer("glow", sceneInstance);
         gl.intensity = 0.5;
-
-        // Render graph
-        const nodeMeshes = new Map<string, Mesh>();
-        graphRenderer.current.createNodes(
-            data,
-            scene,
-            nodeMeshes,
-            onSelect,
-            (nodeData, type) => detailsPanelRef.current.create(scene, nodeData, type),
-            xrHelperRef
-        );
-        graphRenderer.current.createEdges(
-            data,
-            scene,
-            nodeMeshes,
-            onSelect,
-            (edgeData, type) => detailsPanelRef.current.create(scene, edgeData, type),
-            xrHelperRef
-        );
 
         // WebXR Setup
         try {
-            const xr = await scene.createDefaultXRExperienceAsync({
+            const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [],
                 disableTeleportation: true,
                 disableHandTracking: true,  // Prevent hand tracking asset loading
@@ -167,20 +157,54 @@ export default function GraphScene({ data, onSelect }: GraphSceneProps) {
             xrHelperRef.current = xr;
 
             const featuresManager = xr.baseExperience.featuresManager;
-            setupLocomotion(featuresManager, xr);
+            // Use ref to access latest setupLocomotion without adding dependency
+            vrUtilsRef.current.setupLocomotion(featuresManager, xr);
 
             xr.baseExperience.onStateChangedObservable.add((state) => {
                 if (state === 2) {
                     console.log("VR started. Camera:", xr.baseExperience.camera?.position);
-                    createVRMenu(scene, xr);
-                    graphRenderer.current.setupVRInteractions(nodeMeshes, data.nodes.map(n => n.id));
+                    // Use ref to access latest createVRMenu
+                    vrUtilsRef.current.createVRMenu(sceneInstance, xr);
+                    // VR interactions will be setup in useEffect
                 }
             });
 
         } catch (e) {
             console.log("WebXR not supported", e);
         }
-    };
+    }, []); // Empty dependency array ensures stability
+
+    // Handle graph data updates
+    useEffect(() => {
+        if (!scene || !data) return;
+
+        // Clean up old graph
+        graphRenderer.current.disposeGraph(nodeMeshesRef.current, scene);
+
+        // Render graph
+        graphRenderer.current.createNodes(
+            data,
+            scene,
+            nodeMeshesRef.current,
+            onSelect,
+            (nodeData, type) => detailsPanelRef.current.create(scene, nodeData, type),
+            xrHelperRef
+        );
+        graphRenderer.current.createEdges(
+            data,
+            scene,
+            nodeMeshesRef.current,
+            onSelect,
+            (edgeData, type) => detailsPanelRef.current.create(scene, edgeData, type),
+            xrHelperRef
+        );
+
+        // Setup VR interactions if VR is active
+        if (xrHelperRef.current && xrHelperRef.current.baseExperience.state === 2) {
+            graphRenderer.current.setupVRInteractions(nodeMeshesRef.current, data.nodes.map(n => n.id));
+        }
+
+    }, [scene, data, onSelect]);
 
     return (
         <div className="h-full w-full overflow-hidden rounded-xl bg-black/20" style={{ touchAction: 'none' }}>

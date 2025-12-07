@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/app/store/useAuthStore';
+import { useAuth } from '@/app/hooks/useAuth';
+import { Card } from '@/app/components/ui/Card';
+import { Input } from '@/app/components/ui/Input';
+import { Button } from '@/app/components/ui/Button';
+import { Mail, Lock, User, ArrowRight, UserPlus } from 'lucide-react';
 import { useToastStore } from '@/app/store/useToastStore';
 
 export default function RegisterPage() {
-    const router = useRouter();
-    const { register, isLoading } = useAuthStore();
+    const { register } = useAuth();
     const { addToast } = useToastStore();
-
+    
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -30,132 +32,106 @@ export default function RegisterPage() {
             return;
         }
 
-        try {
-            await register({ email, password, full_name: fullName });
-            addToast('Compte créé avec succès ! Veuillez vous connecter.', 'success');
-            router.push('/login');
-        } catch (error: any) {
-            addToast(error.response?.data?.detail || "Erreur d'inscription", 'error');
-        }
+        register.mutate({ email, password, full_name: fullName });
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-800 p-4">
-            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white/10 p-8 shadow-2xl backdrop-blur-xl border border-white/20">
+        <div className="flex min-h-screen items-center justify-center p-4 relative overflow-hidden">
+            {/* Background Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary-500/20 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent-500/20 rounded-full blur-[120px]" />
+            </div>
+
+            <Card className="w-full max-w-md p-8 glass-panel border-surface-50/10">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold text-white">Créer un compte</h1>
-                    <p className="mt-2 text-gray-400">Rejoignez la communauté GraphXR</p>
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
+                        <UserPlus className="h-6 w-6" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-surface-50 mb-2">Créer un compte</h1>
+                    <p className="text-surface-400">Rejoignez la communauté GraphXR</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label htmlFor="fullName" className="block text-sm font-medium text-gray-300">
-                            Nom complet
-                        </label>
+                    <Input
+                        label="Nom complet"
+                        id="fullName"
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Jean Dupont"
+                        leftIcon={<User className="h-5 w-5" />}
+                    />
+
+                    <Input
+                        label="Email"
+                        id="email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="vous@exemple.com"
+                        leftIcon={<Mail className="h-5 w-5" />}
+                    />
+
+                    <Input
+                        label="Mot de passe"
+                        id="password"
+                        type="password"
+                        required
+                        minLength={8}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        leftIcon={<Lock className="h-5 w-5" />}
+                    />
+
+                    <Input
+                        label="Confirmer le mot de passe"
+                        id="confirmPassword"
+                        type="password"
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        leftIcon={<Lock className="h-5 w-5" />}
+                    />
+
+                    <div className="flex items-center">
                         <input
-                            id="fullName"
-                            type="text"
-                            required
-                            value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border border-white/10 bg-black/50 px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                            placeholder="Jean Dupont"
+                            id="gdpr"
+                            type="checkbox"
+                            checked={gdprConsent}
+                            onChange={(e) => setGdprConsent(e.target.checked)}
+                            className="h-4 w-4 rounded border-surface-600 bg-surface-950/50 text-primary-500 focus:ring-primary-500"
                         />
-                    </div>
-
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                            Email
+                        <label htmlFor="gdpr" className="ml-2 block text-sm text-surface-400">
+                            J'accepte la{' '}
+                            <Link href="/privacy" className="text-primary-400 hover:text-primary-300">
+                                politique de confidentialité
+                            </Link>
                         </label>
-                        <input
-                            id="email"
-                            type="email"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border border-white/10 bg-black/50 px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                            placeholder="vous@exemple.com"
-                        />
                     </div>
 
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                            Mot de passe
-                        </label>
-                        <input
-                            id="password"
-                            type="password"
-                            required
-                            minLength={8}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border border-white/10 bg-black/50 px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                            placeholder="••••••••"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">
-                            Confirmer le mot de passe
-                        </label>
-                        <input
-                            id="confirmPassword"
-                            type="password"
-                            required
-                            minLength={8}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border border-white/10 bg-black/50 px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                            placeholder="••••••••"
-                        />
-                    </div>
-
-                    <div className="flex items-start">
-                        <div className="flex h-5 items-center">
-                            <input
-                                id="gdpr"
-                                name="gdpr"
-                                type="checkbox"
-                                required
-                                checked={gdprConsent}
-                                onChange={(e) => setGdprConsent(e.target.checked)}
-                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-black/50 border-white/10"
-                            />
-                        </div>
-                        <div className="ml-3 text-sm">
-                            <label htmlFor="gdpr" className="font-medium text-gray-300">
-                                J'accepte les <Link href="/terms" className="text-blue-400 hover:underline">Conditions d'utilisation</Link> et la <Link href="/privacy" className="text-blue-400 hover:underline">Politique de confidentialité</Link>
-                            </label>
-                            <p className="text-gray-500">Vos données sont traitées conformément au RGPD.</p>
-                        </div>
-                    </div>
-
-                    <button
+                    <Button
                         type="submit"
-                        disabled={isLoading}
-                        className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 font-semibold text-white shadow-lg transition-all hover:from-blue-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                        isLoading={register.isPending}
+                        className="w-full"
+                        size="lg"
+                        rightIcon={<ArrowRight className="h-5 w-5" />}
                     >
-                        {isLoading ? (
-                            <span className="flex items-center justify-center">
-                                <svg className="mr-2 h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                Création en cours...
-                            </span>
-                        ) : (
-                            "S'inscrire"
-                        )}
-                    </button>
+                        S'inscrire
+                    </Button>
                 </form>
 
-                <div className="mt-8 text-center text-sm text-gray-400">
+                <div className="mt-8 text-center text-sm text-surface-400">
                     Déjà un compte ?{' '}
-                    <Link href="/login" className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">
+                    <Link href="/login" className="font-semibold text-primary-400 hover:text-primary-300 transition-colors">
                         Se connecter
                     </Link>
                 </div>
-            </div>
+            </Card>
         </div>
     );
 }

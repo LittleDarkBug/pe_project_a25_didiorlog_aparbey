@@ -4,9 +4,10 @@ interface OverlayControlsProps {
     onResetCamera: () => void;
     onToggleVR: () => void;
     onShare: () => void;
+    onEdit: () => void;
 }
 
-export default function OverlayControls({ onResetCamera, onToggleVR, onShare }: OverlayControlsProps) {
+export default function OverlayControls({ onResetCamera, onToggleVR, onShare, onEdit }: OverlayControlsProps) {
     return (
         <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl">
             <button
@@ -31,6 +32,19 @@ export default function OverlayControls({ onResetCamera, onToggleVR, onShare }: 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 <span className="hidden sm:inline">VR</span>
+            </button>
+
+            <div className="w-px bg-white/10"></div>
+
+            <button
+                onClick={onEdit}
+                className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-orange-500/20 hover:text-white hover:scale-105 cursor-pointer"
+                title="Éditer la visualisation"
+            >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="hidden sm:inline">Éditer</span>
             </button>
 
             <div className="w-px bg-white/10"></div>

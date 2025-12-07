@@ -1,235 +1,545 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import StatsCard from './StatsCard';
-import { filesService, AnalysisResult } from '@/app/services/filesService';
-import { projectsService } from '@/app/services/projectsService';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { apiClient } from '@/app/lib/apiClient';
+import { useRouter } from 'next/navigation';
+import { useToastStore } from '@/app/store/useToastStore';
 
 interface ImportWizardProps {
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (project?: any) => void;
 }
 
-type Step = 'upload' | 'mapping' | 'details';
+type Step = 'upload' | 'mapping' | 'details' | 'review';
+
+interface FileAnalysis {
+    columns: string[];
+    preview: any[];
+    row_count: number;
+    suggested_mapping?: {
+        source: string;
+        target: string;
+        weight?: string;
+    };
+}
 
 export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) {
-    const [step, setStep] = useState<Step>('upload');
+    const router = useRouter();
+    const { token } = useAuthStore();
+    const { addToast } = useToastStore();
+    
+    const [currentStep, setCurrentStep] = useState<Step>('upload');
     const [file, setFile] = useState<File | null>(null);
-    const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-    const [mapping, setMapping] = useState<Record<string, string>>({
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysis, setAnalysis] = useState<FileAnalysis | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [mapping, setMapping] = useState({
         source: '',
         target: '',
-        weight: '',
+        weight: ''
     });
-    const [projectName, setProjectName] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+
+    const [details, setDetails] = useState({
+        name: '',
+        description: '',
+        isPublic: false
+    });
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const uploadedFile = acceptedFiles[0];
-        if (!uploadedFile) return;
+        const selectedFile = acceptedFiles[0];
+        if (!selectedFile) return;
 
-        setFile(uploadedFile);
-        setIsLoading(true);
-        setError(null);
+        setFile(selectedFile);
+        setDetails(prev => ({ ...prev, name: selectedFile.name.split('.')[0] }));
+        
+        // Auto-analyze for CSV
+        if (selectedFile.name.endsWith('.csv')) {
+            setIsAnalyzing(true);
+            const formData = new FormData();
+            formData.append('file', selectedFile);
 
-        try {
-            const data = await filesService.analyze(uploadedFile);
-            console.log('Analyse reçue:', data);
-
-            // Vérifier si c'est un format supporté
-            if (data.type === 'json_object') {
-                setError(data.message || 'Format JSON non compatible. Utilisez CSV ou format node-link (nodes/edges).');
-                setIsLoading(false);
-                return;
+            try {
+                const data = await apiClient.post<FileAnalysis>('/files/analyze', formData, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                setAnalysis(data);
+                
+                if (data.suggested_mapping) {
+                    setMapping({
+                        source: data.suggested_mapping.source || '',
+                        target: data.suggested_mapping.target || '',
+                        weight: data.suggested_mapping.weight || ''
+                    });
+                    addToast('Mapping suggéré appliqué automatiquement', 'info');
+                }
+                
+                // Auto-advance if analysis is successful
+                setTimeout(() => setCurrentStep('mapping'), 500);
+            } catch (error) {
+                console.error('Analysis error:', error);
+                addToast('Erreur lors de l\'analyse du fichier', 'error');
+            } finally {
+                setIsAnalyzing(false);
             }
-
-            setAnalysis(data);
-            setMapping(prev => ({ ...prev, ...data.suggestions }));
-            setStep('mapping');
-        } catch (err) {
-            setError('Erreur lors de l\'analyse du fichier. Vérifiez le format.');
-            console.error(err);
-        } finally {
-            setIsLoading(false);
+        } else {
+            // For JSON/GEXF, skip mapping
+            setTimeout(() => setCurrentStep('details'), 500);
         }
-    }, []);
+    }, [token, addToast]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'text/csv': ['.csv'], 'application/json': ['.json'] },
+        accept: {
+            'text/csv': ['.csv'],
+            'application/json': ['.json'],
+            'application/xml': ['.gexf', '.xml']
+        },
         maxFiles: 1
     });
 
-    const handleMappingSubmit = () => {
-        if (!mapping.source || !mapping.target) {
-            setError('Les champs Source et Target sont obligatoires.');
-            return;
+    const handleCreate = async () => {
+        if (!file) return;
+        setIsSubmitting(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('name', details.name);
+            formData.append('description', details.description);
+            formData.append('is_public', String(details.isPublic));
+            
+            // Toujours envoyer le mapping, même si vide ou non-CSV
+            formData.append('mapping', JSON.stringify(mapping));
+
+            const project: any = await apiClient.post('/projects/', formData, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            addToast('Projet créé avec succès', 'success');
+            onSuccess(project);
+            onClose();
+        } catch (error) {
+            console.error('Creation error:', error);
+            addToast('Erreur lors de la création du projet', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
-        setStep('details');
-        setError(null);
     };
 
-    const handleCreateProject = async () => {
-        if (!projectName.trim()) {
-            setError('Le nom du projet est requis.');
-            return;
+    const steps: { id: Step; label: string; icon: any }[] = [
+        { 
+            id: 'upload', 
+            label: 'Fichier',
+            icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+            )
+        },
+        { 
+            id: 'mapping', 
+            label: 'Mapping',
+            icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+            )
+        },
+        { 
+            id: 'details', 
+            label: 'Détails',
+            icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            )
+        },
+        { 
+            id: 'review', 
+            label: 'Validation',
+            icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            )
         }
-        if (!analysis?.temp_file_id) {
-            setError('Erreur: Fichier manquant.');
-            return;
-        }
+    ];
 
-        setIsLoading(true);
-        try {
-            await projectsService.create({
-                name: projectName,
-                temp_file_id: analysis.temp_file_id,
-                mapping
-            });
-            onSuccess();
-            onClose();
-        } catch (err) {
-            setError('Erreur lors de la création du projet.');
-        } finally {
-            setIsLoading(false);
+    const canProceed = () => {
+        switch (currentStep) {
+            case 'upload': return !!file;
+            case 'mapping': return !file?.name.endsWith('.csv') || (!!mapping.source && !!mapping.target);
+            case 'details': return !!details.name;
+            default: return true;
+        }
+    };
+
+    const nextStep = () => {
+        const currentIndex = steps.findIndex(s => s.id === currentStep);
+        if (currentIndex < steps.length - 1) {
+            // Skip mapping for non-CSV
+            if (currentStep === 'upload' && !file?.name.endsWith('.csv')) {
+                setCurrentStep('details');
+            } else {
+                setCurrentStep(steps[currentIndex + 1].id);
+            }
+        }
+    };
+
+    const prevStep = () => {
+        const currentIndex = steps.findIndex(s => s.id === currentStep);
+        if (currentIndex > 0) {
+            if (currentStep === 'details' && !file?.name.endsWith('.csv')) {
+                setCurrentStep('upload');
+            } else {
+                setCurrentStep(steps[currentIndex - 1].id);
+            }
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-white">Nouveau Projet</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="p-6">
-                    <div className="mb-8 flex items-center justify-center gap-4">
-                        <div className={`h-2 w-20 rounded-full ${step === 'upload' ? 'bg-blue-500' : 'bg-blue-900'}`} />
-                        <div className={`h-2 w-20 rounded-full ${step === 'mapping' ? 'bg-blue-500' : 'bg-gray-800'}`} />
-                        <div className={`h-2 w-20 rounded-full ${step === 'details' ? 'bg-blue-500' : 'bg-gray-800'}`} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-4xl overflow-hidden rounded-3xl bg-surface-900 shadow-2xl border border-surface-700 flex flex-col max-h-[90vh]"
+            >
+                {/* Header */}
+                <div className="border-b border-surface-700 bg-surface-800/50 p-6 backdrop-blur-md">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold text-surface-50">Nouveau Projet</h2>
+                            <p className="text-surface-400 text-sm mt-1">Importez et configurez vos données de graphe</p>
+                        </div>
+                        <button 
+                            onClick={onClose}
+                            className="rounded-full p-2 text-surface-400 hover:bg-surface-700 hover:text-surface-50 transition-colors"
+                        >
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
 
-                    {error && (
-                        <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-sm text-red-400 border border-red-500/20">
-                            {error}
-                        </div>
-                    )}
-
-                    {step === 'upload' && (
-                        <div {...getRootProps()} className={`flex h-64 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all ${isDragActive ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'}`}>
-                            <input {...getInputProps()} />
-                            {isLoading ? (
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-                                    <p className="text-sm text-gray-400">Analyse du fichier...</p>
+                    {/* Stepper */}
+                    <div className="mt-8 flex items-center justify-between px-4">
+                        {steps.map((step, index) => {
+                            const isActive = step.id === currentStep;
+                            const isCompleted = steps.findIndex(s => s.id === currentStep) > index;
+                            
+                            return (
+                                <div key={step.id} className="flex flex-col items-center relative z-10">
+                                    <div 
+                                        className={`
+                                            flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300
+                                            ${isActive || isCompleted 
+                                                ? 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+                                                : 'border-surface-600 bg-surface-800 text-surface-400'
+                                            }
+                                        `}
+                                    >
+                                        {isCompleted ? (
+                                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : step.icon}
+                                    </div>
+                                    <span className={`mt-2 text-xs font-medium transition-colors duration-300 ${isActive ? 'text-blue-400' : 'text-surface-500'}`}>
+                                        {step.label}
+                                    </span>
+                                    
+                                    {/* Connector Line */}
+                                    {index < steps.length - 1 && (
+                                        <div className="absolute left-1/2 top-5 -z-10 h-[2px] w-[calc(100vw/4-2rem)] max-w-[180px] -translate-y-1/2 bg-surface-700">
+                                            <div 
+                                                className="h-full bg-blue-500 transition-all duration-500"
+                                                style={{ width: isCompleted ? '100%' : '0%' }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-8">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={currentStep}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.2 }}
+                            className="h-full"
+                        >
+                            {currentStep === 'upload' && (
+                                <div className="flex h-full flex-col items-center justify-center space-y-6">
+                                    <div
+                                        {...getRootProps()}
+                                        className={`
+                                            group relative flex w-full max-w-2xl flex-col items-center justify-center rounded-3xl border-2 border-dashed p-16 transition-all duration-300 cursor-pointer
+                                            ${isDragActive 
+                                                ? 'border-blue-500 bg-blue-500/10 scale-[1.02]' 
+                                                : 'border-surface-700 bg-surface-800/30 hover:border-blue-400/50 hover:bg-surface-800/50'
+                                            }
+                                        `}
+                                    >
+                                        <input {...getInputProps()} />
+                                        <div className={`
+                                            mb-6 rounded-2xl p-6 transition-all duration-300 shadow-xl
+                                            ${isDragActive ? 'bg-blue-500 text-white scale-110' : 'bg-surface-800 text-surface-400 group-hover:bg-surface-700 group-hover:text-blue-400'}
+                                        `}>
+                                            <svg className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-surface-50 mb-2">
+                                            {isDragActive ? "Déposez le fichier ici" : "Glissez-déposez votre fichier"}
+                                        </h3>
+                                        <p className="text-surface-400 text-center max-w-md">
+                                            Supporte les fichiers CSV (listes d'arêtes) et JSON (format node-link).
+                                            <br/>Taille max: 50MB
+                                        </p>
+                                    </div>
+                                    
+                                    {isAnalyzing && (
+                                        <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-3 rounded-full">
+                                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                            <span className="font-medium">Analyse du fichier en cours...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentStep === 'mapping' && analysis && (
+                                <div className="space-y-8">
+                                    <div className="text-center mb-8">
+                                        <h3 className="text-xl font-bold text-surface-50">Configuration du Mapping</h3>
+                                        <p className="text-surface-400">Associez les colonnes de votre CSV aux propriétés du graphe</p>
+                                    </div>
+
+                                    <div className="grid gap-6 md:grid-cols-3">
+                                        {/* Source Card */}
+                                        <div className="group rounded-2xl bg-surface-800/30 p-6 border border-surface-700 hover:border-blue-500/50 transition-all hover:shadow-lg hover:shadow-blue-500/10">
+                                            <div className="flex items-center gap-3 mb-4 text-blue-400">
+                                                <div className="p-2 rounded-lg bg-blue-500/10">
+                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                    </svg>
+                                                </div>
+                                                <label className="font-bold text-lg">Source *</label>
+                                            </div>
+                                            <select
+                                                value={mapping.source}
+                                                onChange={(e) => setMapping(prev => ({ ...prev, source: e.target.value }))}
+                                                className="w-full rounded-xl border border-surface-600 bg-surface-900 px-4 py-3 text-surface-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors cursor-pointer hover:bg-surface-800"
+                                            >
+                                                <option value="">Sélectionner...</option>
+                                                {analysis.columns.map(col => (
+                                                    <option key={col} value={col}>{col}</option>
+                                                ))}
+                                            </select>
+                                            <p className="mt-3 text-sm text-surface-500">Colonne contenant l'identifiant du nœud de départ</p>
+                                        </div>
+
+                                        {/* Target Card */}
+                                        <div className="group rounded-2xl bg-surface-800/30 p-6 border border-surface-700 hover:border-purple-500/50 transition-all hover:shadow-lg hover:shadow-purple-500/10">
+                                            <div className="flex items-center gap-3 mb-4 text-purple-400">
+                                                <div className="p-2 rounded-lg bg-purple-500/10">
+                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                                    </svg>
+                                                </div>
+                                                <label className="font-bold text-lg">Cible *</label>
+                                            </div>
+                                            <select
+                                                value={mapping.target}
+                                                onChange={(e) => setMapping(prev => ({ ...prev, target: e.target.value }))}
+                                                className="w-full rounded-xl border border-surface-600 bg-surface-900 px-4 py-3 text-surface-50 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-colors cursor-pointer hover:bg-surface-800"
+                                            >
+                                                <option value="">Sélectionner...</option>
+                                                {analysis.columns.map(col => (
+                                                    <option key={col} value={col}>{col}</option>
+                                                ))}
+                                            </select>
+                                            <p className="mt-3 text-sm text-surface-500">Colonne contenant l'identifiant du nœud d'arrivée</p>
+                                        </div>
+
+                                        {/* Weight Card */}
+                                        <div className="group rounded-2xl bg-surface-800/30 p-6 border border-surface-700 hover:border-green-500/50 transition-all hover:shadow-lg hover:shadow-green-500/10">
+                                            <div className="flex items-center gap-3 mb-4 text-green-400">
+                                                <div className="p-2 rounded-lg bg-green-500/10">
+                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                                                    </svg>
+                                                </div>
+                                                <label className="font-bold text-lg">Poids</label>
+                                            </div>
+                                            <select
+                                                value={mapping.weight}
+                                                onChange={(e) => setMapping(prev => ({ ...prev, weight: e.target.value }))}
+                                                className="w-full rounded-xl border border-surface-600 bg-surface-900 px-4 py-3 text-surface-50 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none transition-colors cursor-pointer hover:bg-surface-800"
+                                            >
+                                                <option value="">Aucun (Défaut: 1)</option>
+                                                {analysis.columns.map(col => (
+                                                    <option key={col} value={col}>{col}</option>
+                                                ))}
+                                            </select>
+                                            <p className="mt-3 text-sm text-surface-500">Colonne définissant la force du lien (optionnel)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentStep === 'details' && (
+                                <div className="max-w-2xl mx-auto space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-surface-300">Nom du projet</label>
+                                        <input
+                                            type="text"
+                                            value={details.name}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, name: e.target.value }))}
+                                            className="w-full rounded-xl border border-surface-600 bg-surface-900 px-4 py-3 text-surface-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-all"
+                                            placeholder="Mon Super Graphe"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-surface-300">Description</label>
+                                        <textarea
+                                            value={details.description}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, description: e.target.value }))}
+                                            rows={4}
+                                            className="w-full rounded-xl border border-surface-600 bg-surface-900 px-4 py-3 text-surface-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-all resize-none"
+                                            placeholder="Description optionnelle..."
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-800/50 border border-surface-700">
+                                        <input
+                                            type="checkbox"
+                                            id="isPublic"
+                                            checked={details.isPublic}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, isPublic: e.target.checked }))}
+                                            className="h-5 w-5 rounded border-surface-600 bg-surface-900 text-blue-500 focus:ring-blue-500 focus:ring-offset-surface-900"
+                                        />
+                                        <label htmlFor="isPublic" className="text-sm font-medium text-surface-300 cursor-pointer select-none">
+                                            Rendre ce projet public (visible par tous les utilisateurs)
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentStep === 'review' && (
+                                <div className="max-w-2xl mx-auto space-y-8">
+                                    <div className="bg-surface-800/30 rounded-2xl p-6 border border-surface-700 space-y-4">
+                                        <h3 className="text-lg font-bold text-surface-50 mb-4">Récapitulatif</h3>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-surface-500">Fichier</p>
+                                                <p className="font-medium text-surface-200">{file?.name}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-surface-500">Taille</p>
+                                                <p className="font-medium text-surface-200">{file ? (file.size / 1024).toFixed(1) + ' KB' : '-'}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-surface-500">Nom du projet</p>
+                                                <p className="font-medium text-surface-200">{details.name}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-surface-500">Visibilité</p>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${details.isPublic ? 'bg-green-500/10 text-green-400' : 'bg-surface-700 text-surface-300'}`}>
+                                                    {details.isPublic ? 'Public' : 'Privé'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {file?.name.endsWith('.csv') && (
+                                            <div className="mt-6 pt-6 border-t border-surface-700">
+                                                <p className="text-sm text-surface-500 mb-3">Mapping configuré</p>
+                                                <div className="flex gap-4 text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                                        <span className="text-surface-300">Source: <span className="text-surface-50 font-medium">{mapping.source}</span></span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                                        <span className="text-surface-300">Cible: <span className="text-surface-50 font-medium">{mapping.target}</span></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-surface-700 bg-surface-800/50 p-6 backdrop-blur-md flex justify-between items-center">
+                    <button
+                        onClick={prevStep}
+                        disabled={currentStep === 'upload'}
+                        className={`
+                            px-6 py-2.5 rounded-xl font-medium transition-all
+                            ${currentStep === 'upload' 
+                                ? 'opacity-0 pointer-events-none' 
+                                : 'text-surface-400 hover:bg-surface-700 hover:text-surface-50'
+                            }
+                        `}
+                    >
+                        Retour
+                    </button>
+
+                    {currentStep === 'review' ? (
+                        <button
+                            onClick={handleCreate}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-blue-500 text-white font-bold hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                    Création...
+                                </>
                             ) : (
                                 <>
-                                    <div className="mb-4 rounded-full bg-blue-500/20 p-4 text-blue-400">
-                                        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-lg font-medium text-white">Glissez votre fichier ici</p>
-                                    <p className="mt-1 text-sm text-gray-400">CSV ou JSON acceptés</p>
+                                    Créer le projet
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
                                 </>
                             )}
-                        </div>
-                    )}
-
-                    {step === 'mapping' && analysis && (
-                        <div className="space-y-6">
-                            <div className="grid gap-6 md:grid-cols-2">
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium text-gray-400">Nœud Source *</label>
-                                    <select value={mapping.source} onChange={(e) => setMapping(prev => ({ ...prev, source: e.target.value }))} className="w-full rounded-lg border border-white/10 bg-black px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none">
-                                        <option value="">Sélectionner une colonne</option>
-                                        {analysis.columns?.map(col => <option key={col} value={col}>{col}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium text-gray-400">Nœud Cible *</label>
-                                    <select value={mapping.target} onChange={(e) => setMapping(prev => ({ ...prev, target: e.target.value }))} className="w-full rounded-lg border border-white/10 bg-black px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none">
-                                        <option value="">Sélectionner une colonne</option>
-                                        {analysis.columns?.map(col => <option key={col} value={col}>{col}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium text-gray-400">Poids (Optionnel)</label>
-                                    <select value={mapping.weight} onChange={(e) => setMapping(prev => ({ ...prev, weight: e.target.value }))} className="w-full rounded-lg border border-white/10 bg-black px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none">
-                                        <option value="">Aucun</option>
-                                        {analysis.columns?.map(col => <option key={col} value={col}>{col}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {analysis.stats && <StatsCard stats={analysis.stats} />}
-
-                            <div className="rounded-lg border border-white/10 bg-black/50 overflow-hidden">
-                                <div className="px-4 py-2 bg-white/5 border-b border-white/10 text-xs font-medium text-gray-400 uppercase">
-                                    Aperçu des données
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left text-gray-400">
-                                        <thead className="text-xs text-gray-300 uppercase bg-white/5">
-                                            <tr>
-                                                {analysis.columns?.map(col => <th key={col} className="px-4 py-3 whitespace-nowrap">{col}</th>)}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {analysis.preview?.map((row, i) => (
-                                                <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                                                    {analysis.columns?.map(col => (
-                                                        <td key={`${i}-${col}`} className="px-4 py-3 whitespace-nowrap">
-                                                            {typeof row[col] === 'object' ? JSON.stringify(row[col]) : row[col]}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3">
-                                <button onClick={() => setStep('upload')} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-400 hover:text-white">Retour</button>
-                                <button onClick={handleMappingSubmit} className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-500">Suivant</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {step === 'details' && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-gray-400">Nom du projet</label>
-                                <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Mon super graphe" className="w-full rounded-lg border border-white/10 bg-black px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none" autoFocus />
-                            </div>
-                            <div className="rounded-lg bg-blue-500/10 p-4 border border-blue-500/20">
-                                <h4 className="mb-2 text-sm font-semibold text-blue-400">Résumé</h4>
-                                <ul className="text-sm text-gray-400 space-y-1">
-                                    <li>•Fichier : <span className="text-white">{file?.name}</span></li>
-                                    <li>• Source : <span className="text-white">{mapping.source}</span></li>
-                                    <li>• Cible : <span className="text-white">{mapping.target}</span></li>
-                                    <li>• Poids : <span className="text-white">{mapping.weight || 'N/A'}</span></li>
-                                </ul>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button onClick={() => setStep('mapping')} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-400 hover:text-white">Retour</button>
-                                <button onClick={handleCreateProject} disabled={isLoading} className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
-                                    {isLoading ? 'Création...' : 'Créer le projet'}
-                                </button>
-                            </div>
-                        </div>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={nextStep}
+                            disabled={!canProceed()}
+                            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-surface-50 text-surface-900 font-bold hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Suivant
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        </button>
                     )}
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 }

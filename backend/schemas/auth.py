@@ -89,6 +89,23 @@ class TokenData(BaseModel):
     token_type: Optional[str] = None
 
 
+class UserUpdate(BaseModel):
+    """
+    Données pour la mise à jour du profil utilisateur.
+    """
+    full_name: Optional[str] = Field(None, max_length=100)
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=8, max_length=100)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "full_name": "Jane Doe",
+                "email": "jane@example.com"
+            }
+        }
+
+
 class UserResponse(BaseModel):
     """
     Représentation publique d'un utilisateur dans les réponses API.

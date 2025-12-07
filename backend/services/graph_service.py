@@ -8,6 +8,37 @@ import networkx as nx
 from typing import Dict, Any, List
 from pathlib import Path
 
+def _read_csv_safe(file_path: Path, n_rows: int = None) -> pl.DataFrame:
+    """Tente de lire un CSV avec plusieurs encodages et séparateurs."""
+    encodings = ['utf8', 'latin1', 'cp1252', 'iso-8859-1']
+    separators = [',', ';', '\t', '|']
+    
+    best_df = None
+    last_error = None
+    
+    for encoding in encodings:
+        for separator in separators:
+            try:
+                # On lit le CSV
+                df = pl.read_csv(file_path, n_rows=n_rows, encoding=encoding, separator=separator)
+                
+                # Si on a plus d'une colonne, c'est probablement le bon séparateur
+                if len(df.columns) > 1:
+                    return df
+                
+                # Si on a une seule colonne, on le garde de côté au cas où
+                if best_df is None:
+                    best_df = df
+                    
+            except Exception as e:
+                last_error = e
+                continue
+            
+    if best_df is not None:
+        return best_df
+            
+    raise ValueError(f"Impossible de lire le fichier CSV. Dernier erreur: {str(last_error)}")
+
 async def analyze_file_structure(file_path: Path) -> Dict[str, Any]:
     """
     Analyse la structure d'un fichier (CSV ou JSON) pour proposer un mapping
@@ -24,7 +55,7 @@ async def analyze_file_structure(file_path: Path) -> Dict[str, Any]:
     
     try:
         if file_ext == '.csv':
-            df = pl.read_csv(file_path, n_rows=1000)
+            df = _read_csv_safe(file_path, n_rows=1000)
             columns = df.columns
             preview = df.head(5).to_dicts()
             
@@ -140,17 +171,29 @@ def _suggest_mapping(columns: List[str]) -> Dict[str, str]:
     
     cols_lower = {c.lower(): c for c in columns}
     
-    for candidate in ['source', 'src', 'from', 'start', 'u']:
+    # Mots-clés pour la source (étendus)
+    source_keywords = [
+        'source', 'src', 'from', 'start', 'u', 'origin', 
+        'author', 'sender', 'user', 'initiator', 'subject'
+    ]
+    for candidate in source_keywords:
         if candidate in cols_lower:
             mapping['source'] = cols_lower[candidate]
             break
             
-    for candidate in ['target', 'tgt', 'to', 'end', 'v', 'dest']:
+    # Mots-clés pour la cible (étendus)
+    target_keywords = [
+        'target', 'tgt', 'to', 'end', 'v', 'dest', 'destination',
+        'receiver', 'recipient', 'reply_to', 'mentioned', 'object', 'interaction'
+    ]
+    for candidate in target_keywords:
         if candidate in cols_lower:
             mapping['target'] = cols_lower[candidate]
             break
             
-    for candidate in ['weight', 'poids', 'value', 'score', 'w']:
+    # Mots-clés pour le poids
+    weight_keywords = ['weight', 'poids', 'value', 'score', 'w', 'count', 'strength']
+    for candidate in weight_keywords:
         if candidate in cols_lower:
             mapping['weight'] = cols_lower[candidate]
             break
@@ -187,7 +230,7 @@ async def process_graph_file(
 
 async def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
     """Traite un fichier CSV pour créer un graphe."""
-    df = pl.read_csv(file_path)
+    df = _read_csv_safe(file_path)
     
     src_col = mapping.get('source')
     tgt_col = mapping.get('target')
@@ -201,16 +244,27 @@ async def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[s
     for row in df.iter_rows(named=True):
         source = row[src_col]
         target = row[tgt_col]
-        weight = float(row[weight_col]) if weight_col and weight_col in row else 1.0
         
-        G.add_edge(source, target, weight=weight)
+        weight = 1.0
+        if weight_col and weight_col in row:
+            val = row[weight_col]
+            if val is not None and str(val).strip() != "":
+                try:
+                    weight = float(val)
+                except (ValueError, TypeError):
+                    weight = 1.0
+        
+        # Ignorer les lignes avec des valeurs manquantes ou vides
+        if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
+            G.add_edge(source, target, weight=weight)
     
     metadata = {
         "node_count": G.number_of_nodes(),
         "edge_count": G.number_of_edges(),
         "density": nx.density(G),
         "is_connected": nx.is_connected(G),
-        "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0
+        "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
+        "columns": df.columns
     }
     
     # Calcul du layout 3D
@@ -260,15 +314,19 @@ async def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[
             target = edge.get(tgt_col)
             weight = edge.get(weight_col, 1.0)
             
-            if source and target:
+            # Ignorer les lignes avec des valeurs manquantes ou vides
+            if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
                 G.add_edge(source, target, weight=float(weight) if weight else 1.0)
         
+        edge_keys = list(edges[0].keys()) if edges and len(edges) > 0 else []
+
         metadata = {
             "node_count": G.number_of_nodes(),
             "edge_count": G.number_of_edges(),
             "density": nx.density(G),
             "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
-            "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0
+            "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
+            "columns": edge_keys
         }
         
         # Calcul du layout 3D
@@ -312,15 +370,19 @@ async def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]
         target = row.get(tgt_col)
         weight = row.get(weight_col, 1.0)
         
-        if source and target:
+        # Ignorer les lignes avec des valeurs manquantes ou vides
+        if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
             G.add_edge(source, target, weight=float(weight) if weight else 1.0)
     
+    edge_keys = list(data[0].keys()) if data and len(data) > 0 else []
+
     metadata = {
         "node_count": G.number_of_nodes(),
         "edge_count": G.number_of_edges(),
         "density": nx.density(G),
         "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
-        "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0
+        "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
+        "columns": edge_keys
     }
     
     # Calcul du layout 3D

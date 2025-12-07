@@ -4,9 +4,10 @@ import { API_ENDPOINTS } from '@/app/config/api';
 /** Modèle utilisateur */
 export interface User {
   id: string;
-  name: string;
+  full_name: string | null;
   email: string;
-  createdAt: string;
+  created_at: string;
+  is_active: boolean;
 }
 
 /** Données pour créer un utilisateur */
@@ -18,17 +19,14 @@ export interface CreateUserData {
 
 /** Service pour les opérations CRUD sur les utilisateurs */
 export const userService = {
+  getMe: async (): Promise<User> => {
+    return apiClient.get<User>(API_ENDPOINTS.USERS.ME);
+  },
+  updateMe: async (data: Partial<User>): Promise<User> => {
+    return apiClient.patch<User>(API_ENDPOINTS.USERS.ME, data);
+  },
   getAll: async (): Promise<User[]> => {
     return apiClient.get<User[]>(API_ENDPOINTS.USERS.BASE);
-  },
-  getById: async (id: string): Promise<User> => {
-    return apiClient.get<User>(API_ENDPOINTS.USERS.BY_ID(id));
-  },
-  create: async (data: CreateUserData): Promise<User> => {
-    return apiClient.post<User>(API_ENDPOINTS.USERS.BASE, data);
-  },
-  update: async (id: string, data: Partial<User>): Promise<User> => {
-    return apiClient.patch<User>(API_ENDPOINTS.USERS.BY_ID(id), data);
   },
   delete: async (id: string): Promise<void> => {
     return apiClient.delete<void>(API_ENDPOINTS.USERS.BY_ID(id));

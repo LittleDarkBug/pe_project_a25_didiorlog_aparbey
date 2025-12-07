@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectsService } from '@/app/services/projectsService';
 import GraphScene from '@/app/components/3DandXRComponents/Graph/GraphScene';
 import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
+import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -14,7 +15,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [error, setError] = useState<string | null>(null);
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [selectionType, setSelectionType] = useState<'node' | 'edge' | null>(null);
-    const [clickPosition, setClickPosition] = useState<{ x?: number; y?: number }>({});
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     const router = useRouter();
 
@@ -37,17 +38,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         }
     }, [id]);
 
-    const handleSelect = (data: any, type: 'node' | 'edge' | null, x?: number, y?: number) => {
+    const handleSelect = useCallback((data: any, type: 'node' | 'edge' | null) => {
         setSelectedItem(data);
         setSelectionType(type);
-        setClickPosition({ x, y });
-    };
+    }, []);
 
-    const handleCloseDetails = () => {
+    const handleCloseDetails = useCallback(() => {
         setSelectedItem(null);
         setSelectionType(null);
-        setClickPosition({});
-    };
+    }, []);
+
+    const handleEditSuccess = useCallback((updatedProject: any) => {
+        setIsEditModalOpen(false);
+        if (updatedProject) {
+            setProject(updatedProject);
+        }
+    }, []);
 
     if (isLoading) {
         return (
@@ -100,6 +106,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             <div className="absolute inset-0 z-0" style={{ touchAction: 'none' }}>
                 {project.graph_data ? (
                     <GraphScene
+                        key={project.updated_at || 'initial'}
                         data={project.graph_data}
                         onSelect={handleSelect}
                     />
@@ -135,9 +142,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     data={selectedItem}
                     type={selectionType}
                     onClose={handleCloseDetails}
-                    mouseX={clickPosition.x}
-                    mouseY={clickPosition.y}
                 />
+            )}
+
+            {/* Edit Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-4xl rounded-2xl bg-surface-900 p-6 border border-surface-50/10 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold text-white">Éditer la visualisation</h2>
+                            <button 
+                                onClick={() => setIsEditModalOpen(false)} 
+                                className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="text-sm text-gray-400 mb-6">
+                            Modifiez les données ou le mapping de votre projet existant.
+                        </div>
+                        <EditProjectModal 
+                            project={project}
+                            onClose={() => setIsEditModalOpen(false)} 
+                            onSuccess={handleEditSuccess} 
+                        />
+                    </div>
+                </div>
             )}
 
             {/* Bottom Controls Overlay */}
@@ -152,6 +184,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     onShare={() => {
                         alert("Lien de partage copié ! (Simulation)");
                     }}
+                    onEdit={() => setIsEditModalOpen(true)}
                 />
             </div>
         </div>

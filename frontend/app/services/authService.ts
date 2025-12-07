@@ -52,6 +52,14 @@ export const authService = {
   },
 
   /**
+   * Récupère l'utilisateur courant
+   * @returns Utilisateur connecté
+   */
+  getCurrentUser: async (): Promise<User> => {
+    return apiClient.get<User>('/users/me');
+  },
+
+  /**
    * Déconnecte l'utilisateur
    * Note: Le token doit être injecté via l'intercepteur ou le header
    */

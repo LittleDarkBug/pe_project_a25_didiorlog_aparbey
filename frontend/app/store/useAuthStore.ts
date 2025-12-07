@@ -20,6 +20,7 @@ interface AuthState {
     logout: () => Promise<void>;
     setTokens: (accessToken: string, refreshToken: string) => void;
     setUser: (user: User | null) => void;
+    fetchUser: () => Promise<void>;
     clearError: () => void;
 }
 
@@ -33,6 +34,15 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
 
+            fetchUser: async () => {
+                try {
+                    const user = await authService.getCurrentUser();
+                    set({ user });
+                } catch (error) {
+                    console.error("Failed to fetch user", error);
+                }
+            },
+
             login: async (credentials) => {
                 set({ isLoading: true, error: null });
                 try {
@@ -42,16 +52,16 @@ export const useAuthStore = create<AuthState>()(
                     localStorage.setItem('access_token', response.access_token);
                     localStorage.setItem('refresh_token', response.refresh_token);
 
+                    // Récupérer le profil utilisateur
+                    const user = await authService.getCurrentUser();
+
                     set({
                         accessToken: response.access_token,
                         refreshToken: response.refresh_token,
+                        user: user,
                         isAuthenticated: true,
                         isLoading: false,
                     });
-
-                    // TODO: Fetch user profile after login if needed, 
-                    // but for now we rely on the fact that we have the token.
-                    // We might want to decode the token or fetch /users/me
                 } catch (err: any) {
                     set({
                         error: err.response?.data?.detail || 'Erreur de connexion',
@@ -98,6 +108,11 @@ export const useAuthStore = create<AuthState>()(
                         error: null
                     });
                     console.log("[useAuthStore] Store et localStorage nettoyés");
+
+                    // Rediriger vers la homepage
+                    if (typeof window !== 'undefined') {
+                        window.location.href = '/';
+                    }
                 }
             },
 

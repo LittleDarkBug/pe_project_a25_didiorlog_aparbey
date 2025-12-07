@@ -25,6 +25,8 @@ class Project(Document):
     updated_at: Optional[datetime] = None
     graph_data: Optional[dict] = None
     metadata: Optional[dict] = None
+    mapping: Optional[dict] = None
+    source_file_path: Optional[str] = None
     
     class Settings:
         name = "projects"
