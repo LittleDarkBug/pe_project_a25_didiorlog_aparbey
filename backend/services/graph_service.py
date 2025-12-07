@@ -7,6 +7,7 @@ import orjson
 import networkx as nx
 from typing import Dict, Any, List
 from pathlib import Path
+import asyncio
 
 def _read_csv_safe(file_path: Path, n_rows: int = None) -> pl.DataFrame:
     """Tente de lire un CSV avec plusieurs encodages et séparateurs."""
@@ -141,6 +142,36 @@ async def analyze_file_structure(file_path: Path) -> Dict[str, Any]:
                     }
             else:
                 raise ValueError("Format JSON non supporté")
+        elif file_ext == '.gexf':
+            try:
+                try:
+                    G = nx.read_gexf(file_path)
+                except Exception:
+                    # Fallback pour GEXF 1.3
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                    if b'version="1.3"' in content:
+                        content = content.replace(b'version="1.3"', b'version="1.2"')
+                        content = content.replace(b'http://www.gexf.net/1.3', b'http://www.gexf.net/1.2draft')
+                        from io import BytesIO
+                        G = nx.read_gexf(BytesIO(content))
+                    else:
+                        raise
+
+                result = {
+                    "type": "gexf",
+                    "columns": [],
+                    "preview": [],
+                    "suggestions": {},
+                    "stats": {
+                        "node_count": G.number_of_nodes(),
+                        "edge_count": G.number_of_edges(),
+                        "density": round(nx.density(G), 4),
+                        "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False
+                    }
+                }
+            except Exception as e:
+                raise ValueError(f"Erreur lecture GEXF: {str(e)}")
         else:
             raise ValueError(f"Extension non supportée: {file_ext}")
             
@@ -219,16 +250,18 @@ async def process_graph_file(
     
     try:
         if file_ext == '.csv':
-            return await _process_csv_graph(file_path, mapping)
+            return await asyncio.to_thread(_process_csv_graph, file_path, mapping)
         elif file_ext == '.json':
-            return await _process_json_graph(file_path, mapping)
+            return await asyncio.to_thread(_process_json_graph, file_path, mapping)
+        elif file_ext == '.gexf':
+            return await asyncio.to_thread(_process_gexf_graph, file_path, mapping)
         else:
             raise ValueError(f"Format de fichier non supporté: {file_ext}")
     except Exception as e:
         raise ValueError(f"Erreur traitement graphe: {str(e)}")
 
 
-async def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
     """Traite un fichier CSV pour créer un graphe."""
     df = _read_csv_safe(file_path)
     
@@ -289,7 +322,7 @@ async def _process_csv_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[s
     }
 
 
-async def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
     """Traite un fichier JSON pour créer un graphe."""
     with open(file_path, 'rb') as f:
         content = orjson.loads(f.read())
@@ -348,13 +381,13 @@ async def _process_json_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[
         }
     
     elif isinstance(content, list):
-        return await _process_csv_graph_from_list(content, mapping)
+        return _process_csv_graph_from_list(content, mapping)
     
     else:
         raise ValueError("Format JSON non reconnu. Utilisez le format node-link {nodes: [...], edges: [...]}")
 
 
-async def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]) -> Dict[str, Any]:
+def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]) -> Dict[str, Any]:
     """Traite une liste d'objets JSON comme des edges."""
     src_col = mapping.get('source')
     tgt_col = mapping.get('target')
@@ -401,4 +434,63 @@ async def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str]
         "nodes": graph_data["nodes"],
         "edges": graph_data["links"],
         "format": "json_list"
+    }
+
+
+def _process_gexf_graph(file_path: Path, mapping: Dict[str, str]) -> Dict[str, Any]:
+    """Traite un fichier GEXF pour créer un graphe."""
+    # Tentative de lecture directe
+    try:
+        G = nx.read_gexf(file_path)
+    except Exception:
+        # Si échec (ex: version 1.3 non supportée), on tente de patcher le contenu
+        try:
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
+            # Patch simple pour GEXF 1.3 -> 1.2
+            if b'version="1.3"' in content:
+                content = content.replace(b'version="1.3"', b'version="1.2"')
+                content = content.replace(b'http://www.gexf.net/1.3', b'http://www.gexf.net/1.2draft')
+                
+                from io import BytesIO
+                G = nx.read_gexf(BytesIO(content))
+            else:
+                raise # Relancer l'erreur originale si ce n'est pas la version 1.3
+        except Exception as e:
+            raise ValueError(f"Impossible de lire le fichier GEXF: {str(e)}")
+    
+    # Nettoyage et conversion des attributs pour JSON
+    for node, data in G.nodes(data=True):
+        for k, v in data.items():
+            if isinstance(v, (set, tuple)):
+                data[k] = list(v)
+                
+    metadata = {
+        "node_count": G.number_of_nodes(),
+        "edge_count": G.number_of_edges(),
+        "density": nx.density(G),
+        "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
+        "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
+        "columns": []
+    }
+    
+    # Calcul du layout 3D si pas déjà présent ou si forcé
+    # Note: GEXF peut contenir des positions (viz:position), on pourrait les utiliser
+    # Pour l'instant on recalcule pour être sûr d'avoir du 3D
+    if G.number_of_nodes() > 0:
+        pos = nx.spring_layout(G, dim=3, seed=42)
+        scale = 50
+        for node_id, (x, y, z) in pos.items():
+            G.nodes[node_id]['x'] = float(x) * scale
+            G.nodes[node_id]['y'] = float(y) * scale
+            G.nodes[node_id]['z'] = float(z) * scale
+    
+    graph_data = nx.node_link_data(G)
+    
+    return {
+        "metadata": metadata,
+        "nodes": graph_data["nodes"],
+        "edges": graph_data["links"],
+        "format": "gexf"
     }

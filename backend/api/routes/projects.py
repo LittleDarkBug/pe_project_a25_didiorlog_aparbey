@@ -60,6 +60,7 @@ async def create_project(
     
     try:
         # Sauvegarder le fichier
+        file.file.seek(0)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             

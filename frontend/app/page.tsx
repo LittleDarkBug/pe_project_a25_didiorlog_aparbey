@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import Hero3D from '@/app/components/webComponents/Hero3D';
-import { useAuthStore } from '@/app/store/useAuthStore';
+import { useAuth } from '@/app/hooks/useAuth';
 import { Button } from '@/app/components/ui/Button';
 import { ArrowRight, LayoutDashboard, LogIn, UserPlus, Database, Box, Glasses } from 'lucide-react';
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-surface-950 text-surface-50 selection:bg-primary-500 selection:text-white">

@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthStore } from '@/app/store/useAuthStore';
 import { apiClient } from '@/app/lib/apiClient';
 import { useRouter } from 'next/navigation';
 import { useToastStore } from '@/app/store/useToastStore';
@@ -28,7 +27,6 @@ interface FileAnalysis {
 
 export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) {
     const router = useRouter();
-    const { token } = useAuthStore();
     const { addToast } = useToastStore();
     
     const [currentStep, setCurrentStep] = useState<Step>('upload');
@@ -63,11 +61,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
             formData.append('file', selectedFile);
 
             try {
-                const data = await apiClient.post<FileAnalysis>('/files/analyze', formData, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                const data = await apiClient.post<FileAnalysis>('/files/analyze', formData);
                 
                 setAnalysis(data);
                 
@@ -92,7 +86,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
             // For JSON/GEXF, skip mapping
             setTimeout(() => setCurrentStep('details'), 500);
         }
-    }, [token, addToast]);
+    }, [addToast]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -118,18 +112,15 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
             // Toujours envoyer le mapping, même si vide ou non-CSV
             formData.append('mapping', JSON.stringify(mapping));
 
-            const project: any = await apiClient.post('/projects/', formData, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            // Augmenter le timeout pour la création de projet (traitement lourd)
+            const project: any = await apiClient.post('/projects/', formData, { timeout: 120000 });
 
             addToast('Projet créé avec succès', 'success');
             onSuccess(project);
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Creation error:', error);
-            addToast('Erreur lors de la création du projet', 'error');
+            addToast(error.message || 'Erreur lors de la création du projet', 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -309,7 +300,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                             {isDragActive ? "Déposez le fichier ici" : "Glissez-déposez votre fichier"}
                                         </h3>
                                         <p className="text-surface-400 text-center max-w-md">
-                                            Supporte les fichiers CSV (listes d'arêtes) et JSON (format node-link).
+                                            Supporte les fichiers CSV, JSON et GEXF.
                                             <br/>Taille max: 50MB
                                         </p>
                                     </div>

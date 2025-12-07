@@ -1,29 +1,35 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { authService, LoginRequest, RegisterRequest } from '@/app/services/authService';
-import { useAuthStore } from '@/app/store/useAuthStore';
+import { LoginRequest, RegisterRequest, authService } from '@/app/services/authService';
 import { useToastStore } from '@/app/store/useToastStore';
+import { signIn, signOut, useSession } from 'next-auth/react';
 
 export const useAuth = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { setTokens, setUser, logout: storeLogout, user, fetchUser } = useAuthStore();
+  const { data: session, status, update } = useSession();
   const { addToast } = useToastStore();
 
   const login = useMutation({
-    mutationFn: (credentials: LoginRequest) => authService.login(credentials),
-    onSuccess: async (data) => {
-      setTokens(data.access_token, data.refresh_token);
-      try {
-        await fetchUser();
-      } catch (e) {
-        console.error("Failed to fetch user profile", e);
-      }
+    mutationFn: async (credentials: LoginRequest) => {
+        const result = await signIn('credentials', {
+            redirect: false,
+            email: credentials.email,
+            password: credentials.password,
+        });
+        
+        if (result?.error) {
+            throw new Error("Email ou mot de passe incorrect");
+        }
+        return result;
+    },
+    onSuccess: () => {
       addToast('Connexion réussie', 'success');
       router.push('/dashboard');
+      router.refresh();
     },
     onError: (error: any) => {
-      addToast(error.response?.data?.detail || 'Erreur de connexion', 'error');
+      addToast(error.message || 'Erreur de connexion', 'error');
     },
   });
 
@@ -40,20 +46,23 @@ export const useAuth = () => {
 
   const logout = useMutation({
     mutationFn: async () => {
-      await storeLogout();
+      await signOut({ redirect: false });
     },
     onSuccess: () => {
       queryClient.clear();
       router.push('/login');
       addToast('Déconnexion réussie', 'info');
+      router.refresh();
     },
   });
 
   return {
-    user,
+    user: session?.user,
+    isAuthenticated: status === 'authenticated',
+    isLoading: status === 'loading',
     login,
     register,
     logout,
-    fetchUser
+    fetchUser: update // Alias update to fetchUser to refresh session
   };
 };

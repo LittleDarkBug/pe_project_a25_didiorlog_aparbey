@@ -1,4 +1,5 @@
 import { API_CONFIG } from '@/app/config/api';
+import { getSession } from 'next-auth/react';
 
 /** Options pour les requêtes fetch avec support timeout */
 interface FetchOptions extends RequestInit {
@@ -42,36 +43,22 @@ class ApiClient {
 
     const headers: HeadersInit = { ...fetchOptions.headers };
 
-    // Ajouter le token d'authentification si disponible
-    // On récupère le token depuis le store (plus robuste que localStorage direct)
-    // Note: On doit importer le store dynamiquement ou s'assurer qu'il est init
-    // Pour éviter les cycles, on peut lire localStorage 'auth-storage' si besoin,
-    // mais ici on va essayer de lire le localStorage 'access_token' qu'on a set,
-    // ET en fallback lire le store.
-
-    let token = localStorage.getItem('access_token');
-    if (!token) {
-      // Fallback: essayer de lire depuis le state persisté de zustand
-      try {
-        const storage = localStorage.getItem('auth-storage');
-        if (storage) {
-          const parsed = JSON.parse(storage);
-          token = parsed.state?.accessToken;
+    // Ajouter le token d'authentification via NextAuth
+    let token = null;
+    try {
+        if (typeof window !== 'undefined') {
+            const session = await getSession();
+            // @ts-ignore
+            token = session?.user?.accessToken;
         }
-      } catch (e) {
-        console.error("Erreur lecture auth-storage", e);
-      }
+    } catch (e) {
+        console.error("Error getting session", e);
     }
 
     if (token) {
       // @ts-ignore
       headers['Authorization'] = `Bearer ${token}`;
-      console.log(`[ApiClient] Token attached to ${endpoint}:`, token.substring(0, 10) + '...');
-    } else {
-      console.warn(`[ApiClient] No token found for ${endpoint}`);
     }
-
-    console.log(`[ApiClient] Request headers for ${endpoint}:`, headers);
 
     // Définir Content-Type à json uniquement si le body n'est PAS FormData
     if (!(fetchOptions.body instanceof FormData)) {
