@@ -20,6 +20,9 @@ interface GraphData {
 }
 
 export class GraphRenderer {
+    // Store edge references for filtering
+    private edgeInstances: Array<{ mesh: InstancedMesh, source: string, target: string }> = [];
+
     createNodes(
         data: GraphData,
         scene: Scene,
@@ -136,6 +139,9 @@ export class GraphRenderer {
         onVRSelect?: (data: any, type: string) => void,
         xrHelperRef?: { current: any }
     ) {
+        // Clear previous edge references
+        this.edgeInstances = [];
+
         // OPTIMIZATION: Use Instanced Meshes (Cylinders) for Edges
         // This allows 1 draw call while keeping individual interactivity (picking/hover)
         
@@ -182,6 +188,9 @@ export class GraphRenderer {
                 
                 // Rotate to look at target
                 instance.lookAt(p2);
+
+                // Store reference for filtering
+                this.edgeInstances.push({ mesh: instance, source: edge.source, target: edge.target });
 
                 // Interactions
                 instance.actionManager = new ActionManager(scene);
@@ -242,7 +251,37 @@ export class GraphRenderer {
         });
     }
 
+    /**
+     * Updates the visibility of nodes and edges based on a set of visible node IDs.
+     * @param visibleNodeIds Set of node IDs that should be visible. If null, all are visible.
+     * @param nodeMeshes Map of node meshes
+     */
+    updateVisibility(visibleNodeIds: Set<string> | null, nodeMeshes: Map<string, Mesh | InstancedMesh>) {
+        // 1. Update Nodes
+        nodeMeshes.forEach((mesh, id) => {
+            const isVisible = visibleNodeIds === null || visibleNodeIds.has(id);
+            mesh.isVisible = isVisible;
+            // Also disable picking if hidden to prevent ghost clicks
+            mesh.isPickable = isVisible;
+        });
+
+        // 2. Update Edges
+        // An edge is visible only if BOTH its source and target are visible
+        this.edgeInstances.forEach(edge => {
+            const isSourceVisible = visibleNodeIds === null || visibleNodeIds.has(edge.source);
+            const isTargetVisible = visibleNodeIds === null || visibleNodeIds.has(edge.target);
+            
+            const isVisible = isSourceVisible && isTargetVisible;
+            
+            edge.mesh.isVisible = isVisible;
+            edge.mesh.isPickable = isVisible;
+        });
+    }
+
     disposeGraph(nodeMeshes: Map<string, Mesh | InstancedMesh>, scene: Scene) {
+        // Clear edge references
+        this.edgeInstances = [];
+
         // Dispose all node meshes (instances)
         nodeMeshes.forEach((mesh) => {
             mesh.dispose();

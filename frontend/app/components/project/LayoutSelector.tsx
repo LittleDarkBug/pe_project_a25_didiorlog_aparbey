@@ -30,7 +30,7 @@ export default function LayoutSelector({ projectId, onLayoutUpdate }: LayoutSele
         try {
             const response: any = await apiClient.post(`/projects/${projectId}/layout`, { algorithm });
             onLayoutUpdate(response.graph_data);
-            addToast('Layout mis à jour avec succès', 'success');
+            // Toast removed as requested
         } catch (error: any) {
             console.error('Layout update error:', error);
             addToast(error.message || 'Erreur lors de la mise à jour du layout', 'error');

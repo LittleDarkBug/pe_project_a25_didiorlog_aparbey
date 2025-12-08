@@ -89,6 +89,29 @@ docker-compose down -v
 | **MongoDB** | mongodb://localhost:27017 | Base de données (interne) |
 | **Redis** | redis://localhost:6379 | Cache (interne) |
 
+## Fonctionnalités de Filtrage
+
+L'application propose un système de filtrage avancé exécuté côté client ("Frontend-Only") pour une réactivité immédiate.
+
+### 1. Filtres par Attributs
+Détecte automatiquement les propriétés catégorielles de vos données (ex: "groupe", "type", "département").
+- **Recherche Rapide** : Filtre instantané par ID ou Label.
+- **Catégories** : Cochez/décochez des valeurs pour masquer des groupes entiers de nœuds.
+
+### 2. Filtres Topologiques (Onglet "Topologie")
+Permet d'explorer la structure du graphe.
+
+- **Voisinage (Neighbors)** :
+  - Isole un nœud central et ses voisins jusqu'à une certaine distance.
+  - **Profondeur (Sauts/Hops)** :
+    - 1 saut : Voisins directs.
+    - 2 sauts : Voisins des voisins.
+    - etc.
+
+- **Chemin le plus court (Shortest Path)** :
+  - Trouve et affiche uniquement le chemin le plus direct entre deux nœuds (Algorithme BFS).
+  - Utile pour analyser les connexions entre deux entités distantes.
+
 ## Développement
 
 ### Hot Reload

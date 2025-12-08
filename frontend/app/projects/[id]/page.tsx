@@ -8,6 +8,8 @@ import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
 import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
+import FilterPanel from '@/app/components/project/FilterPanel';
+import ShareModal from '@/app/components/project/ShareModal';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -17,6 +19,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [selectionType, setSelectionType] = useState<'node' | 'edge' | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
 
     const router = useRouter();
 
@@ -118,6 +123,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         key={project.updated_at || 'initial'}
                         data={project.graph_data}
                         onSelect={handleSelect}
+                        visibleNodeIds={visibleNodeIds}
                     />
                 ) : (
                     <div className="flex h-full items-center justify-center text-gray-500">
@@ -156,6 +162,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 />
             )}
 
+            {/* Filter Panel Overlay */}
+            {isFilterOpen && project?.graph_data?.nodes && (
+                <FilterPanel
+                    nodes={project.graph_data.nodes}
+                    edges={project.graph_data.edges}
+                    onFilterChange={setVisibleNodeIds}
+                    onClose={() => setIsFilterOpen(false)}
+                />
+            )}
+
             {/* Edit Modal */}
             {isEditModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -183,6 +199,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </div>
             )}
 
+            {/* Share Modal */}
+            {isShareModalOpen && project && (
+                <ShareModal
+                    isOpen={isShareModalOpen}
+                    onClose={() => setIsShareModalOpen(false)}
+                    projectId={project.id}
+                    projectName={project.name}
+                />
+            )}
+
             {/* Bottom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
                 <OverlayControls
@@ -192,15 +218,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     onToggleVR={() => {
                         alert("Pour entrer en VR, veuillez utiliser le bouton lunettes en bas à droite (si disponible).");
                     }}
-                    onShare={() => {
-                        alert("Lien de partage copié ! (Simulation)");
-                    }}
+                    onShare={() => setIsShareModalOpen(true)}
                     onEdit={() => setIsEditModalOpen(true)}
                 >
                     <LayoutSelector 
                         projectId={id} 
                         onLayoutUpdate={handleLayoutUpdate} 
                     />
+                    
+                    {/* Filter Toggle Button */}
+                    <button
+                        onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${
+                            isFilterOpen || visibleNodeIds !== null
+                                ? 'bg-primary-500/20 text-white border border-primary-500/50'
+                                : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
+                        }`}
+                        title="Filtrer le graphe"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        <span className="hidden sm:inline">Filtres</span>
+                        
+                        {/* Active Indicator */}
+                        {visibleNodeIds !== null && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>
+                        )}
+                    </button>
                 </OverlayControls>
             </div>
         </div>

@@ -40,9 +40,10 @@ interface GraphData {
 interface GraphSceneProps {
     data: GraphData;
     onSelect?: (data: any, type: 'node' | 'edge' | null) => void;
+    visibleNodeIds?: Set<string> | null;
 }
 
-export default function GraphScene({ data, onSelect }: GraphSceneProps) {
+export default function GraphScene({ data, onSelect, visibleNodeIds }: GraphSceneProps) {
     const [scene, setScene] = useState<Scene | null>(null);
     const xrHelperRef = useRef<any>(null);
     const detailsPanelRef = useRef(new VRDetailsPanel());
@@ -58,6 +59,13 @@ export default function GraphScene({ data, onSelect }: GraphSceneProps) {
     });
 
     const graphRenderer = useRef(new GraphRenderer());
+
+    // Handle visibility updates
+    useEffect(() => {
+        if (scene && nodeMeshesRef.current.size > 0) {
+            graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
+        }
+    }, [visibleNodeIds, scene]);
 
     const onSceneReady = useCallback(async (sceneInstance: Scene) => {
         setScene(sceneInstance);
