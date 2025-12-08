@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import {
     Vector3,
     Color3,
@@ -43,11 +43,29 @@ interface GraphSceneProps {
     visibleNodeIds?: Set<string> | null;
 }
 
-export default function GraphScene({ data, onSelect, visibleNodeIds }: GraphSceneProps) {
+export interface GraphSceneRef {
+    resetCamera: () => void;
+}
+
+const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const xrHelperRef = useRef<any>(null);
     const detailsPanelRef = useRef(new VRDetailsPanel());
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
+
+    useImperativeHandle(ref, () => ({
+        resetCamera: () => {
+            if (scene) {
+                const camera = scene.getCameraByName("camera") as ArcRotateCamera;
+                if (camera) {
+                    camera.setTarget(Vector3.Zero());
+                    camera.alpha = -Math.PI / 2;
+                    camera.beta = Math.PI / 2.5;
+                    camera.radius = 100;
+                }
+            }
+        }
+    }));
 
     const { createVRMenu } = useVRMenu();
     const { setupLocomotion } = useVRLocomotion();
@@ -229,4 +247,8 @@ export default function GraphScene({ data, onSelect, visibleNodeIds }: GraphScen
             />
         </div>
     );
-}
+});
+
+GraphScene.displayName = 'GraphScene';
+
+export default GraphScene;

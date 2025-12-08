@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState, use, useCallback } from 'react';
+import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectsService } from '@/app/services/projectsService';
-import GraphScene from '@/app/components/3DandXRComponents/Graph/GraphScene';
+import GraphScene, { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphScene';
 import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
 import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
 import ShareModal from '@/app/components/project/ShareModal';
+import { useToastStore } from '@/app/store/useToastStore';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -22,8 +23,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
+    
+    const graphSceneRef = useRef<GraphSceneRef>(null);
+    const { addToast } = useToastStore();
 
     const router = useRouter();
+
+    const handleResetCamera = useCallback(() => {
+        if (graphSceneRef.current) {
+            graphSceneRef.current.resetCamera();
+        }
+    }, []);
 
     useEffect(() => {
         const loadProject = async () => {
@@ -120,6 +130,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             <div className="absolute inset-0 z-0" style={{ touchAction: 'none' }}>
                 {project.graph_data ? (
                     <GraphScene
+                        ref={graphSceneRef}
                         key={project.updated_at || 'initial'}
                         data={project.graph_data}
                         onSelect={handleSelect}
@@ -212,11 +223,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             {/* Bottom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
                 <OverlayControls
-                    onResetCamera={() => {
-                        console.log("Reset Camera");
-                    }}
+                    onResetCamera={handleResetCamera}
                     onToggleVR={() => {
-                        alert("Pour entrer en VR, veuillez utiliser le bouton lunettes en bas à droite (si disponible).");
+                        addToast('info', 'Mode VR', 'Pour entrer en VR, utilisez le bouton lunettes en bas à droite.');
                     }}
                     onShare={() => setIsShareModalOpen(true)}
                     onEdit={() => setIsEditModalOpen(true)}

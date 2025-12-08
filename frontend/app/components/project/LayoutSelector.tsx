@@ -5,8 +5,9 @@ import { apiClient } from '@/app/lib/apiClient';
 import { useToastStore } from '@/app/store/useToastStore';
 
 interface LayoutSelectorProps {
-    projectId: string;
+    projectId?: string;
     onLayoutUpdate: (newGraphData: any) => void;
+    onLayoutRequest?: (algorithm: string) => Promise<any>;
 }
 
 const ALGORITHMS = [
@@ -19,7 +20,7 @@ const ALGORITHMS = [
     { id: 'circular', label: 'Circulaire', description: 'En cercle (2D+Z)' },
 ];
 
-export default function LayoutSelector({ projectId, onLayoutUpdate }: LayoutSelectorProps) {
+export default function LayoutSelector({ projectId, onLayoutUpdate, onLayoutRequest }: LayoutSelectorProps) {
     const [isLoading, setIsLoading] = useState(false);
     const { addToast } = useToastStore();
     const [isOpen, setIsOpen] = useState(false);
@@ -28,7 +29,15 @@ export default function LayoutSelector({ projectId, onLayoutUpdate }: LayoutSele
         setIsLoading(true);
         setIsOpen(false);
         try {
-            const response: any = await apiClient.post(`/projects/${projectId}/layout`, { algorithm });
+            let response: any;
+            if (onLayoutRequest) {
+                response = await onLayoutRequest(algorithm);
+            } else if (projectId) {
+                response = await apiClient.post(`/projects/${projectId}/layout`, { algorithm });
+            } else {
+                throw new Error("Configuration invalide pour LayoutSelector");
+            }
+            
             onLayoutUpdate(response.graph_data);
             // Toast removed as requested
         } catch (error: any) {

@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState, use, useCallback } from 'react';
+import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { shareService } from '@/app/services/shareService';
-import GraphScene from '@/app/components/3DandXRComponents/Graph/GraphScene';
+import GraphScene, { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphScene';
 import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
+import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useToastStore } from '@/app/store/useToastStore';
 
 export default function SharedProjectPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = use(params);
@@ -18,6 +20,9 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     const [selectionType, setSelectionType] = useState<'node' | 'edge' | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
+    
+    const graphSceneRef = useRef<GraphSceneRef>(null);
+    const { addToast } = useToastStore();
 
     useEffect(() => {
         const loadProject = async () => {
@@ -46,6 +51,23 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     const handleCloseDetails = useCallback(() => {
         setSelectedItem(null);
         setSelectionType(null);
+    }, []);
+
+    const handleLayoutRequest = useCallback(async (algorithm: string) => {
+        return shareService.updateLayout(token, algorithm);
+    }, [token]);
+
+    const handleLayoutUpdate = useCallback((newGraphData: any) => {
+        setProject((prev: any) => ({
+            ...prev,
+            graph_data: newGraphData
+        }));
+    }, []);
+
+    const handleResetCamera = useCallback(() => {
+        if (graphSceneRef.current) {
+            graphSceneRef.current.resetCamera();
+        }
     }, []);
 
     if (isLoading) {
@@ -86,20 +108,19 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     return (
         <div className="relative h-screen w-full overflow-hidden bg-black">
             {/* Header minimaliste pour le mode partagé */}
-            <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
-                <div className="pointer-events-auto flex items-center gap-4">
-                    <Link href="/" className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md">
-                        <ArrowLeft className="w-5 h-5 text-white" />
-                    </Link>
-                    <div>
-                        <h1 className="text-xl font-bold text-white drop-shadow-md">{project.name}</h1>
-                        <p className="text-xs text-gray-400">Mode lecture seule</p>
-                    </div>
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-4 pointer-events-auto">
+                <Link href="/" className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md">
+                    <ArrowLeft className="w-5 h-5 text-white" />
+                </Link>
+                <div className="bg-black/40 backdrop-blur-md rounded-xl px-4 py-2 border border-white/10">
+                    <h1 className="text-sm font-bold text-white">{project.name}</h1>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Lecture seule</p>
                 </div>
             </div>
 
             {/* Scene 3D */}
             <GraphScene 
+                ref={graphSceneRef}
                 data={project.graph_data} 
                 onSelect={handleSelect}
                 visibleNodeIds={visibleNodeIds}
@@ -127,13 +148,16 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
             {/* Bottom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
                 <OverlayControls
-                    onResetCamera={() => {
-                        console.log("Reset Camera");
-                    }}
+                    onResetCamera={handleResetCamera}
                     onToggleVR={() => {
-                        alert("Pour entrer en VR, veuillez utiliser le bouton lunettes en bas à droite (si disponible).");
+                        addToast('info', 'Mode VR', 'Pour entrer en VR, utilisez le bouton lunettes en bas à droite.');
                     }}
                 >
+                    <LayoutSelector 
+                        onLayoutUpdate={handleLayoutUpdate}
+                        onLayoutRequest={handleLayoutRequest}
+                    />
+                    
                     {/* Filter Toggle Button */}
                     <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}

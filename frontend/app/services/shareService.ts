@@ -16,5 +16,9 @@ export const shareService = {
 
     getSharedProject: async (token: string) => {
         return apiClient.get<any>(`/share/${token}`);
+    },
+
+    updateLayout: async (token: string, algorithm: string) => {
+        return apiClient.post<any>(`/share/${token}/layout`, { algorithm });
     }
 };
