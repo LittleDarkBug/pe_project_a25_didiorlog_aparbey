@@ -53,20 +53,31 @@ app/
 │   ├── login/               # Page de connexion
 │   └── register/            # Page d'inscription (avec RGPD)
 ├── (dashboard)/             # Espace utilisateur connecté
-│   ├── page.tsx             # Liste des projets
+│   ├── admin/               # Administration
+│   ├── dashboard/           # Tableau de bord (Liste des projets)
 │   └── profile/             # Gestion du profil
-├── (workspace)/             # Espace de travail projet
-│   └── project/[id]/        # Visualisation 3D
+├── projects/                # Espace de travail projet
+│   └── [id]/                # Visualisation 3D et Édition
+├── share/                   # Espace de partage public
+│   └── [token]/             # Visualisation en lecture seule
 ├── components/              # Composants React réutilisables
 │   ├── 3DandXRComponents/   # Composants liés à la 3D et XR
-│   │   └── Scene/           # Composant wrapper Babylon.js
+│   │   ├── Graph/           # Scène de graphe (GraphScene)
+│   │   ├── Scene/           # Composant wrapper Babylon.js
+│   │   └── UI/              # UI Overlay (OverlayControls, DetailsPanel)
+│   ├── project/             # Composants spécifiques aux projets
+│   │   ├── FilterPanel.tsx  # Filtrage avancé
+│   │   ├── LayoutSelector.tsx # Choix de l'algorithme
+│   │   └── ShareModal.tsx   # Modale de partage
 │   ├── ui/                  # Composants UI génériques
 │   │   └── ToastContainer.tsx # Système de notifications
 │   └── webComponents/       # Composants web classiques
 │       └── Hero3D.tsx       # Héros 3D de la landing page
 │
 ├── config/                  # Configuration centralisée
-│   └── api.ts               # Endpoints API (Auth, Users, Projects)
+│   └── api.ts               # Endpoints API (Auth, Users, Projects, Share)
+│
+├── hooks/                   # Hooks personnalisés (VR, etc.)
 │
 ├── lib/                     # Bibliothèques et utilitaires
 │   └── apiClient.ts         # Client HTTP central
@@ -76,7 +87,9 @@ app/
 │   └── index.tsx            # Combine tous les providers
 │
 ├── services/                # Services pour les appels API
-│   ├── authService.ts       # Authentification (Login, Register, Logout)
+│   ├── authService.ts       # Authentification
+│   ├── projectsService.ts   # Gestion des projets
+│   ├── shareService.ts      # Service de partage
 │   ├── userService.ts       # Service utilisateur
 │   └── index.ts             # Exports des services
 │
@@ -91,6 +104,14 @@ app/
 ├── layout.tsx               # Layout racine avec ToastContainer
 └── page.tsx                 # Landing Page Premium
 ```
+
+### Fonctionnalités Clés
+
+- **Visualisation 3D** : Moteur Babylon.js performant.
+- **Mode VR** : Support WebXR pour casques VR.
+- **Partage** : Liens publics pour partager vos graphes en lecture seule.
+- **Layouts Dynamiques** : Recalcul des positions en temps réel (Fruchterman-Reingold, etc.).
+- **Filtrage** : Filtres "Frontend-Only" rapides.
 
 ### Que pouvez-vous modifier ?
 

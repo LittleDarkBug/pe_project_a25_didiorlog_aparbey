@@ -7,14 +7,14 @@ Plateforme de visualisation 3D immersive de graphes avec spatialisation performa
 ```
 PE_Def_Project/
 ├── backend/          # FastAPI + Python
-│   ├── api/         # Routes (Auth, Projects, Users, Files)
+│   ├── api/         # Routes (Auth, Projects, Users, Files, Share)
 │   ├── core/        # Configuration, Sécurité, Redis
-│   ├── models/      # Modèles Beanie (User, Project, Graph)
-│   ├── services/    # Logique métier (Auth, Graphes)
+│   ├── models/      # Modèles Beanie (User, Project, Graph, ShareLink)
+│   ├── services/    # Logique métier (Auth, Graphes, Partage)
 │   ├── Dockerfile
 │   └── requirements.txt
-├── frontend/         # Next.js + React + Three.js
-│   ├── app/          # App Router (Auth, Dashboard, Workspace)
+├── frontend/         # Next.js + React + Babylon.js
+│   ├── app/          # App Router (Auth, Dashboard, Projects, Share)
 │   ├── Dockerfile
 │   └── package.json
 ├── docker-compose.yml
@@ -37,13 +37,22 @@ PE_Def_Project/
 
 ### Frontend
 - **Next.js** 15 - Framework React
-- **Three.js** / **React Three Fiber** / **Babylon.js** - Rendu 3D & WebXR
+- **Babylon.js** - Rendu 3D & WebXR (Moteur principal)
 - **Zustand** - Gestion d'état (Auth, Toast, UI)
 - **Tailwind CSS** - Design Premium (Glassmorphism)
 - **WebXR** - VR/AR immersif
 
 ### Infrastructure
 - **Docker** + **Docker Compose** - Conteneurisation
+
+## Fonctionnalités Principales
+
+- **Visualisation 3D** : Exploration immersive de graphes complexes.
+- **Spatialisation** : Algorithmes de layout performants (Fruchterman-Reingold, Kamada-Kawai, DrL).
+- **Mode VR** : Immersion totale avec support WebXR.
+- **Partage Public** : Génération de liens de partage en lecture seule avec prévisualisation des layouts.
+- **Filtrage Avancé** : Filtres dynamiques côté client (attributs, recherche).
+- **Gestion de Projets** : Création, édition, import CSV/JSON.
 
 ## Prérequis
 

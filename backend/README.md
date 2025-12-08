@@ -92,18 +92,34 @@ backend/
 │   ├── database.py     # MongoDB Motor + Beanie
 │   └── redis_client.py # Redis pour sessions et cache
 ├── models/             # Modèles Beanie (MongoDB)
-│   └── user.py         # Modèle utilisateur
+│   ├── user.py         # Modèle utilisateur
+│   ├── project.py      # Modèle projet et graphe
+│   └── share.py        # Modèle lien de partage
 ├── schemas/            # Schémas Pydantic pour validation
-│   └── auth.py         # Schémas d'authentification
+│   ├── auth.py         # Schémas d'authentification
+│   └── ...             # Autres schémas
 ├── api/
 │   ├── dependencies.py # Dépendances réutilisables
 │   └── routes/         # Routes API
-│       ├── auth.py     # Endpoints auth
-│       └── files.py    # Endpoints upload/graphes
+│       ├── auth.py     # Authentification
+│       ├── users.py    # Gestion utilisateurs
+│       ├── projects.py # CRUD Projets & Calculs
+│       ├── files.py    # Upload/Import
+│       └── share.py    # Gestion du partage public
 ├── services/           # Logique métier
-│   └── graph_service.py # Service graphes (TODO: à implémenter)
+│   ├── auth_service.py # Service d'authentification
+│   └── graph_service.py # Service de calcul de graphes (NetworkX/igraph)
 └── main.py             # Point d'entrée FastAPI
 ```
+
+## Fonctionnalités Clés
+
+- **Authentification** : JWT, Refresh Tokens, Blacklist Redis.
+- **Gestion de Graphes** : Stockage optimisé, support de grands graphes.
+- **Calculs de Layout** : Endpoints dédiés pour recalculer les positions (Fruchterman-Reingold, etc.).
+- **Partage** : Génération de tokens uniques pour accès en lecture seule.
+  - Endpoint de prévisualisation de layout sans persistance pour les vues partagées.
+- **Import/Export** : Support CSV et JSON via Polars.
 
 ## Authentification
 
@@ -255,19 +271,17 @@ Voir `.env.example` pour la liste complète. Principales variables:
 - `ALLOWED_ORIGINS` - Origins CORS autorisés
 - `MAX_UPLOAD_SIZE_MB` - Taille max fichiers (défaut: 50)
 
-## TODO
+## TODO / Roadmap
 
-- [ ] **Implémenter graph_service.py** avec NetworkX + igraph
-- [ ] Fonctions layout: `_spring_layout_3d()`, `_fruchterman_reingold_3d()`, `_drl_3d()`
-- [ ] Conversion NetworkX → igraph pour layouts performants
-- [ ] Créer modèle MongoDB `Graph` pour stockage positions calculées
-- [ ] Endpoint POST `/graphs/compute` avec paramètres (algorithm, iterations, scale)
-- [ ] Endpoint GET `/graphs/{graph_id}/recompute` pour recalculer avec autre algo
-- [ ] Cache Redis pour résultats (clé: `graph_id:algorithm:params_hash`)
-- [ ] Parser CSV Polars → NetworkX Graph
-- [ ] Validation schémas CSV (source, target, weight optionnel)
+- [x] **Implémenter graph_service.py** avec NetworkX + igraph
+- [x] Fonctions layout: `_spring_layout_3d()`, `_fruchterman_reingold_3d()`, `_drl_3d()`
+- [x] Conversion NetworkX → igraph pour layouts performants
+- [x] Créer modèle MongoDB `Graph` pour stockage positions calculées
+- [x] Endpoint POST `/graphs/compute` avec paramètres (algorithm, iterations, scale)
+- [x] Parser CSV Polars → NetworkX Graph
+- [x] Système de Partage (Share Links)
 - [ ] Tests unitaires avec pytest + fixtures graphes
-- [ ] Background tasks pour graphes >20k nœuds
-- [ ] WebSocket progression calcul temps réel (optionnel)
+- [ ] Background tasks pour graphes >20k nœuds (Celery/Redis Queue)
+- [ ] WebSocket progression calcul temps réel
 - [ ] Rate limiting (10 req/min sur /compute)
 - [ ] Métriques: temps calcul par algo, distribution tailles graphes
