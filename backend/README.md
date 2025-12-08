@@ -271,17 +271,6 @@ Voir `.env.example` pour la liste complète. Principales variables:
 - `ALLOWED_ORIGINS` - Origins CORS autorisés
 - `MAX_UPLOAD_SIZE_MB` - Taille max fichiers (défaut: 50)
 
-## TODO / Roadmap
+## Roadmap
 
-- [x] **Implémenter graph_service.py** avec NetworkX + igraph
-- [x] Fonctions layout: `_spring_layout_3d()`, `_fruchterman_reingold_3d()`, `_drl_3d()`
-- [x] Conversion NetworkX → igraph pour layouts performants
-- [x] Créer modèle MongoDB `Graph` pour stockage positions calculées
-- [x] Endpoint POST `/graphs/compute` avec paramètres (algorithm, iterations, scale)
-- [x] Parser CSV Polars → NetworkX Graph
-- [x] Système de Partage (Share Links)
-- [ ] Tests unitaires avec pytest + fixtures graphes
-- [ ] Background tasks pour graphes >20k nœuds (Celery/Redis Queue)
-- [ ] WebSocket progression calcul temps réel
-- [ ] Rate limiting (10 req/min sur /compute)
-- [ ] Métriques: temps calcul par algo, distribution tailles graphes
+Voir le fichier [ROADMAP.md](../ROADMAP.md) à la racine du projet pour la feuille de route détaillée.
