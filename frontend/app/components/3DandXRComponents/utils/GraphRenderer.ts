@@ -176,6 +176,51 @@ export class GraphRenderer {
                         });
                     }
                 });
+
+                // --- Grab global du graphe (tous les nœuds) ---
+                controllers.forEach(controller => {
+                    if (!controller._graphGlobalGrabObserverAdded) {
+                        controller._graphGlobalGrabObserverAdded = true;
+                        let isGrabbingGraph = false;
+                        let graphGrabOffset = null;
+                        let initialNodePositions = null;
+                        controller.onMotionControllerInitObservable.add(motionController => {
+                            // Utilise le bouton menu (ou B/Y) pour grab global
+                            const menuComponent = motionController.getComponent('menu') || motionController.getComponent('secondary-button');
+                            if (menuComponent) {
+                                menuComponent.onButtonStateChangedObservable.add(() => {
+                                    if (menuComponent.changes.pressed) {
+                                        if (menuComponent.pressed) {
+                                            // Début du grab global
+                                            isGrabbingGraph = true;
+                                            // On stocke la position initiale du contrôleur et des nœuds
+                                            const handPos = controller.grip ? controller.grip.position.clone() : controller.pointer.position.clone();
+                                            graphGrabOffset = handPos;
+                                            initialNodePositions = Array.from(nodeMeshes.values()).map(mesh => mesh.position.clone());
+                                        } else {
+                                            // Fin du grab global
+                                            isGrabbingGraph = false;
+                                            graphGrabOffset = null;
+                                            initialNodePositions = null;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        // Déplacement global à chaque frame
+                        scene.onBeforeRenderObservable.add(() => {
+                            if (isGrabbingGraph && (controller.grip || controller.pointer) && graphGrabOffset && initialNodePositions) {
+                                const handPos = controller.grip ? controller.grip.position : controller.pointer.position;
+                                const delta = handPos.subtract(graphGrabOffset);
+                                let i = 0;
+                                for (const mesh of nodeMeshes.values()) {
+                                    mesh.position = initialNodePositions[i].add(delta);
+                                    i++;
+                                }
+                            }
+                        });
+                    }
+                });
             }
 
             nodeMeshes.set(node.id, instance);
@@ -246,7 +291,7 @@ export class GraphRenderer {
                 // Ensure visibility
                 instance.isVisible = true;
 
-                // Interactions
+                // Interactions (VR et Web)
                 instance.actionManager = new ActionManager(scene);
                 instance.isPickable = true;
 
@@ -274,6 +319,7 @@ export class GraphRenderer {
                             instance.instancedBuffers.color = new Color4(1, 0.6, 1, 1);
                         }, 200);
 
+                        // Sélection VR et Web
                         if (onSelect) onSelect(edge, 'edge');
                         if (onVRSelect) {
                             onVRSelect(edge, 'edge');

@@ -117,6 +117,52 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             canvas.addEventListener('touchmove', preventTouchZoom, { passive: false });
         }
 
+        // --- Flying sur joystick gauche, rotation fluide sur joystick droit (VR) ---
+        sceneInstance.onAfterRenderObservable.add(() => {
+            if (xrHelperRef.current && xrHelperRef.current.input && xrHelperRef.current.input.controllers) {
+                // Contrôleur gauche pour flying (axes[0], axes[1])
+                const leftController = xrHelperRef.current.input.controllers.find((c) => c.inputSource && c.inputSource.handedness === 'left');
+                // Contrôleur droit pour rotation (axes[2])
+                const rightController = xrHelperRef.current.input.controllers.find((c) => c.inputSource && c.inputSource.handedness === 'right');
+                const xrCamera = xrHelperRef.current.baseExperience && xrHelperRef.current.baseExperience.camera;
+                // Flying (déplacement) - on force le joystick gauche
+                if (leftController && xrCamera) {
+                    const gamepad = leftController.motionController && leftController.motionController.gamepad;
+                    if (gamepad && gamepad.axes && gamepad.axes.length >= 2) {
+                        const x = gamepad.axes[0]; // gauche/droite
+                        const y = gamepad.axes[1]; // avant/arrière
+                        const FLY_SPEED = 0.15;
+                        if (Math.abs(x) > 0.1 || Math.abs(y) > 0.1) {
+                            // Calcul direction selon l'orientation de la caméra
+                            const forward = new Vector3(
+                                Math.sin(xrCamera.rotation.y),
+                                0,
+                                Math.cos(xrCamera.rotation.y)
+                            );
+                            const right = new Vector3(
+                                Math.sin(xrCamera.rotation.y + Math.PI / 2),
+                                0,
+                                Math.cos(xrCamera.rotation.y + Math.PI / 2)
+                            );
+                            const move = forward.scale(-y).add(right.scale(x)).scale(FLY_SPEED);
+                            xrCamera.position.addInPlace(move);
+                        }
+                    }
+                }
+                // Rotation fluide - joystick droit
+                if (rightController && xrCamera) {
+                    const gamepad = rightController.motionController && rightController.motionController.gamepad;
+                    if (gamepad && gamepad.axes && gamepad.axes.length >= 4) {
+                        const x = gamepad.axes[2]; // gauche/droite
+                        const ROTATION_SPEED = 0.04;
+                        if (Math.abs(x) > 0.1) {
+                            xrCamera.rotation.y -= x * ROTATION_SPEED;
+                        }
+                    }
+                }
+            }
+        });
+
         // WebXR Setup
         try {
             const xr = await sceneInstance.createDefaultXRExperienceAsync({

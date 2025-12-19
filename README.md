@@ -1,3 +1,23 @@
+# Interactions VR & Mapping des Touches
+
+Voici la liste des interactions disponibles en mode VR/WebXR et leur mapping sur les contrôleurs standards (Oculus/Meta, Index, etc.) :
+
+| Interaction                        | Contrôleur / Touche         | Description |
+|-------------------------------------|-----------------------------|-------------|
+| **Déplacement (flying)**            | Joystick gauche             | Avancer, reculer, gauche, droite (flying 6DoF) |
+| **Rotation de la vue**              | Joystick droit              | Tourner la caméra (yaw) à gauche/droite |
+| **Sélection nœud/lien**             | Gâchette (Trigger)          | Pointer un nœud/lien avec le rayon, appuyer pour ouvrir le panneau de détails |
+| **Grab (saisie) d’un nœud**         | Gâchette (Trigger) ou Grip  | Maintenir sur un nœud pour le déplacer en VR |
+| **Grab du graphe entier**           | Bouton Menu (≡, B ou Y)     | Maintenir pour déplacer tout le graphe d’un bloc |
+| **Ouvrir le menu VR**               | Bouton Menu (≡)             | Affiche le menu VR flottant |
+| **Quitter la VR**                   | Menu VR → Quitter           | Quitte la session immersive |
+
+**Remarques :**
+- Le flying (déplacement) est toujours sur le joystick gauche, la rotation sur le droit, quel que soit le casque.
+- Le bouton Menu correspond à ≡ sur Oculus/Meta, ou B/Y sur d’autres contrôleurs.
+- Le grab global fonctionne uniquement en maintenant le bouton Menu.
+- Les interactions sont optimisées pour Babylon.js/WebXR, mais peuvent varier selon le navigateur ou le casque (mapping standardisé ici).
+
 # PE_Def_Project
 
 Plateforme de visualisation 3D immersive de graphes avec spatialisation performante.
