@@ -59,7 +59,10 @@ export default function SceneComponent({
     // Boucle de rendu
     engine.runRenderLoop(() => {
       if (typeof onRender === "function") onRender(scene);
-      scene.render();
+      // Only render if there is an active camera to avoid "No camera defined" errors during async init
+      if (scene.activeCamera) {
+        scene.render();
+      }
     });
 
     const resize = () => {

@@ -3,7 +3,9 @@
 import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectsService } from '@/app/services/projectsService';
-import GraphScene, { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphScene';
+import GraphSceneWeb from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
+import GraphSceneXR from '@/app/components/3DandXRComponents/Graph/GraphSceneXR';
+import { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
 import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
 import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
@@ -24,6 +26,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
+    const [isVRMode, setIsVRMode] = useState(false);
     
     const graphSceneRef = useRef<GraphSceneRef>(null);
     const { addToast } = useToastStore();
@@ -103,13 +106,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             {/* 3D Scene Layer */}
             <div className="absolute inset-0 z-0" style={{ touchAction: 'none' }}>
                 {project.graph_data ? (
-                    <GraphScene
-                        ref={graphSceneRef}
-                        key={project.updated_at || 'initial'}
-                        data={project.graph_data}
-                        onSelect={handleSelect}
-                        visibleNodeIds={visibleNodeIds}
-                    />
+                    isVRMode ? (
+                        <GraphSceneXR
+                            ref={graphSceneRef}
+                            key={`xr-${project.updated_at || 'initial'}`}
+                            data={project.graph_data}
+                            onSelect={handleSelect}
+                            visibleNodeIds={visibleNodeIds}
+                        />
+                    ) : (
+                        <GraphSceneWeb
+                            ref={graphSceneRef}
+                            key={`web-${project.updated_at || 'initial'}`}
+                            data={project.graph_data}
+                            onSelect={handleSelect}
+                            visibleNodeIds={visibleNodeIds}
+                        />
+                    )
                 ) : (
                     <div className="flex h-full items-center justify-center text-gray-500">
                         Aucune donnée de graphe
@@ -194,13 +207,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 />
             )}
 
+            {/* VR Instructions Overlay */}
+            {isVRMode && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+                    <div className="bg-black/60 backdrop-blur-xl border border-primary-500/30 rounded-2xl p-6 text-center shadow-2xl max-w-md animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
+                            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Mode VR Prêt</h3>
+                        <p className="text-gray-300 mb-4">
+                            La scène est configurée pour la réalité virtuelle.
+                            <br />
+                            <span className="text-primary-400 font-medium">Cliquez sur l'icône de lunettes en bas à droite</span> pour entrer en immersion.
+                        </p>
+                        <div className="text-xs text-gray-500">
+                            Compatible Meta Quest, HTC Vive, Apple Vision Pro
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Bottom Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
                 <OverlayControls
                     onResetCamera={handleResetCamera}
-                    onToggleVR={() => {
-                        addToast('info', 'Mode VR', 'Pour entrer en VR, utilisez le bouton lunettes en bas à droite.');
-                    }}
+                    onToggleVR={() => setIsVRMode(!isVRMode)}
                     onShare={() => setIsShareModalOpen(true)}
                     onEdit={() => setIsEditModalOpen(true)}
                 >

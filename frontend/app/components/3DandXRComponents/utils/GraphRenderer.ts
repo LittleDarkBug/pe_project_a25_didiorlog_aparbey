@@ -121,7 +121,8 @@ export class GraphRenderer {
                     }, 200);
 
                     if (onSelect) onSelect(node, 'node');
-                    if (xrHelperRef?.current && xrHelperRef.current.baseExperience.state === 2 && onVRSelect) {
+                    // Always call onVRSelect if provided - let the callback handle state checks if needed
+                    if (onVRSelect) {
                         onVRSelect(node, 'node');
                     }
                 })
@@ -148,8 +149,8 @@ export class GraphRenderer {
         // 1. Create Master Edge (Cylinder aligned with Z axis for easier lookAt)
         const masterEdge = MeshBuilder.CreateCylinder("master_edge_cylinder", {
             height: 1,
-            diameter: 0.05, // Thin line
-            tessellation: 6 // Low poly for performance
+            diameter: 0.1, // Thicker line for better visibility
+            tessellation: 8
         }, scene);
         
         // Rotate geometry so cylinder aligns with Z axis (default is Y)
@@ -161,13 +162,13 @@ export class GraphRenderer {
         edgeMaterial.emissiveColor = new Color3(0.5, 0.2, 0.5);
         edgeMaterial.metallic = 0.0;
         edgeMaterial.roughness = 1.0;
-        edgeMaterial.alpha = 0.4;
+        edgeMaterial.alpha = 0.6; // More visible
         masterEdge.material = edgeMaterial;
         masterEdge.isVisible = false;
 
         // Register instanced buffer for individual colors
         masterEdge.registerInstancedBuffer("color", 4);
-        masterEdge.instancedBuffers.color = new Color4(0.8, 0.4, 0.8, 0.4);
+        masterEdge.instancedBuffers.color = new Color4(0.8, 0.4, 0.8, 0.6);
 
         data.edges.forEach(edge => {
             const sourceMesh = nodeMeshes.get(edge.source);
@@ -191,6 +192,9 @@ export class GraphRenderer {
 
                 // Store reference for filtering
                 this.edgeInstances.push({ mesh: instance, source: edge.source, target: edge.target });
+
+                // Ensure visibility
+                instance.isVisible = true;
 
                 // Interactions
                 instance.actionManager = new ActionManager(scene);
@@ -221,7 +225,7 @@ export class GraphRenderer {
                         }, 200);
 
                         if (onSelect) onSelect(edge, 'edge');
-                        if (xrHelperRef?.current && xrHelperRef.current.baseExperience.state === 2 && onVRSelect) {
+                        if (onVRSelect) {
                             onVRSelect(edge, 'edge');
                         }
                     })
