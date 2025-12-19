@@ -63,6 +63,7 @@ export class GraphRenderer {
             // Create an instance instead of a clone or new mesh
             const instance = masterMesh.createInstance(node.id);
             instance.position = new Vector3(node.x, node.y, node.z);
+            instance.isPickable = true; // Ensure pickable for VR rays
             
             // Apply custom color if present
             if (node.color) {
@@ -127,6 +128,55 @@ export class GraphRenderer {
                     }
                 })
             );
+
+            // --- XR Node Grabbing (VR Only) ---
+            if (xrHelperRef && xrHelperRef.current && xrHelperRef.current.input && xrHelperRef.current.input.controllers) {
+                // Pour chaque contrôleur, on ajoute la logique de grab sur ce nœud
+                const controllers = xrHelperRef.current.input.controllers;
+                controllers.forEach(controller => {
+                    // Pour éviter d'attacher plusieurs fois
+                    if (!controller._graphGrabObserverAdded) {
+                        controller._graphGrabObserverAdded = true;
+                        let grabbedNode = null;
+                        let grabOffset = null;
+                        // On écoute le squeeze (ou select) pour grab
+                        controller.onMotionControllerInitObservable.add(motionController => {
+                            // Squeeze (grip) pour grab
+                            const squeezeComponent = motionController.getComponentOfType('squeeze') || motionController.getComponent('grip');
+                            const selectComponent = motionController.getComponentOfType('trigger') || motionController.getComponent('trigger');
+                            // On écoute le squeeze ou le select
+                            [squeezeComponent, selectComponent].forEach(component => {
+                                if (component) {
+                                    component.onButtonStateChangedObservable.add(() => {
+                                        if (component.changes.pressed) {
+                                            if (component.pressed) {
+                                                // On tente de pick un mesh sous le contrôleur
+                                                const pick = scene.pickWithRay(controller.getForwardRay(100));
+                                                if (pick && pick.pickedMesh === instance) {
+                                                    grabbedNode = instance;
+                                                    // Calculer l'offset entre la main et le nœud
+                                                    grabOffset = grabbedNode.position.subtract(controller.grip ? controller.grip.position : controller.pointer.position);
+                                                }
+                                            } else {
+                                                // Relâchement
+                                                grabbedNode = null;
+                                                grabOffset = null;
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        });
+                        // Bouger le nœud si grab actif
+                        scene.onBeforeRenderObservable.add(() => {
+                            if (grabbedNode && (controller.grip || controller.pointer)) {
+                                const handPos = controller.grip ? controller.grip.position : controller.pointer.position;
+                                grabbedNode.position = handPos.add(grabOffset || Vector3.Zero());
+                            }
+                        });
+                    }
+                });
+            }
 
             nodeMeshes.set(node.id, instance);
         });

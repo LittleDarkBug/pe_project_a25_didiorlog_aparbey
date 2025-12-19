@@ -122,10 +122,10 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [], // We are in space, no floor
                 disableTeleportation: true, // We use custom locomotion
-                disableHandTracking: false, // Enable hand tracking if available
+                disableHandTracking: true, // Désactive le hand tracking pour éviter l'erreur
                 uiOptions: {
                     sessionMode: 'immersive-vr',
-                    optionalFeatures: ['unbounded', 'local-floor', 'hand-tracking']
+                    optionalFeatures: ['unbounded', 'local-floor'] // Retire 'hand-tracking'
                 }
             });
             xrHelperRef.current = xr;

@@ -2,65 +2,50 @@ import { WebXRFeatureName } from '@babylonjs/core';
 
 export function useVRLocomotion() {
     const setupLocomotion = (featuresManager: any, xr: any) => {
-        // Movement locomotion using proper feature name
+        // 1. Enable Free Movement (Flying)
+        // Since we are in a space graph (no floor), we want to fly in the direction we are looking/pointing.
         try {
             const movementFeature = featuresManager.enableFeature(
                 WebXRFeatureName.MOVEMENT,
                 'latest',
                 {
                     xrInput: xr.input,
-                    movementSpeed: 2.0,
-                    rotationSpeed: 1.5
+                    // High speed for large graph traversal
+                    movementSpeed: 20.0, 
+                    rotationSpeed: 0.5,
+                    // Fly in the direction of the viewer/controller
+                    movementOrientationFollowsViewerPose: true,
+                    // Disable gravity/ground check for flying
+                    enablePhysics: false 
                 }
             );
-            console.log("Movement feature enabled", movementFeature);
-        } catch (e) {
-            console.log("Movement unavailable, trying walking locomotion", e);
-            // Fallback to walking locomotion
-            try {
-                const walkingFeature = featuresManager.enableFeature(
-                    WebXRFeatureName.WALKING_LOCOMOTION,
-                    'latest',
-                    {
-                        locomotionTarget: xr.baseExperience.camera
-                    }
-                );
-                console.log("Walking locomotion enabled", walkingFeature);
-            } catch (err) {
-                console.log("Walking locomotion also unavailable");
+            
+            // Ensure movement is enabled
+            if (movementFeature) {
+                movementFeature.movementEnabled = true;
             }
+            
+            console.log("VR Flying Movement enabled");
+        } catch (e) {
+            console.error("Failed to enable VR Movement", e);
         }
 
-        // Pointer selection with proper feature name
+        // 2. Pointer Selection is usually enabled by default in createDefaultXRExperienceAsync.
+        // We can configure it if needed, but re-enabling it might cause duplicates.
+        // We just ensure the existing one is configured correctly if accessible.
         try {
-            const pointerFeature = featuresManager.enableFeature(
-                WebXRFeatureName.POINTER_SELECTION,
-                'stable',
-                {
-                    xrInput: xr.input,
-                    enablePointerSelectionOnAllControllers: true
-                }
-            );
-            console.log("Pointer selection enabled", pointerFeature);
+             // If we need to force it or configure it:
+             const pointerSelection = featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION);
+             if (pointerSelection) {
+                 pointerSelection.displayLaserPointer = true;
+                 pointerSelection.selectionMeshPickedPointEnabled = true;
+             }
         } catch (e) {
-            console.log("Pointer selection unavailable", e);
+            console.log("Could not configure pointer selection", e);
         }
 
-        // Near interaction with proper feature name
-        try {
-            const nearFeature = featuresManager.enableFeature(
-                WebXRFeatureName.NEAR_INTERACTION,
-                'stable',
-                {
-                    xrInput: xr.input,
-                    enableNearInteractionOnAllControllers: true,
-                    nearInteractionMode: 'grab'
-                }
-            );
-            console.log("Near interaction enabled", nearFeature);
-        } catch (e) {
-            console.log("Near interaction unavailable", e);
-        }
+        // 3. Disable Near Interaction for now to avoid conflicts with Ray Selection in large scenes
+        // (Unless specifically requested for UI interaction close up)
     };
 
     return { setupLocomotion };
