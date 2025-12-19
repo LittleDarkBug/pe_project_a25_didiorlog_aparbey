@@ -129,96 +129,80 @@ export class GraphRenderer {
                 })
             );
 
-            // --- XR Node Grabbing (VR Only) ---
-            if (xrHelperRef && xrHelperRef.current && xrHelperRef.current.input && xrHelperRef.current.input.controllers) {
-                // Pour chaque contrôleur, on ajoute la logique de grab sur ce nœud
-                const controllers = xrHelperRef.current.input.controllers;
-                controllers.forEach(controller => {
-                    // Pour éviter d'attacher plusieurs fois
-                    if (!controller._graphGrabObserverAdded) {
-                        controller._graphGrabObserverAdded = true;
-                        let grabbedNode = null;
-                        let grabOffset = null;
-                        // On écoute le squeeze (ou select) pour grab
-                        controller.onMotionControllerInitObservable.add(motionController => {
-                            // Squeeze (grip) pour grab
-                            const squeezeComponent = motionController.getComponentOfType('squeeze') || motionController.getComponent('grip');
-                            const selectComponent = motionController.getComponentOfType('trigger') || motionController.getComponent('trigger');
-                            // On écoute le squeeze ou le select
-                            [squeezeComponent, selectComponent].forEach(component => {
-                                if (component) {
-                                    component.onButtonStateChangedObservable.add(() => {
-                                        if (component.changes.pressed) {
-                                            if (component.pressed) {
-                                                // On tente de pick un mesh sous le contrôleur
-                                                const pick = scene.pickWithRay(controller.getForwardRay(100));
-                                                if (pick && pick.pickedMesh === instance) {
-                                                    grabbedNode = instance;
-                                                    // Calculer l'offset entre la main et le nœud
-                                                    grabOffset = grabbedNode.position.subtract(controller.grip ? controller.grip.position : controller.pointer.position);
-                                                }
-                                            } else {
-                                                // Relâchement
-                                                grabbedNode = null;
-                                                grabOffset = null;
-                                            }
+            // --- XR Node Grabbing (Babylon.js v8 natif) ---
+            if (xrHelperRef && xrHelperRef.current && xrHelperRef.current.input) {
+                const xrInput = xrHelperRef.current.input;
+                let grabbedNode = null;
+                let grabOffset = null;
+                let isGrabbingGraph = false;
+                let graphGrabOffset = null;
+                let initialNodePositions = null;
+
+                // Grab de nœud : trigger sur le nœud
+                xrInput.onControllerAddedObservable.add(controller => {
+                    controller.onMotionControllerInitObservable.add(motionController => {
+                        // Trigger pour grab nœud
+                        const trigger = motionController.getComponent('trigger');
+                        if (trigger) {
+                            trigger.onButtonStateChangedObservable.add(() => {
+                                if (trigger.changes.pressed) {
+                                    if (trigger.pressed) {
+                                        // Pick mesh sous le laser
+                                        const pick = scene.pickWithRay(controller.getForwardRay(100));
+                                        if (pick && pick.pickedMesh === instance) {
+                                            grabbedNode = instance;
+                                            grabOffset = grabbedNode.position.subtract(controller.pointer.position);
                                         }
-                                    });
+                                    } else {
+                                        grabbedNode = null;
+                                        grabOffset = null;
+                                    }
                                 }
                             });
-                        });
-                        // Bouger le nœud si grab actif
-                        scene.onBeforeRenderObservable.add(() => {
-                            if (grabbedNode && (controller.grip || controller.pointer)) {
-                                const handPos = controller.grip ? controller.grip.position : controller.pointer.position;
-                                grabbedNode.position = handPos.add(grabOffset || Vector3.Zero());
-                            }
-                        });
-                    }
-                });
-
-                // --- Grab global du graphe (tous les nœuds) ---
-                controllers.forEach(controller => {
-                    if (!controller._graphGlobalGrabObserverAdded) {
-                        controller._graphGlobalGrabObserverAdded = true;
-                        let isGrabbingGraph = false;
-                        let graphGrabOffset = null;
-                        let initialNodePositions = null;
-                        controller.onMotionControllerInitObservable.add(motionController => {
-                            // Utilise le bouton menu (ou B/Y) pour grab global
-                            const menuComponent = motionController.getComponent('menu') || motionController.getComponent('secondary-button');
-                            if (menuComponent) {
-                                menuComponent.onButtonStateChangedObservable.add(() => {
-                                    if (menuComponent.changes.pressed) {
-                                        if (menuComponent.pressed) {
-                                            // Début du grab global
+                        }
+                        // Grip/Menu pour grab global
+                        const grip = motionController.getComponent('grip');
+                        const menu = motionController.getComponent('menu') || motionController.getComponent('secondary-button');
+                        const grabButton = grip || menu;
+                        if (grabButton) {
+                            grabButton.onButtonStateChangedObservable.add(() => {
+                                if (grabButton.changes.pressed) {
+                                    if (grabButton.pressed) {
+                                        // Pick vide = grab global
+                                        const pick = scene.pickWithRay(controller.getForwardRay(100));
+                                        if (!pick || !pick.pickedMesh) {
                                             isGrabbingGraph = true;
-                                            // On stocke la position initiale du contrôleur et des nœuds
-                                            const handPos = controller.grip ? controller.grip.position.clone() : controller.pointer.position.clone();
-                                            graphGrabOffset = handPos;
+                                            graphGrabOffset = controller.pointer.position.clone();
                                             initialNodePositions = Array.from(nodeMeshes.values()).map(mesh => mesh.position.clone());
-                                        } else {
-                                            // Fin du grab global
-                                            isGrabbingGraph = false;
-                                            graphGrabOffset = null;
-                                            initialNodePositions = null;
                                         }
+                                    } else {
+                                        isGrabbingGraph = false;
+                                        graphGrabOffset = null;
+                                        initialNodePositions = null;
                                     }
-                                });
-                            }
-                        });
-                        // Déplacement global à chaque frame
-                        scene.onBeforeRenderObservable.add(() => {
-                            if (isGrabbingGraph && (controller.grip || controller.pointer) && graphGrabOffset && initialNodePositions) {
-                                const handPos = controller.grip ? controller.grip.position : controller.pointer.position;
-                                const delta = handPos.subtract(graphGrabOffset);
-                                let i = 0;
-                                for (const mesh of nodeMeshes.values()) {
-                                    mesh.position = initialNodePositions[i].add(delta);
-                                    i++;
                                 }
+                            });
+                        }
+                    });
+                });
+                // Déplacement à chaque frame
+                scene.onBeforeRenderObservable.add(() => {
+                    if (grabbedNode && xrInput.controllers.length) {
+                        const controller = xrInput.controllers.find(c => c.pointer && c.pointer.position && grabbedNode);
+                        if (controller) {
+                            grabbedNode.position = controller.pointer.position.add(grabOffset || Vector3.Zero());
+                        }
+                    }
+                    if (isGrabbingGraph && graphGrabOffset && initialNodePositions && xrInput.controllers.length) {
+                        const controller = xrInput.controllers.find(c => c.pointer && c.pointer.position);
+                        if (controller) {
+                            const delta = controller.pointer.position.subtract(graphGrabOffset);
+                            let i = 0;
+                            for (const mesh of nodeMeshes.values()) {
+                                mesh.position = initialNodePositions[i].add(delta);
+                                i++;
                             }
-                        });
+                        }
                     }
                 });
             }

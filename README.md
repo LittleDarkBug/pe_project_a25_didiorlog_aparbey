@@ -4,19 +4,20 @@ Voici la liste des interactions disponibles en mode VR/WebXR et leur mapping sur
 
 | Interaction                        | Contrôleur / Touche         | Description |
 |-------------------------------------|-----------------------------|-------------|
-| **Déplacement (flying)**            | Joystick gauche             | Avancer, reculer, gauche, droite (flying 6DoF) |
-| **Rotation de la vue**              | Joystick droit              | Tourner la caméra (yaw) à gauche/droite |
-| **Sélection nœud/lien**             | Gâchette (Trigger)          | Pointer un nœud/lien avec le rayon, appuyer pour ouvrir le panneau de détails |
-| **Grab (saisie) d’un nœud**         | Gâchette (Trigger) ou Grip  | Maintenir sur un nœud pour le déplacer en VR |
-| **Grab du graphe entier**           | Bouton Menu (≡, B ou Y)     | Maintenir pour déplacer tout le graphe d’un bloc |
-| **Ouvrir le menu VR**               | Bouton Menu (≡)             | Affiche le menu VR flottant |
-| **Quitter la VR**                   | Menu VR → Quitter           | Quitte la session immersive |
+| **Déplacement (flying)**            | Joystick gauche             | Avancer, reculer, gauche, droite, haut/bas (flying 6DoF, natif Babylon.js v8) |
+| **Pointer (laser)**                 | Automatique (tous contrôleurs) | Rayon laser visible pour viser/interagir (natif) |
+| **Sélection nœud/lien**             | Gâchette (Trigger)          | Pointer un nœud/lien avec le laser, appuyer pour sélectionner/interagir (natif) |
+| **Grab (saisie) d’un nœud**         | Gâchette (Trigger)          | Maintenir sur un nœud pour le déplacer en VR (custom, Babylon.js v8 events) |
+| **Grab du graphe entier**           | Grip/Menu (≡, B ou Y)       | Maintenir sur espace vide pour déplacer tout le graphe (custom, Babylon.js v8 events) |
+| **Ouvrir le menu VR**               | (À implémenter custom)      | (Non natif, nécessite logique custom) |
+| **Quitter la VR**                   | (Menu VR ou bouton natif)   | Quitte la session immersive |
 
 **Remarques :**
-- Le flying (déplacement) est toujours sur le joystick gauche, la rotation sur le droit, quel que soit le casque.
-- Le bouton Menu correspond à ≡ sur Oculus/Meta, ou B/Y sur d’autres contrôleurs.
-- Le grab global fonctionne uniquement en maintenant le bouton Menu.
-- Les interactions sont optimisées pour Babylon.js/WebXR, mais peuvent varier selon le navigateur ou le casque (mapping standardisé ici).
+- Le flying (déplacement) et le pointer (laser) sont natifs Babylon.js v8.
+- La sélection d’un nœud/lien fonctionne avec le trigger et le laser.
+- Le grab de nœud et du graphe sont custom, basés sur les events Babylon.js v8 (trigger/grip/menu).
+- Le menu VR custom n’est pas natif, il doit être implémenté si besoin.
+- Les interactions peuvent varier selon le casque, mais ce mapping est standardisé pour Babylon.js v8.
 
 # PE_Def_Project
 

@@ -131,8 +131,35 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             });
             xrHelperRef.current = xr;
 
+
+            // Activation du flying (movement) et du pointer selection selon la doc Babylon.js v8
             const featuresManager = xr.baseExperience.featuresManager;
-            vrUtilsRef.current.setupLocomotion(featuresManager, xr);
+            // Flying (movement)
+            featuresManager.enableFeature(
+                BABYLON.WebXRFeatureName.MOVEMENT,
+                'latest',
+                {
+                    xrInput: xr.input,
+                    movementSpeed: 20.0,
+                    rotationSpeed: 0.5,
+                    movementOrientationFollowsViewerPose: true,
+                    enablePhysics: false,
+                    allowVerticalMovement: true,
+                    allowHorizontalMovement: true,
+                    movementMode: 'flying',
+                }
+            );
+            // Pointer Selection (laser)
+            featuresManager.enableFeature(
+                BABYLON.WebXRFeatureName.POINTER_SELECTION,
+                'latest',
+                {
+                    xrInput: xr.input,
+                    enablePointerSelectionOnAllControllers: true,
+                    displayLaserPointer: true,
+                    selectionMeshPickedPointEnabled: true,
+                }
+            );
 
             xr.baseExperience.onStateChangedObservable.add((state) => {
                 if (state === 2) { // IN_XR
