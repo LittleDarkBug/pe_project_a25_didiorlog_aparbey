@@ -8,6 +8,7 @@ import {
     Mesh,
     InstancedMesh
 } from '@babylonjs/core';
+import { WebXRFeatureName } from '@babylonjs/core/XR/webXRFeaturesManager';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
 import { useVRLocomotion } from '../hooks/useVRLocomotion';
@@ -136,7 +137,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             const featuresManager = xr.baseExperience.featuresManager;
             // Flying (movement)
             featuresManager.enableFeature(
-                BABYLON.WebXRFeatureName.MOVEMENT,
+                WebXRFeatureName.MOVEMENT,
                 'latest',
                 {
                     xrInput: xr.input,
@@ -151,7 +152,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             );
             // Pointer Selection (laser)
             featuresManager.enableFeature(
-                BABYLON.WebXRFeatureName.POINTER_SELECTION,
+                WebXRFeatureName.POINTER_SELECTION,
                 'latest',
                 {
                     xrInput: xr.input,
