@@ -2,30 +2,32 @@ import { WebXRFeatureName } from '@babylonjs/core';
 
 export function useVRLocomotion() {
     const setupLocomotion = (featuresManager: any, xr: any) => {
-        // 1. Enable Free Movement (Flying)
-        // Since we are in a space graph (no floor), we want to fly in the direction we are looking/pointing.
+        // 1. Enable Free Movement (Flying, 6DoF)
         try {
             const movementFeature = featuresManager.enableFeature(
                 WebXRFeatureName.MOVEMENT,
                 'latest',
                 {
                     xrInput: xr.input,
-                    // High speed for large graph traversal
-                    movementSpeed: 20.0, 
+                    movementSpeed: 20.0,
                     rotationSpeed: 0.5,
-                    // Fly in the direction of the viewer/controller
                     movementOrientationFollowsViewerPose: true,
-                    // Disable gravity/ground check for flying
-                    enablePhysics: false 
+                    enablePhysics: false,
+                    // Permet le déplacement vertical (Y) et latéral (X)
+                    allowVerticalMovement: true,
+                    allowHorizontalMovement: true,
+                    // Optionnel : activer le "flying mode" explicite si dispo
+                    movementMode: 'flying',
                 }
             );
-            
-            // Ensure movement is enabled
             if (movementFeature) {
                 movementFeature.movementEnabled = true;
+                // Pour certains devices, forcer flying mode
+                if (typeof movementFeature.setMovementMode === 'function') {
+                    movementFeature.setMovementMode('flying');
+                }
             }
-            
-            console.log("VR Flying Movement enabled");
+            console.log("VR Flying Movement enabled (6DoF)");
         } catch (e) {
             console.error("Failed to enable VR Movement", e);
         }
