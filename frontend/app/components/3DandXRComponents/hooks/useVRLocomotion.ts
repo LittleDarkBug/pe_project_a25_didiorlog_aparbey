@@ -32,16 +32,24 @@ export function useVRLocomotion() {
             console.error("Failed to enable VR Movement", e);
         }
 
-        // 2. Pointer Selection is usually enabled by default in createDefaultXRExperienceAsync.
-        // We can configure it if needed, but re-enabling it might cause duplicates.
-        // We just ensure the existing one is configured correctly if accessible.
+        // 2. Pointer Selection (laser) : forcer l'activation si besoin
         try {
-             // If we need to force it or configure it:
-             const pointerSelection = featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION);
-             if (pointerSelection) {
-                 pointerSelection.displayLaserPointer = true;
-                 pointerSelection.selectionMeshPickedPointEnabled = true;
-             }
+            let pointerSelection = featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION);
+            if (!pointerSelection) {
+                pointerSelection = featuresManager.enableFeature(
+                    WebXRFeatureName.POINTER_SELECTION,
+                    'latest',
+                    {
+                        xrInput: xr.input,
+                        enablePointerSelectionOnAllControllers: true,
+                        displayLaserPointer: true,
+                        selectionMeshPickedPointEnabled: true,
+                    }
+                );
+            } else {
+                pointerSelection.displayLaserPointer = true;
+                pointerSelection.selectionMeshPickedPointEnabled = true;
+            }
         } catch (e) {
             console.log("Could not configure pointer selection", e);
         }
