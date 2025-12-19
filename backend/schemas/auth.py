@@ -115,6 +115,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
     is_active: bool
+    role: str = "user"
     created_at: str
     
     class Config:
@@ -124,6 +125,7 @@ class UserResponse(BaseModel):
                 "email": "user@example.com",
                 "full_name": "John Doe",
                 "is_active": True,
+                "role": "user",
                 "created_at": "2025-01-15T10:30:00Z"
             }
         }

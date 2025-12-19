@@ -23,9 +23,17 @@ export const useAuth = () => {
         }
         return result;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       addToast('Connexion réussie', 'success');
-      router.push('/dashboard');
+      
+      // Force session refresh to get the latest user data including role
+      const newSession = await update();
+      
+      if ((newSession?.user as any)?.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
       router.refresh();
     },
     onError: (error: any) => {
@@ -40,7 +48,8 @@ export const useAuth = () => {
       router.push('/login');
     },
     onError: (error: any) => {
-      addToast(error.response?.data?.detail || "Erreur d'inscription", 'error');
+      const errorMessage = error.data?.detail || error.message || "Erreur d'inscription";
+      addToast(errorMessage, 'error');
     },
   });
 

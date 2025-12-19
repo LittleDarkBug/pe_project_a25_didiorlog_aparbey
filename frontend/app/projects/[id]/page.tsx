@@ -11,6 +11,7 @@ import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
 import ShareModal from '@/app/components/project/ShareModal';
 import { useToastStore } from '@/app/store/useToastStore';
+import { ProjectSkeleton } from '@/app/components/ui/ProjectSkeleton';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -80,34 +81,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }, []);
 
     if (isLoading) {
-        return (
-            <div className="flex h-screen items-center justify-center bg-gradient-to-br from-black via-gray-900 to-black">
-                <div className="relative">
-                    {/* Glassmorphism container */}
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-12 backdrop-blur-2xl shadow-2xl">
-                        <div className="flex flex-col items-center gap-6">
-                            {/* Animated spinner */}
-                            <div className="relative">
-                                <div className="h-16 w-16 animate-spin rounded-full border-4 border-blue-500/30 border-t-blue-500"></div>
-                                <div className="absolute inset-0 h-16 w-16 animate-pulse rounded-full border-4 border-purple-500/20"></div>
-                            </div>
-
-                            {/* Loading text */}
-                            <div className="text-center">
-                                <p className="text-lg font-medium text-white">Chargement du projet</p>
-                                <p className="text-sm text-gray-400 mt-1">Préparation de la visualisation 3D...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Ambient glow effect */}
-                    <div className="absolute inset-0 -z-10">
-                        <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/20 blur-3xl"></div>
-                        <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-purple-500/20 blur-2xl"></div>
-                    </div>
-                </div>
-            </div>
-        );
+        return <ProjectSkeleton />;
     }
 
     if (error || !project) {

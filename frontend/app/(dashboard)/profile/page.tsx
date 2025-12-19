@@ -5,6 +5,7 @@ import { useCurrentUser, useUpdateProfile } from '@/app/hooks/useUsers';
 import { Card } from '@/app/components/ui/Card';
 import { Input } from '@/app/components/ui/Input';
 import { Button } from '@/app/components/ui/Button';
+import { Skeleton } from '@/app/components/ui/Skeleton';
 import { User, Mail, Lock, Save, Shield } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -56,8 +57,60 @@ export default function ProfilePage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            <div className="space-y-6 max-w-4xl mx-auto">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-10 w-48" />
+                    <Skeleton className="h-9 w-32 rounded-full" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Profile Summary Card Skeleton */}
+                    <Card className="md:col-span-1 p-6 flex flex-col items-center space-y-4 h-fit">
+                        <Skeleton className="h-24 w-24 rounded-full" />
+                        <div className="space-y-2 w-full flex flex-col items-center">
+                            <Skeleton className="h-6 w-32" />
+                            <Skeleton className="h-4 w-48" />
+                        </div>
+                        <div className="w-full pt-4 border-t border-surface-50/10">
+                            <Skeleton className="h-3 w-24 mb-2" />
+                            <Skeleton className="h-4 w-32" />
+                        </div>
+                    </Card>
+
+                    {/* Edit Form Card Skeleton */}
+                    <Card className="md:col-span-2 p-8">
+                        <Skeleton className="h-7 w-64 mb-6" />
+                        
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-16" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+
+                            <div className="border-t border-surface-50/10 my-6 pt-6">
+                                <Skeleton className="h-4 w-20 mb-4" />
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-40" />
+                                        <Skeleton className="h-10 w-full" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-48" />
+                                        <Skeleton className="h-10 w-full" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <Skeleton className="h-10 w-64" />
+                            </div>
+                        </div>
+                    </Card>
+                </div>
             </div>
         );
     }

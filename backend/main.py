@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from core.config import settings
-from api.routes import auth, files, projects, users, share
+from api.routes import auth, files, projects, users, share, admin
 
 
 @asynccontextmanager
@@ -73,6 +73,7 @@ app.include_router(files.router)
 app.include_router(projects.router)
 app.include_router(users.router)
 app.include_router(share.router)
+app.include_router(admin.router)
 
 
 @app.get("/", tags=["Root"])

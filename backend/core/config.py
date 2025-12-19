@@ -33,11 +33,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     
     # CORS
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3000"
-    ]
+    ALLOWED_ORIGINS: List[str] = ["*"]
     
     # Upload
     MAX_UPLOAD_SIZE_MB: int = 100

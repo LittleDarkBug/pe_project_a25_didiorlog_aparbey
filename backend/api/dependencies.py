@@ -78,6 +78,20 @@ async def get_current_user(
     return user
 
 
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Vérifie que l'utilisateur courant a les droits d'administrateur.
+    """
+    if not current_user.is_superuser and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough privileges",
+        )
+    return current_user
+
+
 async def get_current_active_superuser(
     current_user: User = Depends(get_current_user)
 ) -> User:

@@ -11,6 +11,7 @@ import {
     Settings, 
     LogOut, 
     User, 
+    Users,
     Shield,
     Menu,
     X,
@@ -42,13 +43,19 @@ export function Sidebar() {
     };
 
     const navigation = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Profil', href: '/profile', icon: User },
     ];
 
     // Add Admin link if user is admin
     if (user?.role === 'admin') {
-        navigation.push({ name: 'Administration', href: '/admin', icon: Shield });
+        navigation.unshift(
+            { name: 'Vue d\'ensemble', href: '/admin', icon: LayoutDashboard },
+            { name: 'Utilisateurs', href: '/admin/users', icon: Users },
+            { name: 'Projets', href: '/admin/projects', icon: FolderOpen }
+        );
+    } else {
+        // Only regular users can see/create projects
+        navigation.unshift({ name: 'Mes Projets', href: '/dashboard', icon: FolderOpen });
     }
 
     const isActive = (path: string) => pathname === path;

@@ -10,6 +10,7 @@ import FilterPanel from '@/app/components/project/FilterPanel';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useToastStore } from '@/app/store/useToastStore';
+import { ProjectSkeleton } from '@/app/components/ui/ProjectSkeleton';
 
 export default function SharedProjectPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = use(params);
@@ -71,24 +72,7 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     }, []);
 
     if (isLoading) {
-        return (
-            <div className="flex h-screen items-center justify-center bg-gradient-to-br from-black via-gray-900 to-black">
-                <div className="relative">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-12 backdrop-blur-2xl shadow-2xl">
-                        <div className="flex flex-col items-center gap-6">
-                            <div className="relative">
-                                <div className="h-16 w-16 animate-spin rounded-full border-4 border-blue-500/30 border-t-blue-500"></div>
-                                <div className="absolute inset-0 h-16 w-16 animate-pulse rounded-full border-4 border-purple-500/20"></div>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-lg font-medium text-white">Chargement du projet partagé</p>
-                                <p className="text-sm text-gray-400 mt-1">Préparation de la visualisation 3D...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+        return <ProjectSkeleton />;
     }
 
     if (error) {

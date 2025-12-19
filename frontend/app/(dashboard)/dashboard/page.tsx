@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, LayoutGrid, List } from 'lucide-react';
 import ImportWizard from '@/app/components/dashboard/ImportWizard';
 import { projectsService } from '@/app/services/projectsService';
+import { Skeleton } from '@/app/components/ui/Skeleton';
 
 // Mock data for now
 const MOCK_PROJECTS = [
@@ -139,7 +140,18 @@ export default function DashboardPage() {
                     {isLoading ? (
                         // Skeleton loading
                         [...Array(3)].map((_, i) => (
-                            <div key={i} className="h-48 rounded-2xl border border-surface-50/10 bg-surface-50/5 animate-pulse"></div>
+                            <div key={i} className="relative overflow-hidden rounded-2xl border border-surface-50/10 bg-surface-50/5 p-6">
+                                <div className="mb-4 flex items-start justify-between">
+                                    <Skeleton className="h-12 w-12 rounded-lg" />
+                                    <Skeleton className="h-8 w-8 rounded-full" />
+                                </div>
+                                <Skeleton className="mb-2 h-7 w-3/4" />
+                                <Skeleton className="mb-4 h-4 w-1/2" />
+                                <div className="flex items-center gap-4 border-t border-surface-50/10 pt-4">
+                                    <Skeleton className="h-4 w-20" />
+                                    <Skeleton className="h-4 w-20" />
+                                </div>
+                            </div>
                         ))
                     ) : (
                         filteredProjects.map((project, index) => (
@@ -236,7 +248,24 @@ export default function DashboardPage() {
                     {isLoading ? (
                         // Skeleton loading for list
                         [...Array(5)].map((_, i) => (
-                            <div key={i} className="h-16 rounded-xl border border-surface-50/10 bg-surface-50/5 animate-pulse"></div>
+                            <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center bg-surface-50/5 rounded-xl border border-surface-50/10">
+                                <div className="col-span-10 sm:col-span-5 flex items-center gap-3">
+                                    <Skeleton className="h-9 w-9 rounded-lg" />
+                                    <Skeleton className="h-5 w-48" />
+                                </div>
+                                <div className="hidden sm:flex sm:col-span-2 items-center gap-2">
+                                    <Skeleton className="h-4 w-16" />
+                                </div>
+                                <div className="hidden sm:flex sm:col-span-2 items-center gap-2">
+                                    <Skeleton className="h-4 w-16" />
+                                </div>
+                                <div className="hidden sm:block sm:col-span-2">
+                                    <Skeleton className="h-4 w-24" />
+                                </div>
+                                <div className="col-span-2 sm:col-span-1 flex justify-end">
+                                    <Skeleton className="h-8 w-8 rounded-full" />
+                                </div>
+                            </div>
                         ))
                     ) : (
                         <>

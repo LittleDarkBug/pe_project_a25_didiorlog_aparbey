@@ -18,6 +18,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         full_name=current_user.full_name,
         is_active=current_user.is_active,
+        role=current_user.role,
         created_at=current_user.created_at.isoformat()
     )
 
@@ -51,6 +52,7 @@ async def update_user_me(
         email=current_user.email,
         full_name=current_user.full_name,
         is_active=current_user.is_active,
+        role=current_user.role,
         created_at=current_user.created_at.isoformat()
     )
 
@@ -76,6 +78,7 @@ async def read_users(
             email=user.email,
             full_name=user.full_name,
             is_active=user.is_active,
+            role=user.role,
             created_at=user.created_at.isoformat()
         )
         for user in users
