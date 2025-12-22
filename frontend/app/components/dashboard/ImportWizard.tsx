@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiClient } from '@/app/lib/apiClient';
+import { projectsService } from '@/app/services/projectsService';
+import { filesService, AnalysisResult } from '@/app/services/filesService';
+import { useJobPolling } from '@/app/hooks/useJobPolling';
 import { useRouter } from 'next/navigation';
 import { useToastStore } from '@/app/store/useToastStore';
 
@@ -14,26 +16,19 @@ interface ImportWizardProps {
 
 type Step = 'upload' | 'mapping' | 'details' | 'review';
 
-interface FileAnalysis {
-    columns: string[];
-    preview: any[];
-    row_count: number;
-    suggested_mapping?: {
-        source: string;
-        target: string;
-        weight?: string;
-    };
-}
-
 export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) {
     const router = useRouter();
     const { addToast } = useToastStore();
-    
+
     const [currentStep, setCurrentStep] = useState<Step>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [analysis, setAnalysis] = useState<FileAnalysis | null>(null);
+    const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // États pour le workflow asynchrone Celery
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
 
     const [mapping, setMapping] = useState({
         source: '',
@@ -47,33 +42,53 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
         isPublic: false
     });
 
+    // Polling du job Celery
+    const { status: jobStatus, loading: pollingLoading } = useJobPolling(jobId, {
+        onSuccess: async () => {
+            if (createdProjectId) {
+                try {
+                    const project = await projectsService.getById(createdProjectId);
+                    addToast('Projet créé avec succès', 'success');
+                    onSuccess(project);
+                    onClose();
+                } catch (err) {
+                    addToast('Projet créé mais impossible de charger les données', 'error');
+                }
+            }
+            setIsSubmitting(false);
+        },
+        onError: (error) => {
+            addToast(error || 'Erreur lors du traitement asynchrone', 'error');
+            setIsSubmitting(false);
+        }
+    });
+
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const selectedFile = acceptedFiles[0];
         if (!selectedFile) return;
 
         setFile(selectedFile);
         setDetails(prev => ({ ...prev, name: selectedFile.name.split('.')[0] }));
-        
+
         // Auto-analyze for CSV
         if (selectedFile.name.endsWith('.csv')) {
             setIsAnalyzing(true);
-            const formData = new FormData();
-            formData.append('file', selectedFile);
 
             try {
-                const data = await apiClient.post<FileAnalysis>('/files/analyze', formData);
-                
+                const data = await filesService.analyze(selectedFile);
+
                 setAnalysis(data);
-                
-                if (data.suggested_mapping) {
+
+                // Use 'suggestions' from AnalysisResult (not 'suggested_mapping')
+                if (data.suggestions) {
                     setMapping({
-                        source: data.suggested_mapping.source || '',
-                        target: data.suggested_mapping.target || '',
-                        weight: data.suggested_mapping.weight || ''
+                        source: data.suggestions.source || '',
+                        target: data.suggestions.target || '',
+                        weight: data.suggestions.weight || ''
                     });
                     addToast('Mapping suggéré appliqué automatiquement', 'info');
                 }
-                
+
                 // Auto-advance if analysis is successful
                 setTimeout(() => setCurrentStep('mapping'), 500);
             } catch (error) {
@@ -103,32 +118,24 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
         setIsSubmitting(true);
 
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('name', details.name);
-            formData.append('description', details.description);
-            formData.append('is_public', String(details.isPublic));
-            
-            // Toujours envoyer le mapping, même si vide ou non-CSV
-            formData.append('mapping', JSON.stringify(mapping));
-
-            // Augmenter le timeout pour la création de projet (traitement lourd)
-            const project: any = await apiClient.post('/projects/', formData, { timeout: 120000 });
-
-            addToast('Projet créé avec succès', 'success');
-            onSuccess(project);
-            onClose();
+            const payload = {
+                name: details.name,
+                temp_file_id: analysis?.temp_file_id || '',
+                mapping: mapping
+            };
+            const { job_id, project_id } = await projectsService.create(payload);
+            setJobId(job_id);
+            setCreatedProjectId(project_id);
         } catch (error: any) {
             console.error('Creation error:', error);
             addToast(error.message || 'Erreur lors de la création du projet', 'error');
-        } finally {
             setIsSubmitting(false);
         }
     };
 
     const steps: { id: Step; label: string; icon: any }[] = [
-        { 
-            id: 'upload', 
+        {
+            id: 'upload',
             label: 'Fichier',
             icon: (
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -136,8 +143,8 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                 </svg>
             )
         },
-        { 
-            id: 'mapping', 
+        {
+            id: 'mapping',
             label: 'Mapping',
             icon: (
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -145,8 +152,8 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                 </svg>
             )
         },
-        { 
-            id: 'details', 
+        {
+            id: 'details',
             label: 'Détails',
             icon: (
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -154,8 +161,8 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                 </svg>
             )
         },
-        { 
-            id: 'review', 
+        {
+            id: 'review',
             label: 'Validation',
             icon: (
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -199,12 +206,28 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="w-full max-w-4xl overflow-hidden rounded-3xl bg-surface-900 shadow-2xl border border-surface-700 flex flex-col max-h-[90vh]"
             >
+                {/* Loader asynchrone */}
+                {(isSubmitting || pollingLoading) && jobId && (
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 rounded-3xl">
+                        <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-4 rounded-full mb-4">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            <span className="font-medium">
+                                Création du projet en cours...<br />
+                                (Cette opération peut prendre plusieurs minutes selon la taille du graphe)
+                            </span>
+                        </div>
+                        {jobStatus?.status && (
+                            <span className="text-surface-400 text-sm">Statut : {jobStatus.status}</span>
+                        )}
+                    </div>
+                )}
+
                 {/* Header */}
                 <div className="border-b border-surface-700 bg-surface-800/50 p-6 backdrop-blur-md">
                     <div className="flex items-center justify-between">
@@ -212,7 +235,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                             <h2 className="text-2xl font-bold text-surface-50">Nouveau Projet</h2>
                             <p className="text-surface-400 text-sm mt-1">Importez et configurez vos données de graphe</p>
                         </div>
-                        <button 
+                        <button
                             onClick={onClose}
                             className="rounded-full p-2 text-surface-400 hover:bg-surface-700 hover:text-surface-50 transition-colors"
                         >
@@ -227,14 +250,14 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                         {steps.map((step, index) => {
                             const isActive = step.id === currentStep;
                             const isCompleted = steps.findIndex(s => s.id === currentStep) > index;
-                            
+
                             return (
                                 <div key={step.id} className="flex flex-col items-center relative z-10">
-                                    <div 
+                                    <div
                                         className={`
                                             flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300
-                                            ${isActive || isCompleted 
-                                                ? 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+                                            ${isActive || isCompleted
+                                                ? 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                                                 : 'border-surface-600 bg-surface-800 text-surface-400'
                                             }
                                         `}
@@ -248,11 +271,11 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                     <span className={`mt-2 text-xs font-medium transition-colors duration-300 ${isActive ? 'text-blue-400' : 'text-surface-500'}`}>
                                         {step.label}
                                     </span>
-                                    
+
                                     {/* Connector Line */}
                                     {index < steps.length - 1 && (
                                         <div className="absolute left-1/2 top-5 -z-10 h-[2px] w-[calc(100vw/4-2rem)] max-w-[180px] -translate-y-1/2 bg-surface-700">
-                                            <div 
+                                            <div
                                                 className="h-full bg-blue-500 transition-all duration-500"
                                                 style={{ width: isCompleted ? '100%' : '0%' }}
                                             />
@@ -281,8 +304,8 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                         {...getRootProps()}
                                         className={`
                                             group relative flex w-full max-w-2xl flex-col items-center justify-center rounded-3xl border-2 border-dashed p-16 transition-all duration-300 cursor-pointer
-                                            ${isDragActive 
-                                                ? 'border-blue-500 bg-blue-500/10 scale-[1.02]' 
+                                            ${isDragActive
+                                                ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
                                                 : 'border-surface-700 bg-surface-800/30 hover:border-blue-400/50 hover:bg-surface-800/50'
                                             }
                                         `}
@@ -301,10 +324,10 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                         </h3>
                                         <p className="text-surface-400 text-center max-w-md">
                                             Supporte les fichiers CSV, JSON et GEXF.
-                                            <br/>Taille max: 50MB
+                                            <br />Taille max: 50MB
                                         </p>
                                     </div>
-                                    
+
                                     {isAnalyzing && (
                                         <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-3 rounded-full">
                                             <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -437,7 +460,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                 <div className="max-w-2xl mx-auto space-y-8">
                                     <div className="bg-surface-800/30 rounded-2xl p-6 border border-surface-700 space-y-4">
                                         <h3 className="text-lg font-bold text-surface-50 mb-4">Récapitulatif</h3>
-                                        
+
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
                                                 <p className="text-sm text-surface-500">Fichier</p>
@@ -488,8 +511,8 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                         disabled={currentStep === 'upload'}
                         className={`
                             px-6 py-2.5 rounded-xl font-medium transition-all
-                            ${currentStep === 'upload' 
-                                ? 'opacity-0 pointer-events-none' 
+                            ${currentStep === 'upload'
+                                ? 'opacity-0 pointer-events-none'
                                 : 'text-surface-400 hover:bg-surface-700 hover:text-surface-50'
                             }
                         `}

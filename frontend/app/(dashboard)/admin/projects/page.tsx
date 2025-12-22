@@ -21,7 +21,7 @@ export default function AdminProjectsPage() {
             const data = await adminService.getProjects(0, 100, search);
             setProjects(data);
         } catch (error) {
-            addToast('error', 'Erreur', 'Impossible de charger les projets');
+            addToast('Impossible de charger les projets', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -39,9 +39,9 @@ export default function AdminProjectsPage() {
         try {
             await adminService.deleteProject(projectId);
             setProjects(projects.filter(p => p.id !== projectId));
-            addToast('success', 'Succès', 'Projet supprimé');
+            addToast('Projet supprimé', 'success');
         } catch (error) {
-            addToast('error', 'Erreur', 'Suppression échouée');
+            addToast('Suppression échouée', 'error');
         }
     };
 
@@ -110,16 +110,15 @@ export default function AdminProjectsPage() {
                                         {project.owner_email || 'Inconnu'}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                                            project.is_public ? 'bg-orange-500/20 text-orange-400' : 'bg-surface-500/20 text-surface-400'
-                                        }`}>
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${project.is_public ? 'bg-orange-500/20 text-orange-400' : 'bg-surface-500/20 text-surface-400'
+                                            }`}>
                                             {project.is_public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
                                             {project.is_public ? 'Public' : 'Privé'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="text-xs">
-                                            {project.node_count} Nœuds<br/>
+                                            {project.node_count} Nœuds<br />
                                             {project.edge_count} Liens
                                         </div>
                                     </td>

@@ -29,10 +29,10 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
 
         try {
             const newUser = await adminService.createUser(formData);
-            addToast('success', 'Succès', 'Utilisateur créé avec succès');
+            addToast('Utilisateur créé avec succès', 'success');
             onSuccess(newUser);
         } catch (error: any) {
-            addToast('error', 'Erreur', error.message || 'Impossible de créer l\'utilisateur');
+            addToast(error.message || 'Impossible de créer l\'utilisateur', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -84,22 +84,20 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
                                 <button
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'user' })}
-                                    className={`flex-1 rounded-lg border p-2 text-sm transition-colors ${
-                                        formData.role === 'user'
+                                    className={`flex-1 rounded-lg border p-2 text-sm transition-colors ${formData.role === 'user'
                                             ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                                             : 'border-surface-50/10 bg-surface-800 text-gray-400 hover:bg-surface-700'
-                                    }`}
+                                        }`}
                                 >
                                     Utilisateur
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'admin' })}
-                                    className={`flex-1 rounded-lg border p-2 text-sm transition-colors ${
-                                        formData.role === 'admin'
+                                    className={`flex-1 rounded-lg border p-2 text-sm transition-colors ${formData.role === 'admin'
                                             ? 'border-purple-500 bg-purple-500/10 text-purple-400'
                                             : 'border-surface-50/10 bg-surface-800 text-gray-400 hover:bg-surface-700'
-                                    }`}
+                                        }`}
                                 >
                                     Admin
                                 </button>
@@ -111,11 +109,10 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
                             <button
                                 type="button"
                                 onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                                className={`flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-sm transition-colors ${
-                                    formData.is_active
+                                className={`flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-sm transition-colors ${formData.is_active
                                         ? 'border-green-500 bg-green-500/10 text-green-400'
                                         : 'border-red-500 bg-red-500/10 text-red-400'
-                                }`}
+                                    }`}
                             >
                                 {formData.is_active ? (
                                     <>

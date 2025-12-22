@@ -64,7 +64,7 @@ export class GraphRenderer {
             const instance = masterMesh.createInstance(node.id);
             instance.position = new Vector3(node.x, node.y, node.z);
             instance.isPickable = true; // Ensure pickable for VR rays
-            
+
             // Apply custom color if present
             if (node.color) {
                 const c = Color3.FromHexString(node.color);
@@ -78,7 +78,7 @@ export class GraphRenderer {
                 new ExecuteCodeAction(ActionManager.OnPointerOverTrigger, () => {
                     // Scale up
                     instance.scaling = originalScaling.scale(1.3);
-                    
+
                     instance.renderOutline = true;
                     instance.outlineColor = Color3.White();
                     instance.outlineWidth = 0.1;
@@ -132,15 +132,15 @@ export class GraphRenderer {
             // --- XR Node Grabbing (Babylon.js v8 natif) ---
             if (xrHelperRef && xrHelperRef.current && xrHelperRef.current.input) {
                 const xrInput = xrHelperRef.current.input;
-                let grabbedNode = null;
-                let grabOffset = null;
+                let grabbedNode: InstancedMesh | null = null;
+                let grabOffset: Vector3 | null = null;
                 let isGrabbingGraph = false;
-                let graphGrabOffset = null;
-                let initialNodePositions = null;
+                let graphGrabOffset: Vector3 | null = null;
+                let initialNodePositions: Vector3[] | null = null;
 
                 // Grab de nœud : trigger sur le nœud
-                xrInput.onControllerAddedObservable.add(controller => {
-                    controller.onMotionControllerInitObservable.add(motionController => {
+                xrInput.onControllerAddedObservable.add((controller: any) => {
+                    controller.onMotionControllerInitObservable.add((motionController: any) => {
                         // Trigger pour grab nœud
                         const trigger = motionController.getComponent('trigger');
                         if (trigger) {
@@ -188,13 +188,13 @@ export class GraphRenderer {
                 // Déplacement à chaque frame
                 scene.onBeforeRenderObservable.add(() => {
                     if (grabbedNode && xrInput.controllers.length) {
-                        const controller = xrInput.controllers.find(c => c.pointer && c.pointer.position && grabbedNode);
+                        const controller = xrInput.controllers.find((c: any) => c.pointer && c.pointer.position && grabbedNode);
                         if (controller) {
                             grabbedNode.position = controller.pointer.position.add(grabOffset || Vector3.Zero());
                         }
                     }
                     if (isGrabbingGraph && graphGrabOffset && initialNodePositions && xrInput.controllers.length) {
-                        const controller = xrInput.controllers.find(c => c.pointer && c.pointer.position);
+                        const controller = xrInput.controllers.find((c: any) => c.pointer && c.pointer.position);
                         if (controller) {
                             const delta = controller.pointer.position.subtract(graphGrabOffset);
                             let i = 0;
@@ -224,14 +224,14 @@ export class GraphRenderer {
 
         // OPTIMIZATION: Use Instanced Meshes (Cylinders) for Edges
         // This allows 1 draw call while keeping individual interactivity (picking/hover)
-        
+
         // 1. Create Master Edge (Cylinder aligned with Z axis for easier lookAt)
         const masterEdge = MeshBuilder.CreateCylinder("master_edge_cylinder", {
             height: 1,
             diameter: 0.1, // Thicker line for better visibility
             tessellation: 8
         }, scene);
-        
+
         // Rotate geometry so cylinder aligns with Z axis (default is Y)
         masterEdge.rotation.x = Math.PI / 2;
         masterEdge.bakeCurrentTransformIntoVertices();
@@ -255,17 +255,17 @@ export class GraphRenderer {
 
             if (sourceMesh && targetMesh) {
                 const instance = masterEdge.createInstance(`edge_${edge.source}_${edge.target}`);
-                
+
                 const p1 = sourceMesh.position;
                 const p2 = targetMesh.position;
-                
+
                 // Position at midpoint
                 instance.position = Vector3.Center(p1, p2);
-                
+
                 // Scale Z to length
                 const distance = Vector3.Distance(p1, p2);
                 instance.scaling.z = distance;
-                
+
                 // Rotate to look at target
                 instance.lookAt(p2);
 
@@ -354,9 +354,9 @@ export class GraphRenderer {
         this.edgeInstances.forEach(edge => {
             const isSourceVisible = visibleNodeIds === null || visibleNodeIds.has(edge.source);
             const isTargetVisible = visibleNodeIds === null || visibleNodeIds.has(edge.target);
-            
+
             const isVisible = isSourceVisible && isTargetVisible;
-            
+
             edge.mesh.isVisible = isVisible;
             edge.mesh.isPickable = isVisible;
         });

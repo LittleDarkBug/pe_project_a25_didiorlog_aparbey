@@ -70,17 +70,20 @@ services:
       redis:
         condition: service_healthy
 
-  # Next.js frontend
+  # Next.js frontend (development)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
     restart: unless-stopped
+    command: npm run dev
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - AUTH_TRUST_HOST=true
+      - AUTH_SECRET=${JWT_SECRET}
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
     volumes:
@@ -91,3 +94,63 @@ services:
       - app-network
     depends_on:
       - backend
+
+  # Next.js frontend (production)
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend-prod
+    restart: unless-stopped
+    command: npm start
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - AUTH_TRUST_HOST=true
+      - AUTH_SECRET=${JWT_SECRET}
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  # Celery worker for async task processing
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: celery-worker
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-adminpassword}@mongodb:27017/?authSource=admin
+      - REDIS_URL=redis://default:${REDIS_PASSWORD:-redispassword}@redis:6379/0
+      - MONGODB_DB=${MONGO_DATABASE:-graphdb}
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    networks:
+      - app-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Flower for Celery monitoring
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flower
+    restart: unless-stopped
+    command: celery -A celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://default:${REDIS_PASSWORD:-redispassword}@redis:6379/0
+    networks:
+      - app-network
+    depends_on:
+      - redis
+      - celery-worker

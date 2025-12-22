@@ -6,12 +6,11 @@ import {
     Scene,
     ArcRotateCamera,
     Mesh,
-    InstancedMesh
+    InstancedMesh,
+    WebXRState
 } from '@babylonjs/core';
-import { WebXRFeatureName } from '@babylonjs/core/XR/webXRFeaturesManager';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
-import { useVRLocomotion } from '../hooks/useVRLocomotion';
 import { VRDetailsPanel } from '../components/VRDetailsPanel';
 import { GraphRenderer } from '../utils/GraphRenderer';
 import { setupCommonScene } from '../utils/SceneSetup';
@@ -58,23 +57,22 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             if (xrHelperRef.current && xrHelperRef.current.baseExperience) {
                 xrHelperRef.current.baseExperience.camera.position.set(0, 0, 0);
             } else if (scene) {
-                 const camera = scene.getCameraByName("camera") as ArcRotateCamera;
-                 if (camera) {
-                     camera.setTarget(Vector3.Zero());
-                     camera.alpha = -Math.PI / 2;
-                     camera.beta = Math.PI / 2.5;
-                     camera.radius = 100;
-                 }
+                const camera = scene.getCameraByName("camera") as ArcRotateCamera;
+                if (camera) {
+                    camera.setTarget(Vector3.Zero());
+                    camera.alpha = -Math.PI / 2;
+                    camera.beta = Math.PI / 2.5;
+                    camera.radius = 100;
+                }
             }
         }
     }));
 
     const { createVRMenu } = useVRMenu();
-    const { setupLocomotion } = useVRLocomotion();
-    
-    const vrUtilsRef = useRef({ createVRMenu, setupLocomotion });
+
+    const vrUtilsRef = useRef({ createVRMenu });
     useEffect(() => {
-        vrUtilsRef.current = { createVRMenu, setupLocomotion };
+        vrUtilsRef.current = { createVRMenu };
     });
 
     // Handle visibility updates
@@ -94,7 +92,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 100, Vector3.Zero(), sceneInstance);
         const canvas = sceneInstance.getEngine().getRenderingCanvas();
         camera.attachControl(canvas, true);
-        
+
         // Camera Optimization (Matches GraphSceneWeb)
         camera.wheelPrecision = 10;
         camera.pinchPrecision = 10;
@@ -119,51 +117,22 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         }
 
 
-        // WebXR Setup
+        // WebXR Setup - Using default experience with built-in features
         try {
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [], // We are in space, no floor
                 disableTeleportation: true, // We use custom locomotion
-                disableHandTracking: true, // Désactive le hand tracking pour éviter l'erreur
+                disableHandTracking: true,
+                disablePointerSelection: false, // Enable laser pointer by default
                 uiOptions: {
                     sessionMode: 'immersive-vr',
-                    optionalFeatures: ['unbounded', 'local-floor'] // Retire 'hand-tracking'
                 }
             });
             xrHelperRef.current = xr;
 
-
-            // Activation du flying (movement) et du pointer selection selon la doc Babylon.js v8
-            const featuresManager = xr.baseExperience.featuresManager;
-            // Flying (movement)
-            featuresManager.enableFeature(
-                WebXRFeatureName.MOVEMENT,
-                'latest',
-                {
-                    xrInput: xr.input,
-                    movementSpeed: 20.0,
-                    rotationSpeed: 0.5,
-                    movementOrientationFollowsViewerPose: true,
-                    enablePhysics: false,
-                    allowVerticalMovement: true,
-                    allowHorizontalMovement: true,
-                    movementMode: 'flying',
-                }
-            );
-            // Pointer Selection (laser)
-            featuresManager.enableFeature(
-                WebXRFeatureName.POINTER_SELECTION,
-                'latest',
-                {
-                    xrInput: xr.input,
-                    enablePointerSelectionOnAllControllers: true,
-                    displayLaserPointer: true,
-                    selectionMeshPickedPointEnabled: true,
-                }
-            );
-
-            xr.baseExperience.onStateChangedObservable.add((state) => {
-                if (state === 2) { // IN_XR
+            // Listen to XR state changes using proper Babylon.js v8 API
+            xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
+                if (state === WebXRState.IN_XR) {
                     console.log("VR started");
                     vrUtilsRef.current.createVRMenu(sceneInstance, xr);
                 }
@@ -172,7 +141,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         } catch (e) {
             console.log("WebXR not supported", e);
         }
-        
+
         setIsSceneReady(true);
     }, []);
 
@@ -200,7 +169,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             (edgeData, type) => detailsPanelRef.current.create(scene, edgeData, type),
             xrHelperRef
         );
-        
+
         // Force visibility update
         graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
 

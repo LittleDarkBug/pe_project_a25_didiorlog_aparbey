@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useJobPolling } from '@/app/hooks/useJobPolling';
 import { useDropzone } from 'react-dropzone';
 import { filesService, AnalysisResult } from '@/app/services/filesService';
 import { projectsService, Project } from '@/app/services/projectsService';
@@ -69,34 +70,69 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
         maxFiles: 1
     });
 
+    // Nouvelle logique asynchrone
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [updatedProjectId, setUpdatedProjectId] = useState<string | null>(null);
+
     const handleUpdate = async () => {
         if (!mapping.source || !mapping.target) {
             setError('Les champs Source et Target sont obligatoires.');
             return;
         }
-
         setIsLoading(true);
+        setError(null);
         try {
-            const updateData: any = {
-                mapping
-            };
-
+            const updateData: any = { mapping };
             if (analysis?.temp_file_id) {
                 updateData.temp_file_id = analysis.temp_file_id;
             }
-
-            const updatedProject = await projectsService.update(project.id, updateData);
-            onSuccess(updatedProject);
+            const { job_id, project_id } = await projectsService.update(project.id, updateData);
+            setJobId(job_id);
+            setUpdatedProjectId(project_id);
         } catch (err) {
             console.error(err);
             setError("Erreur lors de la mise à jour du projet.");
-        } finally {
             setIsLoading(false);
         }
     };
 
+    // Polling du job Celery
+    const { status: jobStatus, loading: pollingLoading } = useJobPolling(jobId, {
+        onSuccess: async () => {
+            if (updatedProjectId) {
+                try {
+                    const updatedProject = await projectsService.getById(updatedProjectId);
+                    onSuccess(updatedProject);
+                    onClose();
+                } catch (err) {
+                    setError('Projet mis à jour mais impossible de charger les données');
+                }
+            }
+            setIsLoading(false);
+        },
+        onError: (error) => {
+            setError(error || 'Erreur lors du traitement asynchrone');
+            setIsLoading(false);
+        }
+    });
+
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative">
+            {/* Loader asynchrone */}
+            {(isLoading || pollingLoading) && jobId && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70">
+                    <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-4 rounded-full mb-4">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        <span className="font-medium">
+                            Mise à jour du projet en cours...<br/>
+                            (Cette opération peut prendre plusieurs minutes selon la taille du graphe)
+                        </span>
+                    </div>
+                    {jobStatus?.status && (
+                        <span className="text-surface-400 text-sm">Statut : {jobStatus.status}</span>
+                    )}
+                </div>
+            )}
             {/* Tabs */}
             <div className="flex border-b border-surface-50/10 mb-6">
                 <button

@@ -11,7 +11,8 @@ import {
     HemisphericLight,
     Mesh,
     GlowLayer,
-    InstancedMesh
+    InstancedMesh,
+    WebXRState
 } from '@babylonjs/core';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
@@ -69,7 +70,7 @@ const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect,
 
     const { createVRMenu } = useVRMenu();
     const { setupLocomotion } = useVRLocomotion();
-    
+
     // Use refs for VR hooks to keep onSceneReady stable
     const vrUtilsRef = useRef({ createVRMenu, setupLocomotion });
     useEffect(() => {
@@ -96,16 +97,16 @@ const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect,
         const canvas = sceneInstance.getEngine().getRenderingCanvas();
 
         camera.attachControl(canvas, true);
-        
+
         // OPTIMIZATION: Faster and smoother navigation
         camera.wheelPrecision = 10; // Lower = Faster zoom
         camera.pinchPrecision = 10; // Lower = Faster pinch
         camera.panningSensibility = 20; // Lower = Faster panning
         camera.wheelDeltaPercentage = 0.05; // 5% zoom per scroll (was 1%) - Makes zoom much faster on large scales
-        
+
         camera.lowerRadiusLimit = 0.1; // Allow getting very close
         camera.upperRadiusLimit = 10000; // Allow seeing huge graphs
-        
+
         camera.inertia = 0.9; // High inertia for fluid movement
         camera.angularSensibilityX = 800; // Faster rotation
         camera.angularSensibilityY = 800;
@@ -188,10 +189,10 @@ const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect,
 
             const featuresManager = xr.baseExperience.featuresManager;
             // Use ref to access latest setupLocomotion without adding dependency
-            vrUtilsRef.current.setupLocomotion(featuresManager, xr);
+            vrUtilsRef.current.setupLocomotion();
 
-            xr.baseExperience.onStateChangedObservable.add((state) => {
-                if (state === 2) {
+            xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
+                if (state === WebXRState.IN_XR) {
                     console.log("VR started. Camera:", xr.baseExperience.camera?.position);
                     // Use ref to access latest createVRMenu
                     vrUtilsRef.current.createVRMenu(sceneInstance, xr);

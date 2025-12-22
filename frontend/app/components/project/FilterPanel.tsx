@@ -35,12 +35,12 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
     // Extract available categories dynamically
     const categories = useMemo(() => {
         const cats: Record<string, Set<string>> = {};
-        
+
         nodes.forEach(node => {
             Object.entries(node).forEach(([key, value]) => {
                 // Skip internal or non-categorical keys
                 if (['id', 'x', 'y', 'z', 'color', 'label', 'vx', 'vy', 'vz', 'index'].includes(key)) return;
-                
+
                 // Only consider string or number values as categories
                 if (typeof value === 'string' || typeof value === 'number') {
                     if (!cats[key]) cats[key] = new Set();
@@ -64,16 +64,17 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
         // 1. Topology Filters (Priority)
         if (topologyMode) {
             const visibleIds = new Set<string>();
-            
+
             if (topologyMode === 'neighbors' && sourceNodeId) {
                 // BFS for N hops
-                const queue = [[sourceNodeId, 0]];
+                const queue: Array<[string, number]> = [[sourceNodeId, 0]];
                 const visited = new Set([sourceNodeId]);
                 visibleIds.add(sourceNodeId);
 
                 while (queue.length > 0) {
-                    // @ts-ignore
-                    const [currentId, dist] = queue.shift();
+                    const item = queue.shift();
+                    if (!item) continue;
+                    const [currentId, dist] = item;
                     if (dist >= hopCount) continue;
 
                     const neighbors = adjacencyList[currentId] || [];
@@ -91,15 +92,14 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
 
             if (topologyMode === 'path' && sourceNodeId && targetNodeId) {
                 // BFS for Shortest Path
-                const queue = [[sourceNodeId]];
+                const queue: string[][] = [[sourceNodeId]];
                 const visited = new Set([sourceNodeId]);
                 const parent: Record<string, string> = {};
 
                 let found = false;
                 while (queue.length > 0) {
-                    // @ts-ignore
                     const path = queue.shift();
-                    // @ts-ignore
+                    if (!path) continue;
                     const node = path[path.length - 1];
 
                     if (node === targetNodeId) {
@@ -112,18 +112,17 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                     for (const neighbor of neighbors) {
                         if (!visited.has(neighbor)) {
                             visited.add(neighbor);
-                            // @ts-ignore
                             queue.push([...path, neighbor]);
                         }
                     }
                 }
-                
+
                 if (found) {
                     onFilterChange(visibleIds);
                 } else {
                     // No path found, maybe show nothing or just source/target?
                     // For now, show nothing to indicate no path
-                    onFilterChange(new Set()); 
+                    onFilterChange(new Set());
                 }
                 return;
             }
@@ -176,7 +175,7 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
         setActiveFilters(prev => {
             const newFilters = { ...prev };
             if (!newFilters[category]) newFilters[category] = new Set();
-            
+
             if (newFilters[category].has(value)) {
                 newFilters[category].delete(value);
                 if (newFilters[category].size === 0) delete newFilters[category];
@@ -189,8 +188,8 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
 
     return (
         <div className="fixed z-50 w-80 flex flex-col max-h-[70vh] animate-slide-up rounded-xl border border-surface-50/10 bg-surface-950/95 backdrop-blur-xl shadow-2xl"
-             style={{ left: '2rem', bottom: '6rem' }}>
-            
+            style={{ left: '2rem', bottom: '6rem' }}>
+
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-surface-50/10 bg-surface-950/95 rounded-t-xl shrink-0">
                 <h3 className="text-lg font-bold text-surface-50 flex items-center gap-2">
@@ -210,21 +209,19 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
             <div className="flex border-b border-surface-50/10">
                 <button
                     onClick={() => { setActiveTab('attributes'); setTopologyMode(null); }}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer ${
-                        activeTab === 'attributes' 
-                            ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5' 
+                    className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === 'attributes'
+                            ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5'
                             : 'text-surface-400 hover:text-surface-200'
-                    }`}
+                        }`}
                 >
                     Attributs
                 </button>
                 <button
                     onClick={() => setActiveTab('topology')}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer ${
-                        activeTab === 'topology' 
-                            ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5' 
+                    className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === 'topology'
+                            ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5'
                             : 'text-surface-400 hover:text-surface-200'
-                    }`}
+                        }`}
                 >
                     Topologie
                 </button>
@@ -232,7 +229,7 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
 
             {/* Content */}
             <div className="overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                
+
                 {activeTab === 'attributes' ? (
                     <>
                         {/* Search */}
@@ -247,7 +244,7 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                     className="w-full bg-surface-900/50 border border-surface-50/10 rounded-lg px-4 py-2 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all"
                                 />
                                 {searchTerm && (
-                                    <button 
+                                    <button
                                         onClick={() => setSearchTerm('')}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-50 cursor-pointer"
                                     >
@@ -273,11 +270,10 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                             <button
                                                 key={value}
                                                 onClick={() => toggleFilter(category, value)}
-                                                className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-                                                    isActive 
-                                                        ? 'bg-primary-500/20 border-primary-500/50 text-primary-100' 
+                                                className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer ${isActive
+                                                        ? 'bg-primary-500/20 border-primary-500/50 text-primary-100'
                                                         : 'bg-surface-50/5 border-surface-50/10 text-surface-400 hover:border-surface-50/30 hover:text-surface-200'
-                                                }`}
+                                                    }`}
                                             >
                                                 {value}
                                             </button>
@@ -326,11 +322,10 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                 <button
                                     onClick={() => setTopologyMode(topologyMode === 'neighbors' ? null : 'neighbors')}
                                     disabled={!sourceNodeId}
-                                    className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
-                                        topologyMode === 'neighbors'
+                                    className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${topologyMode === 'neighbors'
                                             ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20'
                                             : 'bg-surface-50/10 text-surface-300 hover:bg-surface-50/20 hover:text-surface-100'
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     {topologyMode === 'neighbors' ? 'Désactiver' : 'Afficher Voisins'}
                                 </button>
@@ -363,11 +358,10 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                 <button
                                     onClick={() => setTopologyMode(topologyMode === 'path' ? null : 'path')}
                                     disabled={!sourceNodeId || !targetNodeId}
-                                    className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
-                                        topologyMode === 'path'
+                                    className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${topologyMode === 'path'
                                             ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
                                             : 'bg-surface-50/10 text-surface-300 hover:bg-surface-50/20 hover:text-surface-100'
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     {topologyMode === 'path' ? 'Désactiver' : 'Trouver Chemin'}
                                 </button>
@@ -376,12 +370,12 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                     </div>
                 )}
             </div>
-            
+
             {/* Footer Stats */}
             <div className="p-3 border-t border-surface-50/10 bg-surface-900/30 text-center">
                 <p className="text-xs text-surface-400">
-                    {(searchTerm || Object.keys(activeFilters).length > 0 || topologyMode) 
-                        ? "Filtres actifs" 
+                    {(searchTerm || Object.keys(activeFilters).length > 0 || topologyMode)
+                        ? "Filtres actifs"
                         : "Affichage de tous les éléments"}
                 </p>
             </div>

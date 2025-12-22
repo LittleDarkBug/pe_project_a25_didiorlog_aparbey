@@ -1218,6 +1218,37 @@ export default function ProductsPage() {
 }
 ```
 
+
+## Workflow asynchrone (traitement de projet)
+
+### Fonctionnement général
+
+Lors de la création ou l'édition d'un projet, le backend lance un traitement asynchrone (Celery) qui peut prendre plusieurs secondes à plusieurs minutes selon la taille du graphe.
+
+- L'utilisateur déclenche la création/édition comme avant.
+- Un loader s'affiche automatiquement (“Traitement en cours…”), l'UI reste responsive.
+- Dès que le traitement est terminé, la vue projet se recharge automatiquement, sans action manuelle.
+- En cas d'erreur, un message explicite s'affiche, avec possibilité de relancer ou corriger l'import.
+
+### Détail technique (développeur)
+
+- Les appels à l'API de création/édition de projet retournent un `job_id` et un `project_id`.
+- Le frontend utilise un hook de polling (`useJobPolling`) pour interroger `/projects/tasks/{job_id}` jusqu'à obtenir `SUCCESS` ou `FAILURE`.
+- Pendant le polling, un loader bloque l'UI et affiche le statut en temps réel.
+- À la fin, le projet est rechargé automatiquement et le composant parent est notifié via `onSuccess`.
+- En cas d'échec, l'erreur détaillée est affichée et l'utilisateur peut réessayer.
+
+### Impact UX
+
+- L'utilisateur n'a rien à faire de plus : tout est géré automatiquement.
+- L'expérience reste fluide, sans rupture de navigation.
+- Les erreurs sont explicites et non bloquantes.
+
+### Exemple d'intégration
+
+Voir les composants `ImportWizard` et `EditProjectModal` pour l'intégration complète du workflow asynchrone.
+
+---
 ## FAQ - Questions fréquentes
 
 ### Quand utiliser Zustand vs React Query ?

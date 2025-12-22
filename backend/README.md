@@ -1,3 +1,43 @@
+## Fonctionnalités Clés
+
+- **Authentification** : JWT, Refresh Tokens, Blacklist Redis.
+- **Gestion de Graphes** : Stockage optimisé, support de grands graphes.
+- **Calculs de Layout** : Endpoints dédiés pour recalculer les positions (Fruchterman-Reingold, etc.).
+- **Partage** : Génération de tokens uniques pour accès en lecture seule.
+  - Endpoint de prévisualisation de layout sans persistance pour les vues partagées.
+- **Import/Export** : Support CSV et JSON via Polars.
+
+---
+
+### Traitement asynchrone (Celery + Redis)
+
+Depuis la v2, tout traitement lourd (création/édition/recalcul de projet avec spatialisation) est délégué à une tâche Celery asynchrone, pour garantir la réactivité de l'API même sur de très gros graphes.
+
+**Workflow complet** :
+
+1. Le frontend envoie la création ou l'édition de projet (POST/PUT /projects).
+2. L'API retourne immédiatement un `job_id` (et l'id du projet), statut `PENDING`.
+3. Le frontend doit poller `/projects/tasks/{job_id}` pour suivre l'état (`PENDING`, `STARTED`, `SUCCESS`, `FAILURE`).
+4. Dès que le job est terminé (`SUCCESS`), le résultat (graph_data, metadata, etc.) est automatiquement sauvegardé dans le projet MongoDB (aucune action manuelle requise).
+5. Le frontend peut alors rafraîchir la vue du projet pour afficher le graphe.
+
+**Impact frontend** :
+- Affichage d'un loader/état "en attente" après création/édition.
+- Polling régulier de l'endpoint de tâche jusqu'à succès ou erreur.
+- Rafraîchissement automatique du projet une fois le job terminé.
+
+**Gestion des erreurs** :
+- Si le job échoue (`FAILURE`), l'API retourne l'erreur détaillée via `/projects/tasks/{job_id}`.
+- Le frontend doit afficher un message d'erreur et permettre de relancer ou corriger l'import.
+
+**Avantages** :
+- Aucun blocage de l'API, même pour des graphes >100k nœuds.
+- Comportement identique à l'utilisateur final (transparence totale).
+- Résultat toujours persistant en base dès la fin du traitement.
+
+**À noter** :
+- Les lectures simples (GET) restent synchrones et rapides.
+- Les modifications légères (nom, description) ne déclenchent pas de job Celery.
 # PE_Def_Project Backend
 
 Backend API FastAPI pour spatialisation 3D de graphes avec authentification JWT. Supporte NetworkX et igraph pour calculs performants jusqu'à 100k nœuds.
@@ -50,6 +90,13 @@ Les variables d'environnement sont injectées automatiquement par `docker-compos
 - `REDIS_URL` : Connexion Redis
 - `JWT_SECRET` : Clé de signature JWT
 - `MAX_UPLOAD_SIZE_MB` : Limite d'upload
+```
+
+**Celery et Flower sont lancés automatiquement** :
+- Le worker Celery (`celery-worker`) exécute les tâches asynchrones du backend.
+- Flower (`flower`) permet de monitorer les tâches Celery sur http://localhost:5555.
+
+Vous n'avez rien à lancer manuellement en mode Docker, tout est géré par docker-compose.
 
 **Accès :**
 - API: <http://localhost:8000>
@@ -62,6 +109,18 @@ Les variables d'environnement sont injectées automatiquement par `docker-compos
 - Python 3.11+
 - MongoDB 7+ en cours d'exécution
 - Redis 7+ en cours d'exécution
+
+**⚠️ En mode local, il faut lancer le worker Celery manuellement dans un terminal séparé :**
+
+```bash
+celery -A celery worker --loglevel=info
+```
+
+Pour monitorer les tâches (optionnel) :
+
+```bash
+celery -A celery flower
+```
 
 **Installation :**
 

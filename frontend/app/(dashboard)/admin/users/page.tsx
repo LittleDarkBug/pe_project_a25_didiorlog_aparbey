@@ -23,7 +23,7 @@ export default function AdminUsersPage() {
             const data = await adminService.getUsers(0, 100, search);
             setUsers(data);
         } catch (error) {
-            addToast('error', 'Erreur', 'Impossible de charger les utilisateurs');
+            addToast('Impossible de charger les utilisateurs', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -40,9 +40,9 @@ export default function AdminUsersPage() {
         try {
             const updated = await adminService.updateUser(user.id, { is_active: !user.is_active });
             setUsers(users.map(u => u.id === user.id ? updated : u));
-            addToast('success', 'Succès', `Utilisateur ${updated.is_active ? 'activé' : 'désactivé'}`);
+            addToast(`Utilisateur ${updated.is_active ? 'activé' : 'désactivé'}`, 'success');
         } catch (error) {
-            addToast('error', 'Erreur', 'Mise à jour échouée');
+            addToast('Mise à jour échouée', 'error');
         }
     };
 
@@ -51,9 +51,9 @@ export default function AdminUsersPage() {
             const newRole = user.role === 'admin' ? 'user' : 'admin';
             const updated = await adminService.updateUser(user.id, { role: newRole });
             setUsers(users.map(u => u.id === user.id ? updated : u));
-            addToast('success', 'Succès', `Rôle mis à jour : ${newRole}`);
+            addToast(`Rôle mis à jour : ${newRole}`, 'success');
         } catch (error) {
-            addToast('error', 'Erreur', 'Mise à jour échouée');
+            addToast('Mise à jour échouée', 'error');
         }
     };
 
@@ -62,9 +62,9 @@ export default function AdminUsersPage() {
         try {
             await adminService.deleteUser(userId);
             setUsers(users.filter(u => u.id !== userId));
-            addToast('success', 'Succès', 'Utilisateur supprimé');
+            addToast('Utilisateur supprimé', 'success');
         } catch (error) {
-            addToast('error', 'Erreur', 'Suppression échouée');
+            addToast('Suppression échouée', 'error');
         }
     };
 
@@ -138,18 +138,16 @@ export default function AdminUsersPage() {
                                         <div className="text-xs">{user.email}</div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                                            user.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-surface-500/20 text-surface-400'
-                                        }`}>
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-surface-500/20 text-surface-400'
+                                            }`}>
                                             {user.role === 'admin' && <Shield className="h-3 w-3" />}
                                             {user.role}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                                            user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
 
-                                        }`}>
+                                            }`}>
                                             {user.is_active ? 'Actif' : 'Banni'}
                                         </span>
                                     </td>

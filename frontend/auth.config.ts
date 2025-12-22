@@ -48,6 +48,7 @@ export const authConfig = {
           id: (user as any).id,
           full_name: (user as any).full_name,
           role: (user as any).role,
+          is_superuser: (user as any).is_superuser,
         };
       }
 
@@ -67,44 +68,46 @@ export const authConfig = {
         (session.user as any).id = token.id;
         (session.user as any).full_name = token.full_name;
         (session.user as any).role = token.role;
+        (session.user as any).is_superuser = token.is_superuser;
         (session.user as any).error = token.error;
       }
       return session;
     },
-  },
-  authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request: { nextUrl } }: { auth: any; request: { nextUrl: URL } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnProtected = 
-        nextUrl.pathname.startsWith('/dashboard') || 
+      const isOnProtected =
+        nextUrl.pathname.startsWith('/dashboard') ||
         nextUrl.pathname.startsWith('/workspace') ||
         nextUrl.pathname.startsWith('/projects') ||
         nextUrl.pathname.startsWith('/admin') ||
         nextUrl.pathname.startsWith('/profile');
-      
+
       if (isOnProtected) {
         if (isLoggedIn) {
-            // Prevent admin from accessing user dashboard/projects
-            if ((auth?.user as any)?.role === 'admin' && (
-                nextUrl.pathname.startsWith('/dashboard') || 
-                nextUrl.pathname.startsWith('/workspace') ||
-                nextUrl.pathname.startsWith('/projects')
-            )) {
-                return Response.redirect(new URL('/admin', nextUrl));
-            }
-            // Prevent regular users from accessing admin
-            if ((auth?.user as any)?.role !== 'admin' && nextUrl.pathname.startsWith('/admin')) {
-                return Response.redirect(new URL('/dashboard', nextUrl));
-            }
-            return true;
+          // Prevent admin from accessing user dashboard/projects
+          if ((auth?.user as any)?.role === 'admin' && (
+            nextUrl.pathname.startsWith('/dashboard') ||
+            nextUrl.pathname.startsWith('/workspace') ||
+            nextUrl.pathname.startsWith('/projects')
+          )) {
+            return Response.redirect(new URL('/admin', nextUrl));
+          }
+          // Prevent regular users from accessing admin
+          if ((auth?.user as any)?.role !== 'admin' && nextUrl.pathname.startsWith('/admin')) {
+            return Response.redirect(new URL('/dashboard', nextUrl));
+          }
+          return true;
         }
         return false; // Redirect unauthenticated users to login page
       } else if (isLoggedIn && (nextUrl.pathname === '/login' || nextUrl.pathname === '/register')) {
         if ((auth?.user as any)?.role === 'admin') {
-            return Response.redirect(new URL('/admin', nextUrl));
+          return Response.redirect(new URL('/admin', nextUrl));
         }
         return Response.redirect(new URL('/dashboard', nextUrl));
       }
       return true;
     },
+  },
   providers: [], // Configured in auth.ts
 } satisfies NextAuthConfig;
+

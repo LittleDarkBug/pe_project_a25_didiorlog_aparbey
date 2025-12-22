@@ -10,7 +10,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     useEffect(() => {
         if (!isLoading && isAuthenticated) {
-            if (user && user.role !== 'admin' && !user.is_superuser) {
+            const userData = user as any;
+            if (userData && userData.role !== 'admin' && !userData.is_superuser) {
                 router.push('/dashboard');
             }
         } else if (!isLoading && !isAuthenticated) {
@@ -18,7 +19,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
     }, [user, isAuthenticated, isLoading, router]);
 
-    if (isLoading || !user || (user.role !== 'admin' && !user.is_superuser)) {
+    const userData = user as any;
+    if (isLoading || !user || (userData.role !== 'admin' && !userData.is_superuser)) {
         return (
             <div className="flex h-full items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
