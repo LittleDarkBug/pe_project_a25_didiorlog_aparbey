@@ -16,18 +16,27 @@ export class VRDetailsPanel {
 
         // Position logic
         // Position logic
-        const camera = scene.activeCamera;
+        const camera = scene.activeCamera; // In XR, this should track the headset
         if (camera) {
+            // HUD Style: Always place in front of user
             const forward = camera.getForwardRay().direction;
-            // Position: 2m in front, 0.8m right (closer and more visible)
-            plane.position = camera.position.add(forward.scale(2.0)).add(camera.getDirection(Vector3.Right()).scale(0.8));
+            forward.y = 0; // Keep roughly level with eye, or follow view?
+            // Better to follow view slightly but keep upright.
+
+            // Position: 1.5m in front, slightly right to clear center view
+            // const pos = camera.position.add(forward.scale(1.5));
+            // Let's use getDirection for local axes
+            const front = camera.getDirection(Vector3.Forward());
+            const right = camera.getDirection(Vector3.Right());
+
+            plane.position = camera.position.add(front.scale(1.5)).add(right.scale(0.5));
 
             // Look at camera
             plane.lookAt(camera.position);
             // Rotate 180 deg for GUI
             plane.rotation.y += Math.PI;
         } else {
-            // Fallback if no camera found (unlikely in VR)
+            // Fallback
             plane.position = new Vector3(0, 1.6, 2.0);
             plane.rotation.y = Math.PI;
         }

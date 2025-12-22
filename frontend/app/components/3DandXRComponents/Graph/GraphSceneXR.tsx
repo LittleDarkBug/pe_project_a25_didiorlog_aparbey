@@ -8,7 +8,10 @@ import {
     Mesh,
     InstancedMesh,
     WebXRState,
-    Quaternion
+
+
+    Quaternion,
+    Ray
 } from '@babylonjs/core';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
@@ -55,6 +58,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     const detailsPanelRef = useRef(new VRDetailsPanel());
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
     const graphRenderer = useRef(new GraphRenderer());
+    const vrMenuRef = useRef<Mesh | null>(null);
 
     // --- Async Layout Handling ---
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -130,12 +134,12 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         // Common Setup
         await setupCommonScene(sceneInstance);
 
-        // Basic Camera for non-VR view (Preview) - Same config as Web for consistency
+        // Basic Camera for non-VR view (Preview)
         const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 100, Vector3.Zero(), sceneInstance);
         const canvas = sceneInstance.getEngine().getRenderingCanvas();
         camera.attachControl(canvas, true);
 
-        // Camera Optimization (Matches GraphSceneWeb)
+        // Camera Optimization
         camera.wheelPrecision = 10;
         camera.pinchPrecision = 10;
         camera.panningSensibility = 20;
@@ -159,69 +163,131 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         }
 
 
-        // WebXR Setup - Using default experience with built-in features
+        // WebXR Setup
         try {
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
-                floorMeshes: [], // We are in space, no floor
-                disableTeleportation: true, // We use custom locomotion
+                floorMeshes: [], // Space mode
+                disableTeleportation: true, // Custom locomotion
                 disableHandTracking: true,
-                disablePointerSelection: false, // Enable laser pointer by default
+                disablePointerSelection: false, // Enable laser pointer
                 uiOptions: {
                     sessionMode: 'immersive-vr',
                 }
             });
             xrHelperRef.current = xr;
 
-            // Listen to XR state changes using proper Babylon.js v8 API
+            // Listen to XR state
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR started");
-                    // Pass the latest handler from ref
-                    vrUtilsRef.current.createVRMenu(sceneInstance, xr, vrUtilsRef.current.handleLayoutRequest);
+                    vrMenuRef.current = vrUtilsRef.current.createVRMenu(sceneInstance, xr, vrUtilsRef.current.handleLayoutRequest);
                 }
             });
 
-            // --- Custom Locomotion (Free Fly) ---
-            const speed = 0.5; // Meters per second approx (scaled by frame time)
-            const rotationSpeed = 0.05; // Radians per frame
+            const speed = 0.5;
+            const rotationSpeed = 0.05;
 
+            // --- XR Input Handling (One-time Setup) ---
+            xr.input.onControllerAddedObservable.add((controller) => {
+                controller.onMotionControllerInitObservable.add((motionController) => {
+
+                    // 1. Menu Toggle (A / X)
+                    const ids = motionController.getComponentIds();
+                    const primaryId = ids.find(id => id === 'a-button' || id === 'x-button');
+                    if (primaryId) {
+                        const primaryButton = motionController.getComponent(primaryId);
+                        if (primaryButton) {
+                            primaryButton.onButtonStateChangedObservable.add(() => {
+                                if (primaryButton.changes.pressed && primaryButton.pressed) {
+                                    // Toggle Menu
+                                    if (vrMenuRef.current) {
+                                        vrMenuRef.current.dispose();
+                                        vrMenuRef.current = null;
+                                    } else {
+                                        vrMenuRef.current = vrUtilsRef.current.createVRMenu(sceneInstance, xr, vrUtilsRef.current.handleLayoutRequest);
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // 2. Node Grab (Trigger)
+                    const trigger = motionController.getComponent('trigger');
+                    let grabbedNode: Mesh | InstancedMesh | null = null;
+                    if (trigger) {
+                        trigger.onButtonStateChangedObservable.add(() => {
+                            if (trigger.changes.pressed) {
+                                if (trigger.pressed) {
+                                    // Pick mesh using Native XR method (Best Practice)
+                                    const ray = new Ray(new Vector3(), new Vector3());
+                                    controller.getWorldPointerRayToRef(ray);
+
+                                    const pick = sceneInstance.pickWithRay(ray);
+                                    if (pick && pick.pickedMesh && pick.pickedMesh.isPickable) {
+                                        // Assume valid node if pickable and has ID logic (checking parent usually safe)
+                                        // Simplified: Just parent it.
+                                        grabbedNode = pick.pickedMesh as Mesh | InstancedMesh;
+                                        grabbedNode.setParent(controller.grip || controller.pointer);
+                                    }
+                                } else {
+                                    // Release
+                                    if (grabbedNode) {
+                                        const root = graphRenderer.current.getGraphRoot();
+                                        if (root) {
+                                            grabbedNode.setParent(root);
+                                        } else {
+                                            grabbedNode.setParent(null);
+                                        }
+                                        grabbedNode = null;
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // 3. World Grab (Grip)
+                    const grip = motionController.getComponent('squeeze') || motionController.getComponent('grip');
+                    if (grip) {
+                        grip.onButtonStateChangedObservable.add(() => {
+                            if (grip.changes.pressed) {
+                                const root = graphRenderer.current.getGraphRoot();
+                                if (root) {
+                                    if (grip.pressed) {
+                                        root.setParent(controller.grip || controller.pointer);
+                                    } else {
+                                        root.setParent(null);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+
+            // --- Render Loop (Locomotion) ---
             sceneInstance.onBeforeRenderObservable.add(() => {
                 if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) return;
 
                 xr.input.controllers.forEach((controller) => {
-                    // Check if controller has motion controller (gamepad)
-                    if (controller.inputSource.gamepad) {
-                        const gamepad = controller.inputSource.gamepad;
-                        // Standard mapping handling if needed
-                    }
-
                     if (controller.motionController) {
                         const thumbstick = controller.motionController.getComponent("xr-standard-thumbstick");
                         if (thumbstick) {
-                            const axes = thumbstick.axes; // {x: number, y: number}
+                            const axes = thumbstick.axes;
+                            if (Math.abs(axes.x) < 0.1 && Math.abs(axes.y) < 0.1) return; // Deadzone
 
-                            if (axes.x !== 0 || axes.y !== 0) {
-                                // Deadzone
-                                if (Math.abs(axes.x) < 0.1 && Math.abs(axes.y) < 0.1) return;
-
-                                const camera = xr.baseExperience.camera;
-                                // Movement Layer (Left Hand usually) or based on handedness
-                                if (controller.inputSource.handedness === 'left') {
-                                    // Move Position
-                                    const forward = camera.getDirection(Vector3.Forward());
-                                    const right = camera.getDirection(Vector3.Right());
-
-                                    // Fly Direction
-                                    // Y axis (negative) -> Forward
-                                    const moveDir = forward.scale(-axes.y * speed).add(right.scale(axes.x * speed));
-                                    camera.position.addInPlace(moveDir);
-                                } else if (controller.inputSource.handedness === 'right') {
-                                    // Rotation (Snap or Smooth)
-                                    // Stick X -> Rotate Y
-                                    if (Math.abs(axes.x) > 0.5) {
-                                        // Smooth turn
-                                        camera.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), -axes.x * rotationSpeed));
-                                    }
+                            const camera = xr.baseExperience.camera;
+                            // Left Hand: Move
+                            if (controller.inputSource.handedness === 'left') {
+                                const forward = camera.getDirection(Vector3.Forward());
+                                const right = camera.getDirection(Vector3.Right());
+                                const moveDir = forward.scale(-axes.y * speed).add(right.scale(axes.x * speed));
+                                camera.position.addInPlace(moveDir);
+                            }
+                            // Right Hand: Rotate
+                            else if (controller.inputSource.handedness === 'right') {
+                                if (Math.abs(axes.x) > 0.5) {
+                                    // Smooth turn
+                                    camera.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), -axes.x * rotationSpeed));
                                 }
                             }
                         }

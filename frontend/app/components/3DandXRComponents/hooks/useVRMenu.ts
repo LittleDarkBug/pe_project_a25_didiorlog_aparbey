@@ -223,10 +223,9 @@ export function useVRMenu() {
             }
         });
 
-        const menuMaterial = new StandardMaterial("menuMat", scene);
-        menuMaterial.emissiveColor = new Color3(0.05, 0.05, 0.1);
-        menuMaterial.alpha = 0.95;
-        menuPanel.material = menuMaterial;
+        // Optional: Enhance the auto-generated material if needed, but do NOT overwrite it
+        // const mat = menuPanel.material as StandardMaterial;
+        // if (mat) { mat.emissiveColor = new Color3(0.1, 0.1, 0.1); }
 
         return menuPanel;
     };

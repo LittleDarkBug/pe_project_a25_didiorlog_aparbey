@@ -24,6 +24,10 @@ export class GraphRenderer {
     private edgeInstances: Array<{ mesh: InstancedMesh, source: string, target: string }> = [];
     private graphRoot: TransformNode | null = null; // Root for all content
 
+    public getGraphRoot(): TransformNode | null {
+        return this.graphRoot;
+    }
+
     createNodes(
         data: GraphData,
         scene: Scene,
@@ -137,72 +141,8 @@ export class GraphRenderer {
                 })
             );
 
-            // --- XR Node Grabbing (Babylon.js v8 natif) ---
-            if (xrHelperRef && xrHelperRef.current && xrHelperRef.current.input) {
-                const xrInput = xrHelperRef.current.input;
-                let grabbedNode: InstancedMesh | null = null;
-                // Use a temporary parent to handle "carrying" the node
-                // But simplified: just updating position is often safer for instances
-                // However, parenting to controller is best for 6DOF.
-                // Instances CANNOT be reparented freely if they depend on master mesh?
-                // Actually instances can be parented to anything.
+            // XR Grab logic moved to GraphSceneXR to avoid listener duplication
 
-                // Keep existing logic for NODE grab but refine it
-                let grabOffset: Vector3 | null = null;
-
-                xrInput.onControllerAddedObservable.add((controller: any) => {
-                    controller.onMotionControllerInitObservable.add((motionController: any) => {
-                        // Trigger pour grab nœud
-                        const trigger = motionController.getComponent('trigger');
-                        if (trigger) {
-                            trigger.onButtonStateChangedObservable.add(() => {
-                                if (trigger.changes.pressed) {
-                                    if (trigger.pressed) {
-                                        // Pick mesh sous le laser
-                                        const pick = scene.pickWithRay(controller.getForwardRay(100));
-                                        if (pick && pick.pickedMesh === instance) {
-                                            grabbedNode = instance;
-                                            // Detach from graphRoot temporarily to move freely?
-                                            // Or just move absolute position.
-                                            // Simple drag:
-                                            grabbedNode.setParent(controller.grip || controller.pointer);
-                                            // instance.parent = controller.pointer; -> This snaps it if we don't preserve world pos?
-                                            // Babylon's setParent(target, true) preserves world pos.
-                                            // Note: setParent works on TransformNode/Mesh.
-                                        }
-                                    } else {
-                                        if (grabbedNode) {
-                                            // Release: Re-parent to graphRoot
-                                            grabbedNode.setParent(this.graphRoot);
-                                            grabbedNode = null;
-                                        }
-                                    }
-                                }
-                            });
-                        }
-
-                        // Grip/Menu pour grab global (WORLD GRAB)
-                        // Use Squeeze/Grip button
-                        const grip = motionController.getComponent('squeeze') || motionController.getComponent('grip');
-                        if (grip && this.graphRoot) {
-                            grip.onButtonStateChangedObservable.add(() => {
-                                if (grip.changes.pressed) {
-                                    if (grip.pressed) {
-                                        // Start World Grab
-                                        // Only if not pointing at a node? Or always?
-                                        // Usually "Grip" is for world, "Trigger" for items.
-                                        // Allow grabbing world anywhere.
-                                        this.graphRoot!.setParent(controller.grip || controller.pointer);
-                                    } else {
-                                        // Release World Grab
-                                        this.graphRoot!.setParent(null);
-                                    }
-                                }
-                            });
-                        }
-                    });
-                });
-            }
 
             nodeMeshes.set(node.id, instance);
         });
