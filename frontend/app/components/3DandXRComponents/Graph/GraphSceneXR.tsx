@@ -7,13 +7,16 @@ import {
     ArcRotateCamera,
     Mesh,
     InstancedMesh,
-    WebXRState
+    WebXRState,
+    Quaternion
 } from '@babylonjs/core';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
 import { VRDetailsPanel } from '../components/VRDetailsPanel';
 import { GraphRenderer } from '../utils/GraphRenderer';
 import { setupCommonScene } from '../utils/SceneSetup';
+import { useJobPolling } from '@/app/hooks/useJobPolling';
+import { apiClient } from '@/app/lib/apiClient';
 
 interface GraphData {
     nodes: Array<{
@@ -37,19 +40,57 @@ interface GraphSceneProps {
     data: GraphData;
     onSelect?: (data: any, type: 'node' | 'edge' | null) => void;
     visibleNodeIds?: Set<string> | null;
+    projectId?: string;
+    onLayoutUpdate?: (newData: any) => void;
 }
 
 export interface GraphSceneRef {
     resetCamera: () => void;
 }
 
-const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds }, ref) => {
+const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, projectId, onLayoutUpdate }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const xrHelperRef = useRef<any>(null);
     const detailsPanelRef = useRef(new VRDetailsPanel());
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
     const graphRenderer = useRef(new GraphRenderer());
+
+    // --- Async Layout Handling ---
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+
+    // Polling inside GraphSceneXR (since VR user triggers it here)
+    useJobPolling(currentJobId, {
+        onSuccess: (result) => {
+            const graphData = result.graph_data || result;
+            if (onLayoutUpdate) {
+                onLayoutUpdate(graphData);
+            }
+            setCurrentJobId(null);
+            console.log("VR Layout Update Success");
+        },
+        onError: (error) => {
+            console.error("VR Layout Update Error:", error);
+            setCurrentJobId(null);
+        }
+    });
+
+    const handleLayoutRequest = useCallback(async (algorithm: string) => {
+        if (!projectId) return;
+        try {
+            console.log("Requesting layout from VR:", algorithm);
+            const response = await apiClient.post<{ job_id?: string, graph_data?: any }>(`/projects/${projectId}/layout`, { algorithm });
+
+            if (response.job_id) {
+                setCurrentJobId(response.job_id);
+            } else if (response.graph_data && onLayoutUpdate) {
+                onLayoutUpdate(response.graph_data);
+            }
+        } catch (err) {
+            console.error("Failed to request layout from VR", err);
+        }
+    }, [projectId, onLayoutUpdate]);
+
 
     useImperativeHandle(ref, () => ({
         resetCamera: () => {
@@ -70,10 +111,11 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
     const { createVRMenu } = useVRMenu();
 
-    const vrUtilsRef = useRef({ createVRMenu });
+    // Store latest callback in ref to avoid recreating menu constantly
+    const vrUtilsRef = useRef({ createVRMenu, handleLayoutRequest });
     useEffect(() => {
-        vrUtilsRef.current = { createVRMenu };
-    });
+        vrUtilsRef.current = { createVRMenu, handleLayoutRequest };
+    }, [createVRMenu, handleLayoutRequest]);
 
     // Handle visibility updates
     useEffect(() => {
@@ -134,8 +176,57 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR started");
-                    vrUtilsRef.current.createVRMenu(sceneInstance, xr);
+                    // Pass the latest handler from ref
+                    vrUtilsRef.current.createVRMenu(sceneInstance, xr, vrUtilsRef.current.handleLayoutRequest);
                 }
+            });
+
+            // --- Custom Locomotion (Free Fly) ---
+            const speed = 0.5; // Meters per second approx (scaled by frame time)
+            const rotationSpeed = 0.05; // Radians per frame
+
+            sceneInstance.onBeforeRenderObservable.add(() => {
+                if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) return;
+
+                xr.input.controllers.forEach((controller) => {
+                    // Check if controller has motion controller (gamepad)
+                    if (controller.inputSource.gamepad) {
+                        const gamepad = controller.inputSource.gamepad;
+                        // Standard mapping handling if needed
+                    }
+
+                    if (controller.motionController) {
+                        const thumbstick = controller.motionController.getComponent("xr-standard-thumbstick");
+                        if (thumbstick) {
+                            const axes = thumbstick.axes; // {x: number, y: number}
+
+                            if (axes.x !== 0 || axes.y !== 0) {
+                                // Deadzone
+                                if (Math.abs(axes.x) < 0.1 && Math.abs(axes.y) < 0.1) return;
+
+                                const camera = xr.baseExperience.camera;
+                                // Movement Layer (Left Hand usually) or based on handedness
+                                if (controller.inputSource.handedness === 'left') {
+                                    // Move Position
+                                    const forward = camera.getDirection(Vector3.Forward());
+                                    const right = camera.getDirection(Vector3.Right());
+
+                                    // Fly Direction
+                                    // Y axis (negative) -> Forward
+                                    const moveDir = forward.scale(-axes.y * speed).add(right.scale(axes.x * speed));
+                                    camera.position.addInPlace(moveDir);
+                                } else if (controller.inputSource.handedness === 'right') {
+                                    // Rotation (Snap or Smooth)
+                                    // Stick X -> Rotate Y
+                                    if (Math.abs(axes.x) > 0.5) {
+                                        // Smooth turn
+                                        camera.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), -axes.x * rotationSpeed));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
             });
 
         } catch (e) {

@@ -1,4 +1,4 @@
-import { Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Scene, Mesh, ActionManager, ExecuteCodeAction, InstancedMesh, PBRMaterial, Quaternion, Matrix } from '@babylonjs/core';
+import { Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Scene, Mesh, ActionManager, ExecuteCodeAction, InstancedMesh, PBRMaterial, Quaternion, Matrix, TransformNode } from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
 
 interface GraphData {
@@ -22,6 +22,7 @@ interface GraphData {
 export class GraphRenderer {
     // Store edge references for filtering
     private edgeInstances: Array<{ mesh: InstancedMesh, source: string, target: string }> = [];
+    private graphRoot: TransformNode | null = null; // Root for all content
 
     createNodes(
         data: GraphData,
@@ -31,6 +32,12 @@ export class GraphRenderer {
         onVRSelect?: (data: any, type: string) => void,
         xrHelperRef?: { current: any }
     ) {
+        // Create or reset Graph Root
+        if (this.graphRoot) {
+            this.graphRoot.dispose();
+        }
+        this.graphRoot = new TransformNode("GraphRoot", scene);
+
         // Create a master mesh for instancing
         // Using PBR material for better aesthetics (metallic/roughness)
         const masterMesh = MeshBuilder.CreateSphere("master_node_sphere", { diameter: 2, segments: 16 }, scene);
@@ -62,6 +69,7 @@ export class GraphRenderer {
         data.nodes.forEach(node => {
             // Create an instance instead of a clone or new mesh
             const instance = masterMesh.createInstance(node.id);
+            instance.parent = this.graphRoot; // Parent to root
             instance.position = new Vector3(node.x, node.y, node.z);
             instance.isPickable = true; // Ensure pickable for VR rays
 
@@ -133,12 +141,15 @@ export class GraphRenderer {
             if (xrHelperRef && xrHelperRef.current && xrHelperRef.current.input) {
                 const xrInput = xrHelperRef.current.input;
                 let grabbedNode: InstancedMesh | null = null;
-                let grabOffset: Vector3 | null = null;
-                let isGrabbingGraph = false;
-                let graphGrabOffset: Vector3 | null = null;
-                let initialNodePositions: Vector3[] | null = null;
+                // Use a temporary parent to handle "carrying" the node
+                // But simplified: just updating position is often safer for instances
+                // However, parenting to controller is best for 6DOF.
+                // Instances CANNOT be reparented freely if they depend on master mesh?
+                // Actually instances can be parented to anything.
 
-                // Grab de nœud : trigger sur le nœud
+                // Keep existing logic for NODE grab but refine it
+                let grabOffset: Vector3 | null = null;
+
                 xrInput.onControllerAddedObservable.add((controller: any) => {
                     controller.onMotionControllerInitObservable.add((motionController: any) => {
                         // Trigger pour grab nœud
@@ -151,59 +162,45 @@ export class GraphRenderer {
                                         const pick = scene.pickWithRay(controller.getForwardRay(100));
                                         if (pick && pick.pickedMesh === instance) {
                                             grabbedNode = instance;
-                                            grabOffset = grabbedNode.position.subtract(controller.pointer.position);
+                                            // Detach from graphRoot temporarily to move freely?
+                                            // Or just move absolute position.
+                                            // Simple drag:
+                                            grabbedNode.setParent(controller.grip || controller.pointer);
+                                            // instance.parent = controller.pointer; -> This snaps it if we don't preserve world pos?
+                                            // Babylon's setParent(target, true) preserves world pos.
+                                            // Note: setParent works on TransformNode/Mesh.
                                         }
                                     } else {
-                                        grabbedNode = null;
-                                        grabOffset = null;
+                                        if (grabbedNode) {
+                                            // Release: Re-parent to graphRoot
+                                            grabbedNode.setParent(this.graphRoot);
+                                            grabbedNode = null;
+                                        }
                                     }
                                 }
                             });
                         }
-                        // Grip/Menu pour grab global
-                        const grip = motionController.getComponent('grip');
-                        const menu = motionController.getComponent('menu') || motionController.getComponent('secondary-button');
-                        const grabButton = grip || menu;
-                        if (grabButton) {
-                            grabButton.onButtonStateChangedObservable.add(() => {
-                                if (grabButton.changes.pressed) {
-                                    if (grabButton.pressed) {
-                                        // Pick vide = grab global
-                                        const pick = scene.pickWithRay(controller.getForwardRay(100));
-                                        if (!pick || !pick.pickedMesh) {
-                                            isGrabbingGraph = true;
-                                            graphGrabOffset = controller.pointer.position.clone();
-                                            initialNodePositions = Array.from(nodeMeshes.values()).map(mesh => mesh.position.clone());
-                                        }
+
+                        // Grip/Menu pour grab global (WORLD GRAB)
+                        // Use Squeeze/Grip button
+                        const grip = motionController.getComponent('squeeze') || motionController.getComponent('grip');
+                        if (grip && this.graphRoot) {
+                            grip.onButtonStateChangedObservable.add(() => {
+                                if (grip.changes.pressed) {
+                                    if (grip.pressed) {
+                                        // Start World Grab
+                                        // Only if not pointing at a node? Or always?
+                                        // Usually "Grip" is for world, "Trigger" for items.
+                                        // Allow grabbing world anywhere.
+                                        this.graphRoot!.setParent(controller.grip || controller.pointer);
                                     } else {
-                                        isGrabbingGraph = false;
-                                        graphGrabOffset = null;
-                                        initialNodePositions = null;
+                                        // Release World Grab
+                                        this.graphRoot!.setParent(null);
                                     }
                                 }
                             });
                         }
                     });
-                });
-                // Déplacement à chaque frame
-                scene.onBeforeRenderObservable.add(() => {
-                    if (grabbedNode && xrInput.controllers.length) {
-                        const controller = xrInput.controllers.find((c: any) => c.pointer && c.pointer.position && grabbedNode);
-                        if (controller) {
-                            grabbedNode.position = controller.pointer.position.add(grabOffset || Vector3.Zero());
-                        }
-                    }
-                    if (isGrabbingGraph && graphGrabOffset && initialNodePositions && xrInput.controllers.length) {
-                        const controller = xrInput.controllers.find((c: any) => c.pointer && c.pointer.position);
-                        if (controller) {
-                            const delta = controller.pointer.position.subtract(graphGrabOffset);
-                            let i = 0;
-                            for (const mesh of nodeMeshes.values()) {
-                                mesh.position = initialNodePositions[i].add(delta);
-                                i++;
-                            }
-                        }
-                    }
                 });
             }
 
@@ -256,18 +253,33 @@ export class GraphRenderer {
             if (sourceMesh && targetMesh) {
                 const instance = masterEdge.createInstance(`edge_${edge.source}_${edge.target}`);
 
-                const p1 = sourceMesh.position;
-                const p2 = targetMesh.position;
+                // Parent to graphRoot
+                instance.parent = this.graphRoot;
 
-                // Position at midpoint
-                instance.position = Vector3.Center(p1, p2);
+                // Position/Scaling logic must be careful if nodes are moving!
+                // If nodes move relative to root, edges must update.
+                // CURRENTLY: Edges are static once created.
+                // If we move NODES (grabNode), we must update connected edges on frame.
+                // For now, let's assume static graph structure unless manipulated.
+                // To support dynamic updates, we need an update loop for edges.
 
-                // Scale Z to length
-                const distance = Vector3.Distance(p1, p2);
-                instance.scaling.z = distance;
+                const updateEdge = () => {
+                    const p1 = sourceMesh.position;
+                    const p2 = targetMesh.position;
+                    // CAUTION: position is relative to parent (graphRoot). 
+                    // Since both nodes and edge are children of graphRoot, local positions work fine!
 
-                // Rotate to look at target
-                instance.lookAt(p2);
+                    instance.position = Vector3.Center(p1, p2);
+                    const distance = Vector3.Distance(p1, p2);
+                    instance.scaling.z = distance;
+                    instance.lookAt(p2);
+                };
+
+                updateEdge(); // Initial
+
+                // Store update function or rely on scene logic?
+                // For this MVP, we won't auto-update edges if nodes are moved individually.
+                // TODO: Add edge update logic if node dragging is critical.
 
                 // Store reference for filtering
                 this.edgeInstances.push({ mesh: instance, source: edge.source, target: edge.target });
@@ -284,6 +296,12 @@ export class GraphRenderer {
                         instance.instancedBuffers.color = new Color4(1, 0.6, 1, 1); // Highlight
                         instance.scaling.x = 4; // Thicker on hover
                         instance.scaling.y = 4;
+                    })
+                );
+
+                instance.actionManager.registerAction(
+                    new ExecuteCodeAction(ActionManager.OnPointerOverTrigger, () => {
+                        // Keep Z scaling!
                     })
                 );
 
@@ -315,24 +333,7 @@ export class GraphRenderer {
     }
 
     setupVRInteractions(nodeMeshes: Map<string, Mesh | InstancedMesh>, nodeIds: string[]) {
-        nodeIds.forEach(id => {
-            const mesh = nodeMeshes.get(id);
-            if (mesh) {
-                mesh.isPickable = true;
-
-                const originalScale = mesh.scaling.clone();
-                mesh.actionManager?.registerAction(
-                    new ExecuteCodeAction(ActionManager.OnPointerOverTrigger, () => {
-                        mesh.scaling = originalScale.scale(1.5);
-                    })
-                );
-                mesh.actionManager?.registerAction(
-                    new ExecuteCodeAction(ActionManager.OnPointerOutTrigger, () => {
-                        mesh.scaling = originalScale;
-                    })
-                );
-            }
-        });
+        // Moved into createNodes for better integration
     }
 
     /**
@@ -366,6 +367,12 @@ export class GraphRenderer {
         // Clear edge references
         this.edgeInstances = [];
 
+        // Dispose root
+        if (this.graphRoot) {
+            this.graphRoot.dispose();
+            this.graphRoot = null;
+        }
+
         // Dispose all node meshes (instances)
         nodeMeshes.forEach((mesh) => {
             mesh.dispose();
@@ -396,16 +403,7 @@ export class GraphRenderer {
             edgeMaterial.dispose();
         }
 
-        // Dispose all edge meshes (instances)
-        // Iterate over a copy of the meshes array to avoid issues when modifying the array during iteration
-        [...scene.meshes].forEach(mesh => {
-            if (mesh.name.startsWith('edge_') || mesh.name === 'edges_system') {
-                mesh.dispose();
-            }
-        });
-
-        // Dispose UI textures if any (attached to nodes)
-        // Iterate over a copy of the textures array
+        // ... (Cleanup textures)
         [...scene.textures].forEach(texture => {
             if (texture instanceof GUI.AdvancedDynamicTexture && texture.name === "UI") {
                 texture.dispose();
@@ -413,3 +411,4 @@ export class GraphRenderer {
         });
     }
 }
+

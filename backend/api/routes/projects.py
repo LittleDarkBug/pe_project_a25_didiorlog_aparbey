@@ -64,9 +64,18 @@ async def get_task_status(job_id: str):
     task_result = AsyncResult(job_id, app=celery_app)
     response = {"job_id": job_id, "status": task_result.status}
     
+    
     if task_result.status == "SUCCESS":
         result = task_result.result
-        response["result"] = result.get("result") if isinstance(result, dict) else result
+        
+        # Check for internal task failure (caught exception)
+        if isinstance(result, dict) and result.get("status") == "FAILURE":
+            response["status"] = "FAILURE"
+            response["error"] = result.get("error")
+        else:
+            final_result = result.get("result") if isinstance(result, dict) else result
+            response["result"] = clean_nans(final_result)
+            
     elif task_result.status == "FAILURE":
         response["error"] = str(task_result.result)
     
@@ -181,27 +190,28 @@ async def update_project_layout(
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Fichier source introuvable sur le disque")
 
+    # Calcul asynchrone via Celery
     try:
-        # Recalculer le graphe avec le nouvel algorithme
-        graph_data = await process_graph_file(
-            file_path,
-            mapping=project.mapping or {},
-            algorithm=layout_update.algorithm
+        celery_task = async_process_graph_file.delay(
+            str(file_path),
+            project.mapping or {},
+            layout_update.algorithm,
+            str(project.id)
         )
         
-        project.graph_data = graph_data
-        project.metadata = graph_data.get("metadata", {})
+        # update metadata or timestamp to show "processing"?
+        # Le timestamp sera mis à jour par la tâche à la fin, mais on peut marquer le "début"
         project.updated_at = datetime.now(timezone.utc)
-        
         await project.save()
         
-        return clean_nans({
-            "message": "Layout mis à jour",
-            "graph_data": project.graph_data
-        })
+        return {
+            "job_id": celery_task.id,
+            "status": "PENDING",
+            "message": "Calcul du layout lancé. Veuillez patienter."
+        }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors du recalcul du layout: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du lancement du calcul: {str(e)}")
 
 
 # ===== Update Project =====

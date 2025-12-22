@@ -27,7 +27,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
-    
+
     const graphSceneRef = useRef<GraphSceneRef>(null);
     const { addToast } = useToastStore();
 
@@ -76,6 +76,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }, []);
 
     const handleLayoutUpdate = useCallback((newGraphData: any) => {
+        if (!newGraphData || !newGraphData.nodes || newGraphData.nodes.length === 0) {
+            console.warn("Mise à jour du layout ignorée car les données sont invalides", newGraphData);
+            return;
+        }
         setProject((prev: any) => ({
             ...prev,
             graph_data: newGraphData,
@@ -113,6 +117,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}
+                            projectId={id}
+                            onLayoutUpdate={handleLayoutUpdate}
                         />
                     ) : (
                         <GraphSceneWeb
@@ -176,8 +182,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <div className="w-full max-w-4xl rounded-2xl bg-surface-900 p-6 border border-surface-50/10 shadow-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-white">Éditer la visualisation</h2>
-                            <button 
-                                onClick={() => setIsEditModalOpen(false)} 
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
                                 className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,10 +194,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <div className="text-sm text-gray-400 mb-6">
                             Modifiez les données ou le mapping de votre projet existant.
                         </div>
-                        <EditProjectModal 
+                        <EditProjectModal
                             project={project}
-                            onClose={() => setIsEditModalOpen(false)} 
-                            onSuccess={handleEditSuccess} 
+                            onClose={() => setIsEditModalOpen(false)}
+                            onSuccess={handleEditSuccess}
                         />
                     </div>
                 </div>
@@ -237,26 +243,25 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     onShare={() => setIsShareModalOpen(true)}
                     onEdit={() => setIsEditModalOpen(true)}
                 >
-                    <LayoutSelector 
-                        projectId={id} 
-                        onLayoutUpdate={handleLayoutUpdate} 
+                    <LayoutSelector
+                        projectId={id}
+                        onLayoutUpdate={handleLayoutUpdate}
                     />
-                    
+
                     {/* Filter Toggle Button */}
                     <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${
-                            isFilterOpen || visibleNodeIds !== null
-                                ? 'bg-primary-500/20 text-white border border-primary-500/50'
-                                : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
-                        }`}
+                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isFilterOpen || visibleNodeIds !== null
+                            ? 'bg-primary-500/20 text-white border border-primary-500/50'
+                            : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
+                            }`}
                         title="Filtrer le graphe"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                         </svg>
                         <span className="hidden sm:inline">Filtres</span>
-                        
+
                         {/* Active Indicator */}
                         {visibleNodeIds !== null && (
                             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>

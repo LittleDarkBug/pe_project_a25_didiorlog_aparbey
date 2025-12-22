@@ -2,98 +2,229 @@ import { Vector3, Color3, MeshBuilder, StandardMaterial, Scene, Mesh } from '@ba
 import * as GUI from '@babylonjs/gui';
 
 export function useVRMenu() {
-    const createVRMenu = (scene: Scene, xr: any) => {
-        const menuPanel = MeshBuilder.CreatePlane("vrMenu", { width: 2, height: 1.5 }, scene);
+    const createVRMenu = (scene: Scene, xr: any, onLayoutSelect?: (algo: string) => void) => {
+        // --- 1. Panel Setup ---
+        const menuPanel = MeshBuilder.CreatePlane("vrMenu", { width: 4, height: 2.5 }, scene); // Widescreen
 
-        if (scene.activeCamera) {
-            menuPanel.position = new Vector3(-1.5, 1.5, 2);
+        // Positioning
+        if (xr && xr.baseExperience && xr.baseExperience.camera) {
+            const camera = xr.baseExperience.camera;
+            const forward = camera.getForwardRay().direction;
+            forward.y = 0;
+            menuPanel.position = camera.position.add(forward.scale(2.2));
+            menuPanel.lookAt(camera.position);
+            menuPanel.rotation.y += Math.PI;
+        } else if (scene.activeCamera) {
+            menuPanel.position = new Vector3(0, 1.6, 2.5);
             menuPanel.billboardMode = Mesh.BILLBOARDMODE_ALL;
         }
 
-        const menuTexture = GUI.AdvancedDynamicTexture.CreateForMesh(menuPanel);
-        const mainPanel = new GUI.StackPanel();
-        mainPanel.width = "100%";
-        mainPanel.height = "100%";
-        mainPanel.background = "#000000DD";
-        mainPanel.paddingTop = "20px";
-        mainPanel.paddingBottom = "20px";
-        menuTexture.addControl(mainPanel);
+        // --- 2. High-Res UI & Theme ---
+        // 2048x1280 for sharp text
+        const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(menuPanel, 2048, 1280);
 
+        // Colors
+        const theme = {
+            bg: "rgba(15, 23, 42, 0.95)", // Slate 950
+            primary: "#8b5cf6", // Violet 500
+            primaryHover: "#7c3aed", // Violet 600
+            secondary: "#1e293b", // Slate 800
+            secondaryBorder: "#334155", // Slate 700
+            text: "#f8fafc", // Slate 50
+            textMuted: "#94a3b8", // Slate 400
+            danger: "#ef4444", // Red 500
+            dangerHover: "#dc2626", // Red 600
+        };
+
+        // Main Container (Glassmorphism)
+        const container = new GUI.Rectangle();
+        container.width = 1;
+        container.height = 1;
+        container.cornerRadius = 60;
+        container.thickness = 4;
+        container.color = theme.secondaryBorder;
+        container.background = theme.bg;
+        advancedTexture.addControl(container);
+
+        // Grid Layout
+        const mainGrid = new GUI.Grid();
+        mainGrid.paddingTop = "40px";
+        mainGrid.paddingBottom = "40px";
+        mainGrid.paddingLeft = "60px";
+        mainGrid.paddingRight = "60px";
+        mainGrid.addRowDefinition(0.2); // Header
+        mainGrid.addRowDefinition(0.65); // Layouts
+        mainGrid.addRowDefinition(0.15); // Footer
+        container.addControl(mainGrid);
+
+        // --- 3. Header ---
+        const headerStack = new GUI.StackPanel();
+        headerStack.isVertical = false;
+        headerStack.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+
+        // Indicator Bar
+        const indicator = new GUI.Rectangle();
+        indicator.width = "10px";
+        indicator.height = "80px";
+        indicator.cornerRadius = 5;
+        indicator.background = theme.primary;
+        indicator.thickness = 0;
+        headerStack.addControl(indicator);
+
+        // Title Text
         const title = new GUI.TextBlock();
-        title.text = "🎮 MENU VR";
-        title.color = "white";
-        title.fontSize = 60;
-        title.height = "80px";
+        title.text = "MENU IMMERSIF";
+        title.color = theme.text;
+        title.fontSize = 80;
         title.fontWeight = "bold";
-        mainPanel.addControl(title);
+        title.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        title.paddingLeft = "30px";
+        title.resizeToFit = true;
+        headerStack.addControl(title);
 
-        const spacer1 = new GUI.Rectangle();
-        spacer1.height = "20px";
-        spacer1.thickness = 0;
-        mainPanel.addControl(spacer1);
+        mainGrid.addControl(headerStack, 0, 0);
 
-        const exitButton = GUI.Button.CreateSimpleButton("exitVR", "🚪 Quitter VR");
-        exitButton.width = "80%";
-        exitButton.height = "120px";
-        exitButton.color = "white";
-        exitButton.fontSize = 50;
-        exitButton.background = "#FF4444";
-        exitButton.cornerRadius = 20;
-        exitButton.thickness = 0;
+        // --- 4. Layouts Section ---
+        const layoutContainer = new GUI.Rectangle();
+        layoutContainer.thickness = 0;
+        layoutContainer.paddingTop = "20px";
+        layoutContainer.paddingBottom = "20px";
+        mainGrid.addControl(layoutContainer, 1, 0);
 
-        exitButton.onPointerEnterObservable.add(() => {
-            exitButton.background = "#FF6666";
-            exitButton.scaleX = 1.05;
-            exitButton.scaleY = 1.05;
+        const subHeader = new GUI.TextBlock();
+        subHeader.text = "DISPOSITIONS (ALGORITHMES)";
+        subHeader.color = theme.textMuted;
+        subHeader.fontSize = 30;
+        subHeader.fontWeight = "bold";
+        subHeader.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        subHeader.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+        subHeader.height = "50px";
+        layoutContainer.addControl(subHeader);
+
+        const layoutsParams = [
+            { id: 'fruchterman_reingold', label: 'Fruchterman (Std)' },
+            { id: 'kamada_kawai', label: 'Kamada (Organique)' },
+            { id: 'drl', label: 'DrL (Cluster)' },
+            { id: 'sphere', label: 'Sphérique 3D' },
+            { id: 'grid', label: 'Grille Statique' },
+            { id: 'circular', label: 'Circulaire' },
+        ];
+
+        // Grid for buttons
+        const btnGrid = new GUI.Grid();
+        btnGrid.paddingTop = "60px"; // Space for subheader
+        btnGrid.addColumnDefinition(0.33);
+        btnGrid.addColumnDefinition(0.33);
+        btnGrid.addColumnDefinition(0.33);
+        btnGrid.addRowDefinition(0.5);
+        btnGrid.addRowDefinition(0.5);
+
+        layoutContainer.addControl(btnGrid);
+
+        // Helper for fancy buttons
+        const createOptionBtn = (text: string, row: number, col: number, callback: () => void) => {
+            const wrapper = new GUI.Rectangle();
+            wrapper.thickness = 0;
+            wrapper.paddingLeft = "10px";
+            wrapper.paddingRight = "10px";
+            wrapper.paddingTop = "10px";
+            wrapper.paddingBottom = "10px";
+
+            // To emulate complex button, we use a container with events
+            const btnBg = new GUI.Rectangle();
+            btnBg.background = theme.secondary;
+            btnBg.cornerRadius = 20;
+            btnBg.thickness = 2;
+            btnBg.color = theme.secondaryBorder;
+            btnBg.isPointerBlocker = true;
+
+            const btnText = new GUI.TextBlock();
+            btnText.text = text;
+            btnText.color = theme.text;
+            btnText.fontSize = 35;
+            btnText.fontWeight = "bold";
+            btnBg.addControl(btnText);
+
+            // Explicit pointer events on the background rectangle
+            btnBg.onPointerEnterObservable.add(() => {
+                btnBg.background = theme.primary;
+                btnBg.color = theme.primary;
+                btnBg.thickness = 0;
+            });
+            btnBg.onPointerOutObservable.add(() => {
+                btnBg.background = theme.secondary;
+                btnBg.color = theme.secondaryBorder;
+                btnBg.thickness = 2;
+            });
+            // Click event needs to be on the control itself
+            btnBg.onPointerClickObservable.add(() => {
+                // Flash feedback
+                btnBg.background = "#fff";
+                btnText.color = "#000";
+                setTimeout(() => {
+                    // Reset will happen on pointer out usually, or here
+                    btnBg.background = theme.secondary;
+                    btnText.color = theme.text;
+                    callback();
+                }, 150);
+            });
+
+            wrapper.addControl(btnBg); // Add our custom button to wrapper
+            btnGrid.addControl(wrapper, row, col);
+        };
+
+        layoutsParams.forEach((algo, index) => {
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+            createOptionBtn(algo.label, row, col, () => {
+                if (onLayoutSelect) onLayoutSelect(algo.id);
+            });
         });
 
-        exitButton.onPointerOutObservable.add(() => {
-            exitButton.background = "#FF4444";
-            exitButton.scaleX = 1.0;
-            exitButton.scaleY = 1.0;
+        // --- 5. Footer Actions ---
+        const footerGrid = new GUI.Grid();
+        footerGrid.addColumnDefinition(0.5);
+        footerGrid.addColumnDefinition(0.5);
+        mainGrid.addControl(footerGrid, 2, 0);
+
+        // Action Button Helper
+        const createActionBtn = (text: string, bgColor: string, hoverColor: string, col: number, action: () => void) => {
+            const wrapper = new GUI.Rectangle();
+            wrapper.thickness = 0;
+            wrapper.paddingLeft = "20px";
+            wrapper.paddingRight = "20px";
+
+            const btn = GUI.Button.CreateSimpleButton("actionBtn", text);
+            btn.color = "white";
+            btn.fontSize = 40;
+            btn.fontWeight = "bold";
+            btn.background = bgColor;
+            btn.cornerRadius = 25;
+            btn.thickness = 0;
+
+            btn.onPointerEnterObservable.add(() => btn.background = hoverColor);
+            btn.onPointerOutObservable.add(() => btn.background = bgColor);
+            btn.onPointerClickObservable.add(action);
+
+            wrapper.addControl(btn);
+            footerGrid.addControl(wrapper, 0, col);
+        };
+
+        createActionBtn("Recentrer", theme.secondaryBorder, theme.primary, 0, () => {
+            if (xr && xr.baseExperience.camera) {
+                xr.baseExperience.camera.position = new Vector3(0, 0, 0);
+            }
         });
 
-        exitButton.onPointerClickObservable.add(() => {
+        createActionBtn("Quitter", theme.danger, theme.dangerHover, 1, () => {
             if (xr && xr.baseExperience) {
                 xr.baseExperience.exitXRAsync();
                 menuPanel.dispose();
             }
         });
 
-        mainPanel.addControl(exitButton);
-
-        const spacer2 = new GUI.Rectangle();
-        spacer2.height = "20px";
-        spacer2.thickness = 0;
-        mainPanel.addControl(spacer2);
-
-        const resetButton = GUI.Button.CreateSimpleButton("resetView", "🔄 Recentrer");
-        resetButton.width = "80%";
-        resetButton.height = "100px";
-        resetButton.color = "white";
-        resetButton.fontSize = 45;
-        resetButton.background = "#4444FF";
-        resetButton.cornerRadius = 20;
-        resetButton.thickness = 0;
-
-        resetButton.onPointerEnterObservable.add(() => {
-            resetButton.background = "#6666FF";
-        });
-
-        resetButton.onPointerOutObservable.add(() => {
-            resetButton.background = "#4444FF";
-        });
-
-        resetButton.onPointerClickObservable.add(() => {
-            if (xr && xr.baseExperience.camera) {
-                xr.baseExperience.camera.position = new Vector3(0, 20, 80);
-            }
-        });
-
-        mainPanel.addControl(resetButton);
-
         const menuMaterial = new StandardMaterial("menuMat", scene);
-        menuMaterial.emissiveColor = new Color3(0.1, 0.1, 0.2);
+        menuMaterial.emissiveColor = new Color3(0.05, 0.05, 0.1);
         menuMaterial.alpha = 0.95;
         menuPanel.material = menuMaterial;
 

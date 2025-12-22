@@ -63,7 +63,8 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     const handleLayoutUpdate = useCallback((newGraphData: any) => {
         setProject((prev: any) => ({
             ...prev,
-            graph_data: newGraphData
+            graph_data: newGraphData,
+            updated_at: new Date().toISOString()
         }));
     }, []);
 

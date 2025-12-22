@@ -10,6 +10,7 @@ from models.project import Project
 from models.share_link import ShareLink
 from api.dependencies import get_current_user
 from services.graph_service import process_graph_file
+from tasks import async_process_graph_file
 from pathlib import Path
 import math
 
@@ -134,15 +135,20 @@ async def preview_shared_project_layout(token: str, layout_update: LayoutUpdate)
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Fichier source introuvable sur le disque")
 
+    # Calcul asynchrone via Celery (SANS SAUVEGARDE car project_id=None)
     try:
-        # Recalculer le graphe avec le nouvel algorithme (SANS SAUVEGARDER)
-        graph_data = await process_graph_file(
-            file_path,
-            mapping=project.mapping or {},
-            algorithm=layout_update.algorithm
+        celery_task = async_process_graph_file.delay(
+            str(file_path),
+            project.mapping or {},
+            layout_update.algorithm,
+            None  # Important: None pour ne pas sauvegarder en BDD
         )
         
-        return clean_nans({"graph_data": graph_data})
+        return {
+            "job_id": celery_task.id,
+            "status": "PENDING",
+            "message": "Calcul du layout lancé."
+        }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors du calcul du layout: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du lancement du calcul: {str(e)}")

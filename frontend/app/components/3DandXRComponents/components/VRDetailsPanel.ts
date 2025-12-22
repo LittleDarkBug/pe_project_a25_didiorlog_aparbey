@@ -3,109 +3,244 @@ import * as GUI from '@babylonjs/gui';
 
 export class VRDetailsPanel {
     private currentPlane: Mesh | null = null;
+    private currentTexture: GUI.AdvancedDynamicTexture | null = null;
 
     create(scene: Scene, data: any, type: string) {
         this.dispose();
 
         if (!data) return;
 
-        // Create a plane for the UI
-        const plane = MeshBuilder.CreatePlane("detailsPlane", { width: 3, height: 2 }, scene);
-        
-        // Position it in front of the user (camera)
+        // --- 1. Create Plane ---
+        // Widescreen format for better information density
+        const plane = MeshBuilder.CreatePlane("detailsPlane", { width: 4, height: 3 }, scene);
+
+        // Position logic
+        // Position logic
         const camera = scene.activeCamera;
         if (camera) {
             const forward = camera.getForwardRay().direction;
-            // Position slightly to the side and front
-            plane.position = camera.position.add(forward.scale(3)).add(new Vector3(1, 0, 0));
-            // Look at camera (inverted because planes are single sided by default usually, but GUI handles it)
+            // Position: 2m in front, 0.8m right (closer and more visible)
+            plane.position = camera.position.add(forward.scale(2.0)).add(camera.getDirection(Vector3.Right()).scale(0.8));
+
+            // Look at camera
             plane.lookAt(camera.position);
-            // Rotate 180 deg to face camera correctly if needed, but lookAt usually handles Z axis alignment. 
-            // Babylon GUI planes often need to be rotated Math.PI if text is backwards.
+            // Rotate 180 deg for GUI
             plane.rotation.y += Math.PI;
+        } else {
+            // Fallback if no camera found (unlikely in VR)
+            plane.position = new Vector3(0, 1.6, 2.0);
+            plane.rotation.y = Math.PI;
         }
 
-        // Create AdvancedDynamicTexture
-        const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(plane, 1024, 1024);
-        
-        // Main Container (Glassmorphism style)
+        // --- 2. Advanced Texture (High Res) ---
+        // 2048x1536 for crisp text
+        const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(plane, 2048, 1536);
+        this.currentTexture = advancedTexture;
+
+        // --- 3. Main Container (Glassmorphism) ---
         const container = new GUI.Rectangle();
         container.width = 1;
         container.height = 1;
-        container.cornerRadius = 60;
-        container.color = "#60a5fa"; // Primary-400 border
+        container.cornerRadius = 40;
         container.thickness = 4;
-        container.background = "rgba(10, 10, 20, 0.85)"; // Dark background
+
+        // Theme Colors
+        const isNode = type === 'node';
+        const primaryColor = isNode ? "#60a5fa" : "#c084fc"; // Blue-400 vs Purple-400
+        const borderColor = isNode ? "#3b82f6" : "#a855f7"; // Blue-500 vs Purple-500
+
+        container.color = borderColor;
+        container.background = "rgba(15, 23, 42, 0.95)"; // Slate-950 with 95% opacity
+
         advancedTexture.addControl(container);
 
-        // Content Stack
-        const panel = new GUI.StackPanel();
-        panel.paddingTop = "40px";
-        panel.paddingBottom = "40px";
-        panel.paddingLeft = "40px";
-        panel.paddingRight = "40px";
-        container.addControl(panel);
+        // --- 4. Content Layout ---
+        const mainGrid = new GUI.Grid();
+        mainGrid.addRowDefinition(0.15, false); // Header
+        mainGrid.addRowDefinition(0.75, false); // Scrollable Content
+        mainGrid.addRowDefinition(0.1, false);  // Footer/Close
+        container.addControl(mainGrid);
 
-        // Header
-        const header = new GUI.TextBlock();
-        header.text = type === 'node' ? (data.label || data.id) : "Détails du Lien";
-        header.color = "white";
-        header.fontSize = 80;
-        header.fontWeight = "bold";
-        header.height = "120px";
-        header.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        panel.addControl(header);
+        // --- Header ---
+        const headerPanel = new GUI.StackPanel();
+        headerPanel.isVertical = false;
+        headerPanel.paddingLeft = "40px";
+        headerPanel.paddingRight = "40px";
+        headerPanel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        mainGrid.addControl(headerPanel, 0, 0);
+
+        // Icon/Indicator
+        const icon = new GUI.Rectangle();
+        icon.width = "40px";
+        icon.height = "40px";
+        icon.cornerRadius = 20;
+        icon.background = primaryColor;
+        icon.thickness = 0;
+        headerPanel.addControl(icon);
+
+        const titleText = new GUI.TextBlock();
+        titleText.text = isNode ? (data.label || data.id || "Nœud sans nom") : "Détails du Lien";
+        titleText.color = "white";
+        titleText.fontSize = 70;
+        titleText.fontWeight = "bold";
+        titleText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        titleText.paddingLeft = "20px";
+        titleText.width = "1200px";
+        headerPanel.addControl(titleText);
+
+        const subTitle = new GUI.TextBlock();
+        subTitle.text = isNode ? `ID: ${data.id}` : `${data.source} ➔ ${data.target}`;
+        subTitle.color = "#94a3b8"; // Slate-400
+        subTitle.fontSize = 40;
+        subTitle.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        // subTitle.width = "600px"; // Auto width
+        headerPanel.addControl(subTitle);
 
         // Divider
         const divider = new GUI.Rectangle();
-        divider.width = 1;
-        divider.height = "4px";
-        divider.color = "transparent";
-        divider.background = "#60a5fa";
-        divider.paddingBottom = "40px";
-        panel.addControl(divider);
+        divider.height = "2px";
+        divider.width = "95%";
+        divider.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+        divider.background = "rgba(255, 255, 255, 0.1)";
+        divider.thickness = 0;
+        mainGrid.addControl(divider, 0, 0);
 
-        // Properties
-        Object.entries(data).forEach(([key, value]) => {
+        // --- Scrollable Body ---
+        const scrollViewer = new GUI.ScrollViewer();
+        scrollViewer.width = 0.95;
+        scrollViewer.height = 0.95;
+        scrollViewer.thickness = 0;
+        // Scrollbar styling
+        scrollViewer.barSize = 20;
+        scrollViewer.thumbLength = 0.5;
+        scrollViewer.barColor = primaryColor;
+        scrollViewer.barBackground = "rgba(255, 255, 255, 0.1)";
+        mainGrid.addControl(scrollViewer, 1, 0);
+
+        const stackPanel = new GUI.StackPanel();
+        stackPanel.isVertical = true;
+        stackPanel.width = 1;
+        // Adapt height automatically based on children
+        scrollViewer.addControl(stackPanel);
+
+        // --- Recursive Property Renderer Helper ---
+        const createPropertyBlock = (key: string, value: any, level: number = 0) => {
+            // Ignore internal props
             if (['id', 'x', 'y', 'z', 'source', 'target', 'fx', 'fy', 'fz', 'vx', 'vy', 'vz', 'index'].includes(key)) return;
-            
-            const row = new GUI.StackPanel();
-            row.isVertical = false;
-            row.height = "70px";
-            panel.addControl(row);
 
-            const keyBlock = new GUI.TextBlock();
-            keyBlock.text = `${key}:`;
-            keyBlock.color = "#94a3b8"; // Slate-400
-            keyBlock.fontSize = 40;
-            keyBlock.width = 0.4;
-            keyBlock.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-            row.addControl(keyBlock);
+            const block = new GUI.StackPanel();
+            block.isVertical = true;
+            block.height = "auto"; // Auto height for wrapping text
+            block.paddingTop = "15px";
+            block.paddingBottom = "15px";
+            block.paddingLeft = `${level * 40}px`; // Indentation
 
-            const valueBlock = new GUI.TextBlock();
-            valueBlock.text = String(value);
-            valueBlock.color = "white";
-            valueBlock.fontSize = 40;
-            valueBlock.width = 0.6;
-            valueBlock.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-            row.addControl(valueBlock);
+            // --- Key ---
+            const keyText = new GUI.TextBlock();
+            keyText.text = key.toUpperCase();
+            keyText.color = level === 0 ? primaryColor : "#cbd5e1";
+            keyText.fontSize = 35 - (level * 2);
+            keyText.height = "40px";
+            keyText.fontWeight = "bold";
+            keyText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            block.addControl(keyText);
+
+            // --- Value Processing ---
+            let displayValue = value;
+            let isComplex = false;
+
+            if (typeof value === 'string' && (value.trim().startsWith('{') || value.trim().startsWith('['))) {
+                try {
+                    displayValue = JSON.parse(value);
+                    isComplex = true;
+                } catch (e) { /* ignore */ }
+            } else if (typeof value === 'object' && value !== null) {
+                isComplex = true;
+            }
+
+            if (isComplex) {
+                // Recursive render
+                if (Array.isArray(displayValue)) {
+                    displayValue.forEach((item, idx) => {
+                        // Simple array rendering
+                        const itemBlock = new GUI.TextBlock();
+                        itemBlock.text = `• ${typeof item === 'object' ? JSON.stringify(item) : String(item)}`;
+                        itemBlock.color = "white";
+                        itemBlock.fontSize = 30;
+                        itemBlock.height = "40px";
+                        itemBlock.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                        itemBlock.paddingLeft = "20px";
+                        block.addControl(itemBlock);
+                    });
+                } else if (typeof displayValue === 'object') {
+                    Object.entries(displayValue).forEach(([k, v]) => {
+                        const subBlock = createPropertyBlock(k, v, level + 1);
+                        if (subBlock) block.addControl(subBlock);
+                    });
+                }
+            } else {
+                // Simple Value
+                const valStr = (value === null || value === undefined) ? 'N/A' : String(value);
+
+                // Text wrapping logic needed because Babylon GUI TextBlock doesn't auto-expand height easily
+                // Simplified approach: fixed reasonable height or use resizeToFit
+
+                const valueText = new GUI.TextBlock();
+                valueText.text = valStr;
+                valueText.color = "white";
+                valueText.fontSize = 32;
+                valueText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                valueText.textWrapping = true;
+
+                // Calculate approximate height based on length
+                const lineEstimate = Math.ceil(valStr.length / 80); // approx chars per line
+                valueText.height = `${Math.max(50, lineEstimate * 40)}px`;
+
+                // Background for readability
+                const valueBg = new GUI.Rectangle();
+                valueBg.thickness = 0;
+                valueBg.background = "rgba(255, 255, 255, 0.05)";
+                valueBg.cornerRadius = 10;
+                valueBg.height = valueText.height;
+                valueBg.addControl(valueText);
+
+                block.addControl(valueBg);
+            }
+
+            // Separator
+            const line = new GUI.Rectangle();
+            line.height = "1px";
+            line.width = "100%";
+            line.color = "transparent";
+            line.background = "rgba(255,255,255,0.05)";
+            block.addControl(line);
+
+            return block;
+        };
+
+        // Populate Content
+        Object.entries(data).forEach(([key, value]) => {
+            const block = createPropertyBlock(key, value);
+            if (block) stackPanel.addControl(block);
         });
 
-        // Close Button (Virtual)
-        const closeButton = GUI.Button.CreateSimpleButton("closeBtn", "Fermer");
-        closeButton.width = "300px";
-        closeButton.height = "80px";
-        closeButton.color = "white";
-        closeButton.cornerRadius = 40;
-        closeButton.background = "#ef4444"; // Red-500
-        closeButton.paddingTop = "20px";
-        closeButton.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
-        closeButton.onPointerUpObservable.add(() => {
+        // --- Footer / Close ---
+        const closeBtn = GUI.Button.CreateSimpleButton("close", "FERMER");
+        closeBtn.width = "300px";
+        closeBtn.height = "80px";
+        closeBtn.color = "white";
+        closeBtn.cornerRadius = 20;
+        closeBtn.background = "#ef4444";
+        closeBtn.fontSize = 35;
+        closeBtn.fontWeight = "bold";
+        closeBtn.thickness = 0;
+        closeBtn.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+
+        closeBtn.onPointerClickObservable.add(() => {
             this.dispose();
         });
-        // Add to container, not stack panel, to position at bottom
-        // Actually stack panel is fine if we want it at the end of list
-        panel.addControl(closeButton);
+
+        mainGrid.addControl(closeBtn, 2, 0);
 
         this.currentPlane = plane;
     }
@@ -114,6 +249,10 @@ export class VRDetailsPanel {
         if (this.currentPlane) {
             this.currentPlane.dispose();
             this.currentPlane = null;
+        }
+        if (this.currentTexture) {
+            this.currentTexture.dispose();
+            this.currentTexture = null;
         }
     }
 }

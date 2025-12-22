@@ -2,6 +2,12 @@
 Tâches Celery pour le traitement asynchrone des graphes.
 """
 
+import sys
+import os
+# Ensure /app is in path for module resolution
+if "/app" not in sys.path:
+    sys.path.insert(0, "/app")
+
 from celery_app import celery_app
 from models.project import Project
 from beanie import init_beanie
@@ -12,6 +18,8 @@ import asyncio
 import networkx as nx
 import polars as pl
 import orjson
+from datetime import datetime, timezone
+from services.graph_service import apply_layout
 
 
 def _read_csv_safe(file_path: Path, n_rows: int = None) -> pl.DataFrame:
@@ -42,7 +50,6 @@ def _read_csv_safe(file_path: Path, n_rows: int = None) -> pl.DataFrame:
 
 def _process_csv_graph_sync(file_path: Path, mapping: dict, algorithm: str = "auto") -> dict:
     """Version synchrone du traitement CSV pour Celery."""
-    from services.graph_service import apply_layout
     
     df = _read_csv_safe(file_path)
     
@@ -93,7 +100,6 @@ def _process_csv_graph_sync(file_path: Path, mapping: dict, algorithm: str = "au
 
 def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "auto") -> dict:
     """Version synchrone du traitement JSON pour Celery."""
-    from services.graph_service import apply_layout
     
     with open(file_path, 'rb') as f:
         content = orjson.loads(f.read())
@@ -172,7 +178,6 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
             "columns": edge_keys
         }
         
-        from services.graph_service import apply_layout
         apply_layout(G, algorithm=algorithm)
         graph_data = nx.node_link_data(G)
         
@@ -189,7 +194,6 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
 
 def _process_gexf_graph_sync(file_path: Path, mapping: dict, algorithm: str = "auto") -> dict:
     """Version synchrone du traitement GEXF pour Celery."""
-    from services.graph_service import apply_layout
     from io import BytesIO
     
     try:
@@ -278,6 +282,7 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
                 if project:
                     project.graph_data = result
                     project.metadata = result.get("metadata", {})
+                    project.updated_at = datetime.now(timezone.utc)
                     await project.save()
             
             try:

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { apiClient } from '@/app/lib/apiClient';
 import { useToastStore } from '@/app/store/useToastStore';
+import { useJobPolling } from '@/app/hooks/useJobPolling';
 
 interface LayoutSelectorProps {
     projectId?: string;
@@ -24,6 +25,29 @@ export default function LayoutSelector({ projectId, onLayoutUpdate, onLayoutRequ
     const [isLoading, setIsLoading] = useState(false);
     const { addToast } = useToastStore();
     const [isOpen, setIsOpen] = useState(false);
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+
+    // Polling pour les calculs asynchrones (Celery)
+    const { status: jobStatus } = useJobPolling(currentJobId, {
+        onSuccess: (result) => {
+            // Le résultat peut être directement les données ou encapsulé
+            const graphData = result.graph_data || result;
+            if (graphData && graphData.nodes && graphData.nodes.length > 0) {
+                onLayoutUpdate(graphData);
+                addToast('Disposition mise à jour avec succès', 'success');
+            } else {
+                console.warn("Layout update returned empty or invalid data", result);
+                addToast('Le calcul a réussi mais aucune donnée n\'a été retournée', 'warning');
+            }
+            setCurrentJobId(null);
+            setIsLoading(false);
+        },
+        onError: (error) => {
+            addToast(error || 'Erreur lors du calcul de la disposition', 'error');
+            setCurrentJobId(null);
+            setIsLoading(false);
+        }
+    });
 
     const handleAlgorithmChange = async (algorithm: string) => {
         setIsLoading(true);
@@ -37,13 +61,25 @@ export default function LayoutSelector({ projectId, onLayoutUpdate, onLayoutRequ
             } else {
                 throw new Error("Configuration invalide pour LayoutSelector");
             }
-            
-            onLayoutUpdate(response.graph_data);
-            // Toast removed as requested
+
+            // Gestion asynchrone (Celery)
+            if (response && response.job_id) {
+                setCurrentJobId(response.job_id);
+                // isLoading reste true jusqu'à la fin du polling
+            }
+            // Gestion synchrone
+            else if (response && response.graph_data) {
+                onLayoutUpdate(response.graph_data);
+                setIsLoading(false);
+            } else {
+                // Fallback si format inattendu
+                console.warn("Format de réponse inattendu", response);
+                onLayoutUpdate(response); // Tentative d'utilisation directe
+                setIsLoading(false);
+            }
         } catch (error: any) {
             console.error('Layout update error:', error);
             addToast(error.message || 'Erreur lors de la mise à jour du layout', 'error');
-        } finally {
             setIsLoading(false);
         }
     };
