@@ -78,11 +78,16 @@ def _process_csv_graph_sync(file_path: Path, mapping: dict, algorithm: str = "au
         if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
             G.add_edge(source, target, weight=weight)
     
+    # Check connectivity based on graph type
+    is_connected = False
+    if G.number_of_nodes() > 0:
+        is_connected = nx.is_weakly_connected(G) if G.is_directed() else nx.is_connected(G)
+    
     metadata = {
         "node_count": G.number_of_nodes(),
         "edge_count": G.number_of_edges(),
         "density": nx.density(G),
-        "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
+        "is_connected": is_connected,
         "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
         "columns": df.columns
     }
@@ -129,11 +134,16 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
         
         edge_keys = list(edges[0].keys()) if edges else []
 
+        # Check connectivity based on graph type
+        is_connected = False
+        if G.number_of_nodes() > 0:
+            is_connected = nx.is_weakly_connected(G) if G.is_directed() else nx.is_connected(G)
+        
         metadata = {
             "node_count": G.number_of_nodes(),
             "edge_count": G.number_of_edges(),
             "density": nx.density(G),
-            "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
+            "is_connected": is_connected,
             "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
             "columns": edge_keys
         }
@@ -169,11 +179,16 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
         
         edge_keys = list(content[0].keys()) if content else []
 
+        # Check connectivity based on graph type
+        is_connected = False
+        if G.number_of_nodes() > 0:
+            is_connected = nx.is_weakly_connected(G) if G.is_directed() else nx.is_connected(G)
+        
         metadata = {
             "node_count": G.number_of_nodes(),
             "edge_count": G.number_of_edges(),
             "density": nx.density(G),
-            "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
+            "is_connected": is_connected,
             "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
             "columns": edge_keys
         }
@@ -195,33 +210,73 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
 def _process_gexf_graph_sync(file_path: Path, mapping: dict, algorithm: str = "auto") -> dict:
     """Version synchrone du traitement GEXF pour Celery."""
     from io import BytesIO
+    import re
+    
+    def sanitize_xml_content(content: bytes) -> bytes:
+        """Nettoie le contenu XML en supprimant les caractères invalides."""
+        # Decode with error handling
+        try:
+            text = content.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                text = content.decode('latin1')
+            except UnicodeDecodeError:
+                text = content.decode('utf-8', errors='ignore')
+        
+        # Remove invalid XML characters (control characters except whitespace)
+        # Valid XML: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD]
+        def is_valid_xml_char(char):
+            codepoint = ord(char)
+            return (
+                codepoint == 0x9 or
+                codepoint == 0xA or
+                codepoint == 0xD or
+                (0x20 <= codepoint <= 0xD7FF) or
+                (0xE000 <= codepoint <= 0xFFFD)
+            )
+        
+        cleaned = ''.join(char if is_valid_xml_char(char) else ' ' for char in text)
+        return cleaned.encode('utf-8')
     
     try:
+        # Try direct parsing first
         G = nx.read_gexf(file_path)
-    except Exception:
+    except Exception as first_error:
         try:
+            # Read and sanitize content
             with open(file_path, 'rb') as f:
                 content = f.read()
             
+            # Try version fix first
             if b'version="1.3"' in content:
                 content = content.replace(b'version="1.3"', b'version="1.2"')
                 content = content.replace(b'http://www.gexf.net/1.3', b'http://www.gexf.net/1.2draft')
-                G = nx.read_gexf(BytesIO(content))
-            else:
-                raise
+            
+            # Sanitize XML
+            content = sanitize_xml_content(content)
+            
+            # Try parsing sanitized content
+            G = nx.read_gexf(BytesIO(content))
         except Exception as e:
-            raise ValueError(f"Impossible de lire le fichier GEXF: {str(e)}")
+            # Provide more helpful error message
+            error_msg = str(first_error) if len(str(first_error)) < 200 else str(e)
+            raise ValueError(f"Impossible de lire le fichier GEXF. Le fichier contient des caractères invalides ou un format XML incorrect. Erreur: {error_msg}")
     
     for node, data in G.nodes(data=True):
         for k, v in data.items():
             if isinstance(v, (set, tuple)):
                 data[k] = list(v)
                 
+    # Check connectivity based on graph type
+    is_connected = False
+    if G.number_of_nodes() > 0:
+        is_connected = nx.is_weakly_connected(G) if G.is_directed() else nx.is_connected(G)
+    
     metadata = {
         "node_count": G.number_of_nodes(),
         "edge_count": G.number_of_edges(),
         "density": nx.density(G),
-        "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
+        "is_connected": is_connected,
         "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
         "columns": []
     }
@@ -296,4 +351,38 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
     except Exception as e:
         import traceback
         traceback.print_exc()
+        
+        # Nettoyage: supprimer le projet si le traitement échoue
+        if project_id:
+            try:
+                mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+                db_name = os.getenv("MONGODB_DB", "pe_def_db")
+                client = motor.motor_asyncio.AsyncIOMotorClient(mongo_uri)
+                db = client[db_name]
+                
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                async def cleanup_project():
+                    await init_beanie(database=db, document_models=[Project])
+                    project = await Project.get(project_id)
+                    if project:
+                        # Supprimer le fichier source si possible
+                        if project.source_file_path:
+                            try:
+                                Path(project.source_file_path).unlink(missing_ok=True)
+                            except Exception:
+                                pass
+                        await project.delete()
+                        print(f"Projet {project_id} supprimé après échec du traitement")
+                
+                try:
+                    loop.run_until_complete(cleanup_project())
+                finally:
+                    loop.close()
+                    client.close()
+            except Exception as cleanup_error:
+                print(f"Erreur lors du nettoyage du projet: {str(cleanup_error)}")
+        
         return {"status": "FAILURE", "error": str(e)}
+
