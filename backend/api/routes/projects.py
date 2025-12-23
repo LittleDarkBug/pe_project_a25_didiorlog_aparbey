@@ -301,6 +301,7 @@ async def list_projects(current_user: User = Depends(get_current_user)):
             "id": str(p.id),
             "name": p.name,
             "created_at": p.created_at,
+            "algorithm": p.algorithm or "auto",
             "stats": {
                 "nodes": (p.metadata or {}).get("node_count", 0),
                 "edges": (p.metadata or {}).get("edge_count", 0)
@@ -336,7 +337,8 @@ async def get_project(
             "updated_at": project.updated_at,
             "metadata": project.metadata or {},
             "graph_data": project.graph_data or {},
-            "mapping": project.mapping or {}
+            "mapping": project.mapping or {},
+            "algorithm": project.algorithm or "auto"
         }
         return clean_nans(response_data)
     except Exception as e:

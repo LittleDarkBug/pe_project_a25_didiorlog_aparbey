@@ -27,6 +27,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
+    const [currentAlgorithm, setCurrentAlgorithm] = useState<string>('auto'); // Track algorithm locally
 
     const graphSceneRef = useRef<GraphSceneRef>(null);
     const { addToast } = useToastStore();
@@ -45,6 +46,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 setIsLoading(true);
                 const data = await projectsService.getById(id);
                 setProject(data);
+                setCurrentAlgorithm(data.algorithm || 'auto'); // Initialize with project's algorithm
             } catch (err) {
                 console.error(err);
                 setError("Impossible de charger le projet");
@@ -246,6 +248,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <LayoutSelector
                         projectId={id}
                         onLayoutUpdate={handleLayoutUpdate}
+                        currentAlgorithm={currentAlgorithm}
+                        onAlgorithmChange={setCurrentAlgorithm}
                     />
 
                     {/* Filter Toggle Button */}

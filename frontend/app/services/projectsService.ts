@@ -18,6 +18,7 @@ export interface Project {
     metadata?: any;
     graph_data?: any;
     mapping?: Record<string, string>;
+    algorithm?: string;
 }
 
 export interface JobResponse {

@@ -8,6 +8,7 @@ email-validator==2.1.0
 # Graph computation
 networkx==3.5
 igraph==0.11.8
+fa2-modified>=0.1.0
 numpy==2.2.0
 scipy==1.15.0
 

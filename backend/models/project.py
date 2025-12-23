@@ -27,6 +27,7 @@ class Project(Document):
     metadata: Optional[dict] = None
     mapping: Optional[dict] = None
     source_file_path: Optional[str] = None
+    algorithm: Optional[str] = "auto"  # Layout algorithm used (auto, fruchterman_reingold, etc.)
     
     class Settings:
         name = "projects"

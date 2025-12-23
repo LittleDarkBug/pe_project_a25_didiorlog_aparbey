@@ -338,6 +338,8 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
                     project.graph_data = result
                     project.metadata = result.get("metadata", {})
                     project.updated_at = datetime.now(timezone.utc)
+                    # Utiliser l'algorithme résolu (après "auto") au lieu de l'argument original
+                    project.algorithm = result.get("algorithm_used", algorithm)
                     await project.save()
             
             try:

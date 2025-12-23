@@ -102,12 +102,13 @@ export function useVRMenu() {
         layoutContainer.addControl(subHeader);
 
         const layoutsParams = [
-            { id: 'fruchterman_reingold', label: 'Fruchterman (Std)' },
-            { id: 'kamada_kawai', label: 'Kamada (Organique)' },
-            { id: 'drl', label: 'DrL (Cluster)' },
-            { id: 'sphere', label: 'Sphérique 3D' },
-            { id: 'grid', label: 'Grille Statique' },
-            { id: 'circular', label: 'Circulaire' },
+            { id: 'fruchterman_reingold', label: 'Fruchterman-Reingold', desc: 'Répartition équilibrée' },
+            { id: 'kamada_kawai', label: 'Kamada-Kawai', desc: 'Préserve la topologie' },
+            { id: 'drl', label: 'DrL', desc: 'Optimisé grands graphes' },
+            { id: 'force_atlas', label: 'Force Atlas', desc: 'Détection de clusters' },
+            { id: 'sphere', label: 'Sphérique', desc: 'Navigation immersive' },
+            { id: 'grid', label: 'Grille', desc: 'Organisation géométrique' },
+            { id: 'random', label: 'Aléatoire', desc: 'Comparaison' },
         ];
 
         // Grid for buttons

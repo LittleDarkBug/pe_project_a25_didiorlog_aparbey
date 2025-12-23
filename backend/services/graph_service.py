@@ -304,7 +304,7 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str 
     }
     
     # Calcul du layout 3D
-    apply_layout(G, algorithm=algorithm)
+    resolved_algorithm = apply_layout(G, algorithm=algorithm)
     
     graph_data = nx.node_link_data(G)
     
@@ -312,7 +312,8 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str 
         "metadata": metadata,
         "nodes": graph_data["nodes"],
         "edges": graph_data["links"],
-        "format": "csv_processed"
+        "format": "csv_processed",
+        "algorithm_used": resolved_algorithm
     }
 
 
@@ -357,7 +358,7 @@ def _process_json_graph(file_path: Path, mapping: Dict[str, str], algorithm: str
         }
         
         # Calcul du layout 3D
-        apply_layout(G, algorithm=algorithm)
+        resolved_algorithm = apply_layout(G, algorithm=algorithm)
         
         graph_data = nx.node_link_data(G)
         
@@ -485,12 +486,56 @@ def apply_layout(G: nx.Graph, algorithm: str = "auto", scale: float = 50.0):
     ig_graph = ig.Graph(len(node_keys))
     ig_graph.add_edges([(node_map[u], node_map[v]) for u, v in G.edges()])
     
-    # Auto-sélection de l'algorithme
+    # Auto-sélection de l'algorithme basée sur plusieurs critères
     if algorithm == "auto":
-        if G.number_of_nodes() > 2000:
-            algorithm = "drl" # DrL est très rapide pour les grands graphes
+        num_nodes = G.number_of_nodes()
+        num_edges = G.number_of_edges()
+        
+        # Calcul de la densité du graphe
+        density = nx.density(G) if num_nodes > 0 else 0
+        
+        # Critère 1: Taille (prioritaire pour performance)
+        if num_nodes > 5000:
+            # Très grand graphe : DrL obligatoire
+            algorithm = "drl"
+        elif num_nodes > 2000:
+            # Grand graphe : DrL sauf si très sparse
+            if density < 0.01:  # Graphe très peu dense
+                algorithm = "sphere"  # Sphérique pour visualisation globale
+            else:
+                algorithm = "drl"
         else:
-            algorithm = "fruchterman_reingold"
+            # Graphes moyens/petits : critères avancés
+            
+            # Critère 2: Densité
+            if density > 0.3:
+                # Graphe dense : Kamada-Kawai préserve mieux la structure
+                algorithm = "kamada_kawai"
+            elif density < 0.05:
+                # Graphe très sparse : pas de structure forte
+                if num_nodes < 500:
+                    algorithm = "sphere"  # Visualisation globale
+                else:
+                    algorithm = "fruchterman_reingold"
+            else:
+                # Densité moyenne : vérifier la modularité
+                try:
+                    # Détection rapide de communautés pour évaluer la structure
+                    ig_test = ig.Graph(num_nodes)
+                    ig_test.add_edges([(node_map[u], node_map[v]) for u, v in G.edges()])
+                    communities = ig_test.community_multilevel()
+                    modularity = communities.modularity
+                    
+                    # Critère 3: Modularité (structure communautaire)
+                    if modularity > 0.4 and len(set(communities.membership)) > 3:
+                        # Structure communautaire forte : Force Atlas
+                        algorithm = "force_atlas"
+                    else:
+                        # Pas de communautés claires : Fruchterman-Reingold
+                        algorithm = "fruchterman_reingold"
+                except:
+                    # Fallback si détection échoue
+                    algorithm = "fruchterman_reingold"
 
     layout = None
     
@@ -502,6 +547,50 @@ def apply_layout(G: nx.Graph, algorithm: str = "auto", scale: float = 50.0):
             layout = ig_graph.layout_kamada_kawai_3d()
         elif algorithm == "drl":
             layout = ig_graph.layout_drl(dim=3)
+        elif algorithm == "force_atlas":
+            # Force Atlas 2 avec extension 3D
+            from fa2_modified import ForceAtlas2
+            import numpy as np
+            
+            # Initialiser Force Atlas 2
+            forceatlas2 = ForceAtlas2(
+                outboundAttractionDistribution=False,
+                linLogMode=False,
+                adjustSizes=False,
+                edgeWeightInfluence=1.0,
+                jitterTolerance=1.0,
+                barnesHutOptimize=True,
+                barnesHutTheta=1.2,
+                scalingRatio=2.0,
+                strongGravityMode=False,
+                gravity=1.0,
+                verbose=False
+            )
+            
+            # Calculer le layout 2D (forceatlas2 retourne un dict {node_id: (x, y)})
+            pos_2d = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=2000)
+            
+            # Étendre à 3D en utilisant la détection de communautés pour l'axe Z
+            try:
+                communities = ig_graph.community_multilevel()
+                membership = communities.membership
+            except:
+                # Fallback si la détection de communautés échoue
+                membership = list(range(len(node_keys)))
+            
+            # Créer layout 3D
+            coords_3d = []
+            unique_communities = set(membership)
+            z_spacing = 20.0  # Espacement vertical entre communautés
+            
+            for i, (x, y) in enumerate(pos_2d):
+                community_id = membership[i]
+                # Z basé sur la communauté + petite variation aléatoire
+                z_base = (community_id / max(unique_communities)) * z_spacing if len(unique_communities) > 1 else 0
+                z_jitter = np.random.uniform(-2, 2)
+                coords_3d.append((x, y, z_base + z_jitter))
+            
+            layout = coords_3d
         elif algorithm == "random":
             layout = ig_graph.layout_random_3d()
         elif algorithm == "sphere":
@@ -549,4 +638,8 @@ def apply_layout(G: nx.Graph, algorithm: str = "auto", scale: float = 50.0):
             G.nodes[node_id]['x'] = float(x) * scale
             G.nodes[node_id]['y'] = float(y) * scale
             G.nodes[node_id]['z'] = float(z) * scale
+        algorithm = "random"  # En cas d'erreur, on a utilisé random
+    
+    # Retourner l'algorithme effectivement utilisé (après résolution de "auto")
+    return algorithm
 
