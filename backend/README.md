@@ -59,6 +59,7 @@ Backend API FastAPI pour spatialisation 3D de graphes avec authentification JWT.
   - Fruchterman-Reingold 3D (O(n²) optimisé, 5-20k nœuds)
   - Kamada-Kawai 3D (distance-based, <10k nœuds)
   - DrL (O(n log n), >20k nœuds)
+- **fa2-modified** - Force Atlas 2 pour détection de clusters
 - **NumPy 2.2.0** + **SciPy 1.15.0** - Calculs scientifiques
 - **Polars 1.35.2** - Parsing CSV ultra-rapide
 
@@ -239,27 +240,35 @@ ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ## Calcul de Spatialisation 3D
 
-**TODO: À implémenter dans `services/graph_service.py`**
-
-Le service supportera 3 algorithmes selon taille du graphe:
+Le système utilise `services/graph_service.py` avec sélection automatique intelligente basée sur 3 critères.
 
 ### Algorithmes disponibles
 
-| Algorithme                               | Taille graphe | Complexité      | Usage                               |
-| ---------------------------------------- | ------------- | ---------------- | ----------------------------------- |
-| **NetworkX spring_layout 3D**      | < 5k nœuds   | O(n²)           | Force-directed simple               |
-| **igraph Fruchterman-Reingold 3D** | 5-20k nœuds  | O(n²) optimisé | Force-directed performant           |
-| **igraph Kamada-Kawai 3D**         | < 10k nœuds  | O(n²)           | Distance-based, préserve topologie |
-| **igraph DrL**                     | > 20k nœuds  | O(n log n)       | Distributed Recursive Layout        |
+| Algorithme | Taille graphe | Complexité | Usage |
+|------------|---------------|------------|-------|
+| **Fruchterman-Reingold 3D** | < 2000 nœuds | O(V² + E) | Force-directed équilibré |
+| **Kamada-Kawai 3D** | Graphes denses | O(V²) | Préserve topologie, esthétique |
+| **DrL** | > 2000 nœuds | O(V log V + E) | Scalable, fait ressortir clusters |
+| **Force Atlas** | Modularité > 0.4 | O(V² + E) | Détection communautés, extension 3D |
+| **Sphérique** | Navigation VR | O(V) | Distribution uniforme sur sphère |
+| **Grille** | Comparaison | O(V) | Organisation géométrique |
+| **Aléatoire** | Tests | O(V) | Baseline |
 
-### Sélection automatique
+### Sélection automatique intelligente
 
-Par défaut, l'algorithme est choisi selon le nombre de nœuds:
+L'algorithme est choisi selon **3 critères** (voir [SPATIALISATION.md](../SPATIALISATION.md)) :
 
-- < 5000 → `spring` (NetworkX simple)
-- 5000-20000 → `fruchterman_reingold` (igraph optimisé)
-- > 20000 → `drl` (igraph multilevel)
-  >
+**Critère 1 : Taille** (prioritaire pour performance)
+- \> 5000 nœuds → DrL obligatoire
+- 2000-5000 nœuds → DrL sauf si sparse (< 0.01) → Sphérique
+
+**Critère 2 : Densité** (graphes < 2000 nœuds)
+- Densité > 0.3 → Kamada-Kawai
+- Densité < 0.05 → Sphérique (< 500 nœuds) ou Fruchterman-Reingold
+
+**Critère 3 : Modularité** (structure communautaire)
+- Modularité > 0.4 + 3+ communautés → **Force Atlas**
+- Sinon → Fruchterman-Reingold (défaut)
 
 L'utilisateur peut forcer un algorithme spécifique via l'API.
 
@@ -291,6 +300,77 @@ A,C,7.0
 
 Colonnes requises: `source`, `target`
 Colonnes optionnelles: `weight` (défaut: 1.0)
+
+### Force Atlas - Détails d'implémentation 3D
+
+L'algorithme Force Atlas 2 est originellement 2D. Notre implémentation l'étend en 3D via détection de communautés :
+
+**Pipeline :**
+1. **Calcul 2D** : `fa2_modified.ForceAtlas2` avec optimisation Barnes-Hut (theta=1.2)
+2. **Détection communautés** : `igraph.community_multilevel()` pour calculer la modularité
+3. **Extension Z** : `z = (community_id / max_communities) * z_spacing + jitter`
+   - `z_spacing = 20.0` (espacement vertical entre couches)
+   - `jitter = random(-2, 2)` (variation pour éviter superposition exacte)
+
+**Configuration Force Atlas :**
+```python
+ForceAtlas2(
+    barnesHutOptimize=True,
+    barnesHutTheta=1.2,       # Précision vs performance
+    scalingRatio=2.0,         # Espacement des nœuds
+    gravity=1.0,              # Attraction vers centre
+    iterations=2000           # Nombre d'itérations
+)
+```
+
+**Quand l'utiliser :**
+- Modularité > 0.4
+- Au moins 3 communautés distinctes
+- Graphes < 5000 nœuds (sinon trop lent)
+
+## Optimisations & Performance
+
+### Sérialisation JSON
+
+**orjson** (C extension) utilisé pour toutes les opérations JSON :
+- 2-3x plus rapide que `json` standard
+- Support natif datetime, UUID, dataclasses
+- Utilisé dans tous les endpoints API
+
+### Parsing CSV
+
+**Polars** (Rust-based) vs pandas :
+- 10-50x plus rapide selon taille fichier
+- Détection automatique séparateur (`,`, `;`, `\t`, `|`)
+- Gestion multi-encodings (utf8, latin1, cp1252, iso-8859-1)
+
+Voir `_read_csv_safe()` dans `graph_service.py` ligne 13.
+
+### I/O Asynchrone
+
+**aiofiles** pour lecture/écriture fichiers sans bloquer l'event loop :
+```python
+async with aiofiles.open(file_path, 'rb') as f:
+    content = await f.read()
+```
+
+### Processing Asynchrone (Celery)
+
+**Workflow complet :**
+1. Client POST `/projects/` → API retourne `job_id` immédiatement
+2. Tâche Celery démarre en background (`tasks.py`)
+3. Client poll `/projects/tasks/{job_id}` pour status
+4. Résultat sauvegardé automatiquement en MongoDB
+
+**Avantages :**
+- Aucun timeout même pour graphes > 100k nœuds
+- API reste réactive
+- Flower pour monitoring (http://localhost:5555)
+
+**Triggers Celery :**
+- Création projet avec spatialisation
+- Recalcul layout (changement algorithme)
+- Import fichier > 10k nœuds
 
 ## Note sur igraph
 

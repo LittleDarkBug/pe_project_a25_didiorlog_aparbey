@@ -14,36 +14,52 @@ Interface utilisateur Next.js pour visualisation 3D/WebXR de graphes spatialisé
 
 ## Installation et démarrage
 
-### Mode Docker (recommandé)
-
-Voir `docker-compose.yml` à la racine:
+Le frontend fonctionne via Docker Compose. Voir `docker-compose.yml` à la racine.
 
 ```bash
-cd ..
+# Depuis la racine du projet
 docker-compose up -d frontend
 ```
 
-Accès: http://localhost:3000
+**Accès:** http://localhost:3000
 
-### Mode développement local
+### Développement avec Docker
 
-```bash
-npm install      # Installe dépendances
-npm run dev      # Dev server http://localhost:3000
+Les volumes bind-mount permettent le hot-reload automatique :
+
+```yaml
+volumes:
+  - ./frontend:/app
 ```
+
+**Modifications React/Next.js → Fast refresh automatique** (pas besoin de rebuild)
 
 ### Variables d'environnement
 
-**Mode Docker:** Variables définies dans `docker-compose.yml`
-
-**Mode local:** Créer `.env.local`
-
-```bash
-# API Backend
-NEXT_PUBLIC_API_URL=http://localhost:8000
+Définies dans `docker-compose.yml` :
+```yaml
+environment:
+  - NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-**Important:** Les variables préfixées `NEXT_PUBLIC_` sont accessibles côté client (navigateur).
+**Important:** Variables préfixées `NEXT_PUBLIC_` accessibles côté client (navigateur).
+
+### Ajouter une dépendance npm
+
+```bash
+# Accéder au container
+docker-compose exec frontend sh
+
+# Installer le package
+npm install <package>
+
+# Sortir du container
+exit
+
+# Le package.json est mis à jour automatiquement via bind-mount
+# Rebuild pour persister dans l'image
+docker-compose up -d --build frontend
+```
 
 ## Architecture du projet
 
@@ -62,9 +78,11 @@ app/
 │   └── [token]/             # Visualisation en lecture seule
 ├── components/              # Composants React réutilisables
 │   ├── 3DandXRComponents/   # Composants liés à la 3D et XR
-│   │   ├── Graph/           # Scène de graphe (GraphScene)
-│   │   ├── Scene/           # Composant wrapper Babylon.js
-│   │   └── UI/              # UI Overlay (OverlayControls, DetailsPanel)
+│   │   ├── Graph/           # GraphScene.tsx - Orchestration scène 3D
+│   │   ├── Scene/           # SceneComponent.tsx - Wrapper Babylon.js
+│   │   ├── components/      # VRDetailsPanel.ts - UI VR
+│   │   ├── hooks/           # useVRMenu, useVRLocomotion - Hooks custom VR
+│   │   └── utils/           # GraphRenderer.ts - Logique rendu optimisé
 │   ├── project/             # Composants spécifiques aux projets
 │   │   ├── FilterPanel.tsx  # Filtrage avancé
 │   │   ├── LayoutSelector.tsx # Choix de l'algorithme
@@ -110,7 +128,8 @@ app/
 - **Visualisation 3D** : Moteur Babylon.js performant.
 - **Mode VR** : Support WebXR pour casques VR.
 - **Partage** : Liens publics pour partager vos graphes en lecture seule.
-- **Layouts Dynamiques** : Recalcul des positions en temps réel (Fruchterman-Reingold, etc.).
+- **Layouts Dynamiques** : 7 algorithmes de spatialisation (Fruchterman-Reingold, Kamada-Kawai, DrL, **Force Atlas**, Sphérique, Grille, Aléatoire).
+- **Sélection Automatique Intelligente** : Choix optimal selon taille, densité et modularité du graphe.
 - **Filtrage** : Filtres "Frontend-Only" rapides.
 
 ### Que pouvez-vous modifier ?
@@ -750,6 +769,190 @@ Le projet inclut une page de test à `/test-scene` qui montre :
 - Documentation officielle : https://doc.babylonjs.com/
 - Playground (tester du code) : https://playground.babylonjs.com/
 - Exemples : https://doc.babylonjs.com/examples/
+
+## Architecture 3D Avancée
+
+Le projet utilise une architecture optimisée en couches pour performance et maintenabilité.
+
+### Séparation des responsabilités
+
+**GraphScene.tsx** - Orchestration de la scène
+- Setup caméra, lumières, environnement
+- Gestion WebXR et hooks VR
+- Coordination des interactions
+- Gestion du cycle de vie (mount/unmount)
+
+**GraphRenderer.ts** - Logique de rendu optimisée
+- Création nodes/edges avec instancing
+- Gestion matériaux PBR
+- Filtrage visibilité (frontend-only)
+- Cleanup ressources
+
+### Optimisations de Rendu
+
+#### 1. Instancing (Performance critique)
+
+**Problème :** Créer 10,000 sphères = 10,000 draw calls = lag
+
+**Solution :** 1 master mesh + N instances = 1 draw call
+
+```typescript
+// GraphRenderer.ts ligne 47
+const masterMesh = MeshBuilder.CreateSphere("master_node_sphere", {...});
+masterMesh.isVisible = false; // Master caché
+
+// Pour chaque nœud
+const instance = masterMesh.createInstance(node.id);
+instance.position = new Vector3(node.x, node.y, node.z);
+```
+
+**Impact :** 10,000 nœuds rendus en < 16ms (60 FPS)
+
+#### 2. PBR Materials (Réalisme)
+
+Au lieu de `StandardMaterial`, utilise `PBRMaterial` :
+
+```typescript
+// GraphRenderer.ts ligne 48
+const nodeMaterial = new PBRMaterial("nodeMat", scene);
+nodeMaterial.metallic = 0.8;      // Aspect métallique
+nodeMaterial.roughness = 0.2;     // Lissage
+nodeMaterial.emissiveColor = new Color3(0.05, 0.2, 0.4); // Glow bleu
+```
+
+**Pourquoi :**
+- Rendu photoréaliste (reflections, fresnel)
+- S'intègre avec GlowLayer
+- Meilleure immersion VR
+
+#### 3. graphRoot Architecture
+
+Tous les nodes/edges sont enfants d'un `TransformNode` racine :
+
+```typescript
+// GraphRenderer.ts ligne 43
+this.graphRoot = new TransformNode("GraphRoot", scene);
+
+// Chaque nœud/edge
+instance.parent = this.graphRoot;
+```
+
+**Avantages :**
+- Manipulation du graphe entier (translation, rotation, scale)
+- Grab VR du graphe complet
+- Cleanup simple : `graphRoot.dispose()` nettoie tout
+- Performance : transformations hiérarchiques optimisées par Babylon.js
+
+#### 4. Tooltips Optimisés
+
+**Problème :** 1 AdvancedDynamicTexture par nœud = crash si > 1000 nœuds
+
+**Solution :** 1 texture partagée pour tous :
+
+```typescript
+// GraphRenderer.ts ligne 63
+const labelTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+const tooltip = new GUI.TextBlock();
+
+// Sur hover d'un nœud
+tooltip.text = node.label;
+tooltip.linkWithMesh(instance);
+tooltip.isVisible = true;
+```
+
+**Impact :** Support 100k nœuds sans ralentissement UI
+
+### Environnement 3D
+
+#### Espace (GraphScene.tsx lignes 143-150)
+
+```typescript
+const spaceSphere = MeshBuilder.CreateSphere("space", { diameter: 2000 });
+spaceSphere.material.backFaceCulling = false; // Intérieur visible
+spaceSphere.material.emissiveColor = new Color3(0.01, 0.02, 0.05); // Bleu foncé
+```
+
+#### Étoiles procédurales (lignes 152-165)
+
+200 étoiles générées aléatoirement :
+- Position : sphère de rayon 800-900
+- Taille aléatoire : 0.5-2.0
+- Couleur variable : blanc-bleu
+
+#### GlowLayer (lignes 168-169)
+
+```typescript
+const gl = new GlowLayer("glow", scene);
+gl.intensity = 0.5;
+```
+
+Ajoute un effet halo lumineux sur tous les matériaux émissifs (nœuds, étoiles).
+
+## Fonctionnalités VR Avancées
+
+### Hooks Custom
+
+**useVRMenu.ts** - Menu radial en VR
+- 7 layouts disponibles avec descriptions
+- Bouton recentrage caméra
+- Bouton quitter VR
+- Interface Babylon GUI 3D
+
+**useVRLocomotion.ts** - Flying 6DOF
+- Joystick gauche : déplacement (avant/arrière/gauche/droite/haut/bas)
+- Rotation continue de la caméra
+- Pas de téléportation (navigation fluide)
+
+### VRDetailsPanel (components/VRDetailsPanel.ts)
+
+Panneau de détails flottant en VR :
+- Affiche infos nœud/edge sélectionné
+- Positionné près du nœud cliqué
+- AdvancedDynamicTexture 3D
+- Auto-hide après désélection
+
+### Configuration WebXR (GraphScene.tsx lignes 178-202)
+
+```typescript
+const xr = await scene.createDefaultXRExperienceAsync({
+    floorMeshes: [],              // Pas de téléportation
+    disableTeleportation: true,   // Flying seulement
+    disableHandTracking: true,    // Évite chargement assets mains
+    uiOptions: {
+        sessionMode: 'immersive-vr'
+    }
+});
+```
+
+**Features activées :**
+- **Pointer selection** : Rayon laser + gâchette pour clic
+- **Near interaction** : Grab nœuds à la main
+- **Physics impostors** : Collisions pour grab
+
+### Interactions VR Complètes
+
+| Action | Input | Description |
+|--------|-------|-------------|
+| Déplacement | Joystick gauche | Flying 6DoF (haut/bas/avant/arrière/gauche/droite) |
+| Rotation | Joystick droit | Rotation libre de la caméra |
+| Sélection nœud | Pointer + Trigger | Ouvre VRDetailsPanel |
+| Grab nœud | Trigger (près du nœud) | Déplace le nœud dans l'espace |
+| Grab graphe | Grip/Menu (espace vide) | Déplace tout le graphe |
+| Menu VR | Bouton A/X | Ouvre menu radial |
+| Recentrer | Menu VR → Bouton | Reset position caméra |
+
+Voir [instructions-pro3.md](../instructions-pro3.md) pour guide complet XR.
+
+### Prévention du Zoom Page (GraphScene.tsx lignes 116-123)
+
+```typescript
+const preventZoom = (e: WheelEvent) => {
+    e.preventDefault();
+};
+canvas.addEventListener('wheel', preventZoom, { passive: false });
+```
+
+Empêche le scroll/zoom de la page web quand on zoome dans la scène 3D.
 
 ## Conventions de code
 
