@@ -118,12 +118,14 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
         setIsSubmitting(true);
 
         try {
-            const payload = {
+            const { job_id, project_id } = await projectsService.create({
+                file: file,
                 name: details.name,
-                temp_file_id: analysis?.temp_file_id || '',
-                mapping: mapping
-            };
-            const { job_id, project_id } = await projectsService.create(payload);
+                description: details.description,
+                isPublic: details.isPublic,
+                mapping: mapping,
+                algorithm: 'auto'
+            });
             setJobId(job_id);
             setCreatedProjectId(project_id);
         } catch (error: any) {

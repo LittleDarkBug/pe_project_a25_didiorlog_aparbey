@@ -13,6 +13,7 @@ import {
     Quaternion,
     Ray
 } from '@babylonjs/core';
+import '@babylonjs/loaders/glTF'; // Required for controller models
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
 import { VRDetailsPanel } from '../components/VRDetailsPanel';
@@ -180,7 +181,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR started");
-                    vrMenuRef.current = vrUtilsRef.current.createVRMenu(sceneInstance, xr, vrUtilsRef.current.handleLayoutRequest);
+                    // Menu is now hidden by default. User must press button to open.
                 }
             });
 
@@ -189,10 +190,26 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
             // --- XR Input Handling (One-time Setup) ---
             xr.input.onControllerAddedObservable.add((controller) => {
+                console.log("XR Controller Added:", controller.inputSource.handedness, "Profiles:", controller.inputSource.profiles);
+
                 controller.onMotionControllerInitObservable.add((motionController) => {
+                    console.log("XR MotionController Init:", motionController.profileId, "Hand:", motionController.handedness);
+                    const ids = motionController.getComponentIds();
+                    console.log("XR Components found:", ids);
+
+                    // DEBUG: Attach listener to ALL components to see what works
+                    ids.forEach(id => {
+                        const comp = motionController.getComponent(id);
+                        if (comp) {
+                            comp.onButtonStateChangedObservable.add(() => {
+                                if (comp.changes.pressed) {
+                                    console.log(`XR DEBUG: Component ${id} pressed state changed to ${comp.pressed}`);
+                                }
+                            });
+                        }
+                    });
 
                     // 1. Menu Toggle (A / X)
-                    const ids = motionController.getComponentIds();
                     const primaryId = ids.find(id => id === 'a-button' || id === 'x-button');
                     if (primaryId) {
                         const primaryButton = motionController.getComponent(primaryId);
@@ -212,22 +229,46 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     }
 
                     // 2. Node Grab (Trigger)
-                    const trigger = motionController.getComponent('trigger');
+                    const triggerId = ids.find(id => id === 'xr-standard-trigger' || id === 'trigger');
+                    const trigger = triggerId ? motionController.getComponent(triggerId) : null;
+
                     let grabbedNode: Mesh | InstancedMesh | null = null;
                     if (trigger) {
+                        console.log("XR Trigger Component Linked:", trigger.id);
                         trigger.onButtonStateChangedObservable.add(() => {
                             if (trigger.changes.pressed) {
+                                console.log("XR Trigger State Changed. Pressed:", trigger.pressed);
                                 if (trigger.pressed) {
                                     // Pick mesh using Native XR method (Best Practice)
                                     const ray = new Ray(new Vector3(), new Vector3());
                                     controller.getWorldPointerRayToRef(ray);
 
-                                    const pick = sceneInstance.pickWithRay(ray);
+                                    // FIX: Add predicate to ignore controller meshes (spoon) and require metadata
+                                    const pick = sceneInstance.pickWithRay(ray, (mesh) => {
+                                        return mesh.isPickable && mesh.isVisible && mesh.name !== "spoon" && !mesh.name.toLowerCase().includes("controller") && mesh.metadata !== null;
+                                    });
+
                                     if (pick && pick.pickedMesh && pick.pickedMesh.isPickable) {
-                                        // Assume valid node if pickable and has ID logic (checking parent usually safe)
-                                        // Simplified: Just parent it.
-                                        grabbedNode = pick.pickedMesh as Mesh | InstancedMesh;
-                                        grabbedNode.setParent(controller.grip || controller.pointer);
+                                        const pickedMesh = pick.pickedMesh as Mesh | InstancedMesh;
+                                        console.log("XR Ray Valid Pick:", pickedMesh.name);
+
+                                        // Priority: Selection vs Grab
+                                        // If we just click cleanly, it's a select.
+                                        // If we hold, it creates a grab.
+                                        // For now, let's do BOTH: Select it (show details) AND grab it.
+
+                                        // 1. Trigger Selection Panel
+                                        if (pickedMesh.metadata) {
+                                            const type = pickedMesh.metadata.type === 'edge' ? 'edge' : 'node';
+                                            detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, type, xr, pickedMesh);
+                                        }
+
+                                        // 2. Grab Logic (Only for nodes)
+                                        // We don't want to grab/move edges directly (they are dependent on nodes)
+                                        if (!pickedMesh.metadata.type || pickedMesh.metadata.type === 'node') {
+                                            grabbedNode = pickedMesh;
+                                            grabbedNode.setParent(controller.grip || controller.pointer);
+                                        }
                                     }
                                 } else {
                                     // Release
@@ -243,6 +284,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                                 }
                             }
                         });
+                    } else {
+                        console.error("XR ERROR: No trigger component found on controller!");
                     }
 
                     // 3. World Grab (Grip)
@@ -264,6 +307,13 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 });
             });
 
+            // DEBUG: Global Pointer Observer
+            sceneInstance.onPointerObservable.add((pointerInfo) => {
+                if (pointerInfo.type === 1) { // POINTERDOWN
+                    console.log("XR/Scene Global POINTERDOWN detected", pointerInfo.pickInfo?.pickedMesh?.name);
+                }
+            });
+
             // --- Render Loop (Locomotion) ---
             sceneInstance.onBeforeRenderObservable.add(() => {
                 if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) return;
@@ -276,11 +326,19 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             if (Math.abs(axes.x) < 0.1 && Math.abs(axes.y) < 0.1) return; // Deadzone
 
                             const camera = xr.baseExperience.camera;
-                            // Left Hand: Move
+                            // Movement Layer (Left Hand)
                             if (controller.inputSource.handedness === 'left') {
-                                const forward = camera.getDirection(Vector3.Forward());
-                                const right = camera.getDirection(Vector3.Right());
-                                const moveDir = forward.scale(-axes.y * speed).add(right.scale(axes.x * speed));
+                                // 1. Get Camera Direction (True 3D Forward)
+                                const forward = camera.getForwardRay().direction;
+                                const right = camera.getDirection(Vector3.Right()); // Local Right
+
+                                // 2. Calculate Move Vector
+                                // Forward/Back follows Gaze (Free Fly)
+                                const moveDir = forward.scale(-axes.y * speed);
+                                // Left/Right follows flat horizon or local right? 
+                                // Ideally strafe is perpendicular to look.
+                                moveDir.addInPlace(right.scale(axes.x * speed));
+
                                 camera.position.addInPlace(moveDir);
                             }
                             // Right Hand: Rotate
@@ -315,7 +373,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             scene,
             nodeMeshesRef.current,
             undefined, // Disable standard web selection in XR mode
-            (nodeData, type) => detailsPanelRef.current.create(scene, nodeData, type), // VR Select
+            undefined, // Disable standard ActionManager selection (We use manual XR Ray)
             xrHelperRef
         );
         graphRenderer.current.createEdges(
@@ -323,7 +381,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             scene,
             nodeMeshesRef.current,
             undefined, // Disable standard web selection in XR mode
-            (edgeData, type) => detailsPanelRef.current.create(scene, edgeData, type),
+            undefined, // Disable standard ActionManager selection
             xrHelperRef
         );
 

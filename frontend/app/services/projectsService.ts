@@ -1,9 +1,12 @@
 import { apiClient } from '@/app/lib/apiClient';
 
-export interface CreateProjectDto {
+export interface CreateProjectPayload {
+    file: File;
     name: string;
-    temp_file_id: string;
-    mapping: Record<string, string>;
+    description?: string;
+    isPublic?: boolean;
+    mapping?: Record<string, string>;
+    algorithm?: string;
 }
 
 export interface Project {
@@ -29,8 +32,24 @@ export interface TaskStatus {
 }
 
 export const projectsService = {
-    create: async (data: CreateProjectDto): Promise<JobResponse> => {
-        return apiClient.post<JobResponse>('/projects/', data);
+    create: async (payload: CreateProjectPayload): Promise<JobResponse> => {
+        const formData = new FormData();
+        formData.append('file', payload.file);
+        formData.append('name', payload.name);
+
+        if (payload.description) {
+            formData.append('description', payload.description);
+        }
+
+        formData.append('is_public', payload.isPublic ? 'true' : 'false');
+
+        if (payload.mapping && Object.keys(payload.mapping).length > 0) {
+            formData.append('mapping', JSON.stringify(payload.mapping));
+        }
+
+        formData.append('algorithm', payload.algorithm || 'auto');
+
+        return apiClient.post<JobResponse>('/projects/', formData);
     },
 
     list: async (): Promise<Project[]> => {
@@ -41,7 +60,7 @@ export const projectsService = {
         return apiClient.get<Project>(`/projects/${id}`);
     },
 
-    update: async (id: string, data: Partial<CreateProjectDto>): Promise<JobResponse> => {
+    update: async (id: string, data: Partial<Omit<CreateProjectPayload, 'file'>>): Promise<JobResponse> => {
         return apiClient.put<JobResponse>(`/projects/${id}`, data);
     },
 

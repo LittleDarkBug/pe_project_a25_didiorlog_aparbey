@@ -228,6 +228,7 @@ export class GraphRenderer {
                 instance.isVisible = true;
 
                 // Interactions (VR et Web)
+                instance.metadata = { ...edge, type: 'edge' }; // Attach edge data as metadata
                 instance.actionManager = new ActionManager(scene);
                 instance.isPickable = true;
 
