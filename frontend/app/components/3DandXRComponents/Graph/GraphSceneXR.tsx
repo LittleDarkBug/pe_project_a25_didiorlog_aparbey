@@ -8,13 +8,11 @@ import {
     Mesh,
     InstancedMesh,
     WebXRState,
-
-
     Quaternion,
-    Ray,
     WebXRFeatureName,
     WebXRControllerPointerSelection,
-    Color3
+    Color3,
+    PointerEventTypes
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF'; // Required for controller models
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
@@ -67,7 +65,6 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     // --- Async Layout Handling ---
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
-    // Polling inside GraphSceneXR (since VR user triggers it here)
     useJobPolling(currentJobId, {
         onSuccess: (result) => {
             const graphData = result.graph_data || result;
@@ -102,7 +99,6 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
     useImperativeHandle(ref, () => ({
         resetCamera: () => {
-            // In XR, resetting camera might mean teleporting user back to start
             if (xrHelperRef.current && xrHelperRef.current.baseExperience) {
                 xrHelperRef.current.baseExperience.camera.position.set(0, 0, 0);
             } else if (scene) {
@@ -118,8 +114,6 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     }));
 
     const { createVRMenu } = useVRMenu();
-
-    // Store latest callback in ref to avoid recreating menu constantly
     const vrUtilsRef = useRef({ createVRMenu, handleLayoutRequest });
     useEffect(() => {
         vrUtilsRef.current = { createVRMenu, handleLayoutRequest };
@@ -147,88 +141,79 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         camera.wheelPrecision = 10;
         camera.pinchPrecision = 10;
         camera.panningSensibility = 20;
-        camera.wheelDeltaPercentage = 0.05;
         camera.lowerRadiusLimit = 0.1;
         camera.upperRadiusLimit = 10000;
-        camera.inertia = 0.9;
-        camera.angularSensibilityX = 800;
-        camera.angularSensibilityY = 800;
 
         // Prevent page zoom
         if (canvas) {
-            const preventZoom = (e: WheelEvent) => {
-                if (e.ctrlKey || e.metaKey) e.preventDefault();
-            };
-            const preventTouchZoom = (e: TouchEvent) => {
-                if (e.touches.length > 1) e.preventDefault();
-            };
+            const preventZoom = (e: WheelEvent) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); };
             canvas.addEventListener('wheel', preventZoom, { passive: false });
-            canvas.addEventListener('touchmove', preventTouchZoom, { passive: false });
         }
 
 
-        // WebXR Setup
+        // --- WebXR Canonical Setup ---
         try {
+            // 1. Initialize Experience
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [], // Space mode
-                disableTeleportation: true, // Custom locomotion
+                disableTeleportation: true, // We use custom free-flight
                 disableHandTracking: true,
-                disablePointerSelection: false, // Enable standard pointer selection
+                // We rely on standard pointer selection. 
+                // We do NOT set pointerSelectionOptions here to avoid initialization race conditions.
+                // We will configure features explicitly via featuresManager.
                 uiOptions: {
                     sessionMode: 'immersive-vr',
-                },
-                pointerSelectionOptions: {
-                    enablePointerSelectionOnAllControllers: true // Enable for both hands
                 }
             });
             xrHelperRef.current = xr;
 
-            // --- ENSURE POINTERS ARE VISIBLE ---
-            try {
-                // Get the feature that was automatically enabled by createDefaultXRExperienceAsync
-                const pointerSelection = xr.baseExperience.featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION) as WebXRControllerPointerSelection;
+            // 2. Configure Pointers (The "Right" Way via FeaturesManager)
+            const featureManager = xr.baseExperience.featuresManager;
 
-                if (pointerSelection) {
-                    pointerSelection.displayLaserPointer = true; // Always show laser
-                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green selection mesh (cursor)
-                    pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green laser beam
+            // Explicitly enable/configure pointer selection
+            const pointerSelection = featureManager.enableFeature(WebXRFeatureName.POINTER_SELECTION, "latest", {
+                xrInput: xr.input,
+                enablePointerSelectionOnAllControllers: true,
+                forceGazeMode: false,
+                disablePointerUpOnTouchOut: false,
+                disableScenePointerVectorUpdate: false
+            }) as WebXRControllerPointerSelection;
 
-                    // Explicitly allow selection on all controllers (redundant with options, but safe)
-                    // Note: enablePointerSelectionOnAllControllers is a creation-time option, 
-                    // but we can ensure the feature is active.
-                    console.log("VR Pointer Selection Feature Found and Configured");
-                } else {
-                    console.error("VR Pointer Selection Feature NOT found!");
+            // 3. Visual Configuration
+            // Ensure lasers are visible and colored correctly
+            pointerSelection.displayLaserPointer = true;
+            pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green Cursor
+            pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green Beam
+
+            // 4. Standard Event Handling (PointerObservable)
+            sceneInstance.onPointerObservable.add((pointerInfo) => {
+                switch (pointerInfo.type) {
+                    case PointerEventTypes.POINTERDOWN:
+                        // Check if we hit a mesh with metadata (Node or Edge)
+                        const pickedMesh = pointerInfo.pickInfo?.pickedMesh as Mesh | InstancedMesh;
+                        if (pickedMesh && pickedMesh.metadata && (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge')) {
+                            console.log("XR Interaction: POINTERDOWN on", pickedMesh.metadata.id);
+                            // Trigger Details Panel
+                            detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr, pickedMesh);
+                        }
+                        break;
                 }
-            } catch (e) {
-                console.error("Error configuring VR pointers:", e);
-            }
+            });
 
-            // Listen to XR state
+            // 5. XR State Logging
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
-                    console.log("VR started - Checking Pointers");
+                    console.log("VR Experience Started - Features Configured");
                 }
             });
 
-            // --- STANDARD SELECTION HANDLING (POINTER OBSERVABLE) ---
-            sceneInstance.onPointerObservable.add((pointerInfo) => {
-                if (pointerInfo.type === 1) { // POINTERDOWN
-                    const pickedMesh = pointerInfo.pickInfo?.pickedMesh as Mesh | InstancedMesh;
-                    // Check if it's a node or edge
-                    if (pickedMesh && pickedMesh.metadata && (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge')) {
-                        console.log("XR Select:", pickedMesh.metadata.type, pickedMesh.metadata);
-                        detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr, pickedMesh);
-                    }
-                }
-            });
-
-            // --- XR Controller Inputs (Menu & Locomotion) ---
+            // 6. Custom Controller Logic (Menu & Locomotion)
+            // This is additive and does not conflict with standard features
             xr.input.onControllerAddedObservable.add((controller) => {
                 controller.onMotionControllerInitObservable.add((motionController) => {
                     const ids = motionController.getComponentIds();
 
-                    // 1. Menu Toggle (A / X)
+                    // Menu Toggle (A / X)
                     const primaryId = ids.find(id => id === 'a-button' || id === 'x-button');
                     if (primaryId) {
                         const primaryButton = motionController.getComponent(primaryId);
@@ -248,7 +233,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 });
             });
 
-            // --- Render Loop (Locomotion) ---
+            // Locomotion Loop (Free Flight)
             const speed = 0.5;
             const rotationSpeed = 0.05;
             sceneInstance.onBeforeRenderObservable.add(() => {
@@ -262,17 +247,15 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             if (Math.abs(axes.x) < 0.1 && Math.abs(axes.y) < 0.1) return; // Deadzone
 
                             const camera = xr.baseExperience.camera;
-                            // Movement Layer (Left Hand)
+                            // Movement (Left Hand)
                             if (controller.inputSource.handedness === 'left') {
                                 const forward = camera.getForwardRay().direction;
                                 const right = camera.getDirection(Vector3.Right());
-
                                 const moveDir = forward.scale(-axes.y * speed);
                                 moveDir.addInPlace(right.scale(axes.x * speed));
-
                                 camera.position.addInPlace(moveDir);
                             }
-                            // Right Hand: Rotate
+                            // Rotation (Right Hand)
                             else if (controller.inputSource.handedness === 'right') {
                                 if (Math.abs(axes.x) > 0.5) {
                                     camera.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), -axes.x * rotationSpeed));
@@ -283,10 +266,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 });
             });
 
-
-
         } catch (e) {
-            console.log("WebXR not supported", e);
+            console.error("WebXR Initialization Failed:", e);
         }
 
         setIsSceneReady(true);
@@ -304,21 +285,20 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             data,
             scene,
             nodeMeshesRef.current,
-            undefined, // Disable standard web selection in XR mode
-            undefined, // Disable standard ActionManager selection (We use manual XR Ray)
+            undefined, // No web selection
+            undefined,
             xrHelperRef,
-            true // skip2DUI: Disable Fullscreen UI in VR to prevent pointer blocking
+            true // skip2DUI: ESSENTIAL for VR picking
         );
         graphRenderer.current.createEdges(
             data,
             scene,
             nodeMeshesRef.current,
-            undefined, // Disable standard web selection in XR mode
-            undefined, // Disable standard ActionManager selection
+            undefined,
+            undefined,
             xrHelperRef
         );
 
-        // Force visibility update
         graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
 
     }, [scene, data, onSelect]);
