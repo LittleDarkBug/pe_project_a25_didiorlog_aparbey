@@ -11,7 +11,10 @@ import {
 
 
     Quaternion,
-    Ray
+    Ray,
+    WebXRFeatureName,
+    WebXRControllerPointerSelection,
+    Color3
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF'; // Required for controller models
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
@@ -176,6 +179,17 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 }
             });
             xrHelperRef.current = xr;
+
+            // --- FORCE POINTER SELECTION VISIBILITY ---
+            try {
+                const pointerSelection = xr.baseExperience.featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION) as WebXRControllerPointerSelection;
+                if (pointerSelection) {
+                    pointerSelection.displayLaserPointer = true;
+                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0);
+                }
+            } catch (err) {
+                console.error("Error configuring XR PointerSelection:", err);
+            }
 
             // Listen to XR state
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
