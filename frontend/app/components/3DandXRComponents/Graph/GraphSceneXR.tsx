@@ -190,7 +190,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
                 if (pointerSelection) {
                     pointerSelection.displayLaserPointer = true; // Always show laser
-                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green laser
+                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green selection mesh (cursor)
+                    pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green laser beam
 
                     // Explicitly allow selection on all controllers (redundant with options, but safe)
                     // Note: enablePointerSelectionOnAllControllers is a creation-time option, 
@@ -305,7 +306,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             nodeMeshesRef.current,
             undefined, // Disable standard web selection in XR mode
             undefined, // Disable standard ActionManager selection (We use manual XR Ray)
-            xrHelperRef
+            xrHelperRef,
+            true // skip2DUI: Disable Fullscreen UI in VR to prevent pointer blocking
         );
         graphRenderer.current.createEdges(
             data,

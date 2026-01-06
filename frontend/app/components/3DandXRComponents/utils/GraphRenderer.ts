@@ -34,7 +34,8 @@ export class GraphRenderer {
         nodeMeshes: Map<string, Mesh | InstancedMesh>,
         onSelect?: (data: any, type: 'node' | 'edge') => void,
         onVRSelect?: (data: any, type: string) => void,
-        xrHelperRef?: { current: any }
+        xrHelperRef?: { current: any },
+        skip2DUI: boolean = false // NEW Param
     ) {
         // Create or reset Graph Root
         if (this.graphRoot) {
@@ -60,15 +61,19 @@ export class GraphRenderer {
         masterMesh.instancedBuffers.color = new Color4(0.1, 0.6, 0.9, 1);
 
         // OPTIMIZATION: Single UI Texture for all tooltips
-        const labelTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
-        const tooltip = new GUI.TextBlock();
-        tooltip.text = "";
-        tooltip.color = "white";
-        tooltip.fontSize = 14;
-        tooltip.outlineWidth = 2;
-        tooltip.outlineColor = "black";
-        tooltip.isVisible = false;
-        labelTexture.addControl(tooltip);
+        // In VR, we skip this to prevent the Fullscreen UI from blocking ray casts
+        let tooltip: GUI.TextBlock | null = null;
+        if (!skip2DUI) {
+            const labelTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+            tooltip = new GUI.TextBlock();
+            tooltip.text = "";
+            tooltip.color = "white";
+            tooltip.fontSize = 14;
+            tooltip.outlineWidth = 2;
+            tooltip.outlineColor = "black";
+            tooltip.isVisible = false;
+            labelTexture.addControl(tooltip);
+        }
 
         data.nodes.forEach(node => {
             // Create an instance instead of a clone or new mesh
@@ -76,6 +81,9 @@ export class GraphRenderer {
             instance.parent = this.graphRoot; // Parent to root
             instance.position = new Vector3(node.x, node.y, node.z);
             instance.isPickable = true; // Ensure pickable for VR rays
+
+            // ESSENTIAL: Attach metadata for VR/Web selection logic
+            instance.metadata = { ...node, type: 'node' };
 
             // Apply custom color if present
             if (node.color) {
@@ -98,7 +106,7 @@ export class GraphRenderer {
                     instance.instancedBuffers.color = new Color4(0.8, 1, 1, 1);
 
                     // Show Tooltip
-                    if (node.label || node.id) {
+                    if (tooltip && (node.label || node.id)) {
                         tooltip.text = node.label || node.id;
                         tooltip.linkWithMesh(instance);
                         tooltip.linkOffsetY = -30;
@@ -121,7 +129,9 @@ export class GraphRenderer {
                     }
 
                     // Hide Tooltip
-                    tooltip.isVisible = false;
+                    if (tooltip) {
+                        tooltip.isVisible = false;
+                    }
                 })
             );
             instance.actionManager.registerAction(
