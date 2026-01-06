@@ -1,0 +1,33 @@
+graph TD
+    subgraph Client_Device ["Client Device"]
+        Browser["Browser (Chrome/Edge)"]
+        VR["VR Headset (Quest 2/3)"]
+        Browser -- WebXR --> VR
+    end
+
+    subgraph Docker_Host ["Docker Host"]
+        subgraph Frontend_Container ["Frontend Container"]
+            NextJS["Next.js Server"]
+        end
+
+        subgraph Backend_Container ["Backend Container"]
+            FastAPI["FastAPI Server"]
+        end
+
+        subgraph Worker_Container ["Worker Container"]
+            Celery["Celery Worker"]
+        end
+
+        subgraph Data_Layer ["Data Layer"]
+            Mongo[("MongoDB")]
+            Redis[("Redis")]
+        end
+    end
+
+    Browser -- "HTTPS/JSON" --> NextJS
+    Browser -- "HTTPS/API" --> FastAPI
+    NextJS -- "Internal Network" --> FastAPI
+    FastAPI -- "Internal Network" --> Mongo
+    FastAPI -- "Internal Network" --> Redis
+    Celery -- "Internal Network" --> Redis
+    Celery -- "Internal Network" --> Mongo

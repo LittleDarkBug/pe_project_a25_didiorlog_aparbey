@@ -1,0 +1,58 @@
+graph TD
+    %% Actors
+    Guest([Guest])
+    User([User])
+    Admin([Admin])
+
+    %% Styles for Actors
+    classDef actor fill:#f9f,stroke:#333,stroke-width:2px;
+    class Guest,User,Admin actor;
+
+    %% Subgraphs (Packages)
+    subgraph Gestion_Compte ["Gestion de Compte"]
+        UC_Auth("S'inscrire / Se connecter")
+        UC_Profile("Gerer Profil")
+    end
+
+    subgraph Gestion_Projet ["Gestion de Projet"]
+        UC_Create("Creer Projet (Upload)")
+        UC_Map("Configurer Mapping")
+        UC_Layout("Lancer Spatialisation")
+        UC_Share("Partager Projet (Public)")
+        UC_Delete("Supprimer Projet")
+    end
+
+    subgraph Visualisation ["Visualisation 3D/VR"]
+        UC_Nav("Naviguer en 3D")
+        UC_Select("Selectionner Noeud (Infos)")
+        UC_VR("Activer Mode VR")
+        UC_Grab("Manipuler Graphe (Grab)")
+    end
+
+    subgraph Administration ["Administration"]
+        UC_Stats("Voir Stats Globales")
+        UC_ManageUsers("Gerer Utilisateurs")
+        UC_ManageProjects("Gerer Projets")
+    end
+
+    %% Relations
+    Guest --> UC_Auth
+    Guest --> UC_Nav
+    Guest --> UC_VR
+
+    User --> UC_Auth
+    User --> UC_Profile
+    User --> UC_Create
+    User --> UC_Map
+    User --> UC_Layout
+    User --> UC_Share
+    User --> UC_Delete
+    User --> UC_Nav
+    User --> UC_Select
+    User --> UC_VR
+    User --> UC_Grab
+
+    Admin --> UC_Auth
+    Admin --> UC_Stats
+    Admin --> UC_ManageUsers
+    Admin --> UC_ManageProjects

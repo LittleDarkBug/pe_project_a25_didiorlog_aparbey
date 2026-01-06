@@ -111,7 +111,7 @@ Vous n'avez rien à lancer manuellement en mode Docker, tout est géré par dock
 - MongoDB 7+ en cours d'exécution
 - Redis 7+ en cours d'exécution
 
-**⚠️ En mode local, il faut lancer le worker Celery manuellement dans un terminal séparé :**
+**En mode local, il faut lancer le worker Celery manuellement dans un terminal séparé :**
 
 ```bash
 celery -A celery worker --loglevel=info

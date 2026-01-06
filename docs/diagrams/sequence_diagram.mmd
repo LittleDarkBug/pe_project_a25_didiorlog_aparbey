@@ -1,0 +1,46 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant DB
+    participant Redis
+    participant Worker
+
+    User->>Frontend: Importer Fichier Source
+    Frontend->>API: Demande Création Projet
+    activate API
+    API->>API: Vérification Format
+    API->>DB: Créer Entité Projet
+    API->>Redis: Planifier Traitement
+    API-->>Frontend: Confirmation (Job ID)
+    deactivate API
+
+    User->>Frontend: (Interface d'Attente)
+    loop Polling Status
+        Frontend->>API: Demande Statut Traitement
+        activate API
+        API->>Redis: Vérifier État
+        Redis-->>API: État: En Cours
+        API-->>Frontend: {Statut: En Cours}
+        deactivate API
+    end
+
+    Note over Worker: Traitement Asynchrone
+    Redis->>Worker: Démarrer Tâche
+    activate Worker
+    Worker->>Worker: Chargement Données
+    Worker->>Worker: Construction Graphe
+    Worker->>Worker: Calcul Spatialisation (3D)
+    Worker->>DB: Mise à jour Projet (Données Graphe)
+    Worker->>Redis: Marquer Terminé
+    deactivate Worker
+
+    Frontend->>API: Demande Statut Traitement
+    activate API
+    API->>Redis: Vérifier État
+    Redis-->>API: État: Terminé
+    API->>DB: Récupérer Données
+    API-->>Frontend: {Statut: Terminé, Données}
+    deactivate API
+
+    Frontend->>User: Affichage Scène 3D

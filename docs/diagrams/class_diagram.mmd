@@ -1,0 +1,59 @@
+classDiagram
+    direction LR
+    class User {
+        +String email
+        +String hashed_password
+        +String full_name
+        +String role
+        +Boolean is_active
+        +Boolean is_superuser
+        +Dict preferences
+        +DateTime created_at
+        +create()
+        +save()
+        +delete()
+    }
+
+    class Project {
+        +String name
+        +String description
+        +Boolean is_public
+        +String source_file_path
+        +Dict mapping
+        +String algorithm
+        +Dict graph_data
+        +Dict metadata
+        +String status
+        +DateTime created_at
+        +insert()
+        +save()
+        +delete()
+    }
+
+    class GraphData {
+        +List~Node~ nodes
+        +List~Edge~ links
+        +String format
+    }
+
+    class Node {
+        +String id
+        +Float x
+        +Float y
+        +Float z
+        +String label
+        +String color
+        +Dict attributes
+    }
+
+    class Edge {
+        +String source
+        +String target
+        +Float weight
+        +Dict attributes
+    }
+
+    User "1" --> "0..*" Project : owns
+    Project "1" *-- "1" GraphData : contains
+    GraphData "1" *-- "0..*" Node : has
+    GraphData "1" *-- "0..*" Edge : has
