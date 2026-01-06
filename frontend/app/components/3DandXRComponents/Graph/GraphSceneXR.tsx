@@ -173,55 +173,50 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 floorMeshes: [], // Space mode
                 disableTeleportation: true, // Custom locomotion
                 disableHandTracking: true,
-                disablePointerSelection: false, // Enable laser pointer
+                disablePointerSelection: false, // Enable standard pointer selection
                 uiOptions: {
                     sessionMode: 'immersive-vr',
+                },
+                pointerSelectionOptions: {
+                    enablePointerSelectionOnAllControllers: true // Enable for both hands
                 }
             });
             xrHelperRef.current = xr;
 
-            // --- FORCE POINTER SELECTION VISIBILITY ---
+            // Force visual configuration if needed
             try {
                 const pointerSelection = xr.baseExperience.featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION) as WebXRControllerPointerSelection;
                 if (pointerSelection) {
                     pointerSelection.displayLaserPointer = true;
-                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0);
+                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green
                 }
-            } catch (err) {
-                console.error("Error configuring XR PointerSelection:", err);
+            } catch (e) {
+                console.warn("Could not configure pointer selection manually", e);
             }
 
             // Listen to XR state
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR started");
-                    // Menu is now hidden by default. User must press button to open.
                 }
             });
 
-            const speed = 0.5;
-            const rotationSpeed = 0.05;
+            // --- STANDARD SELECTION HANDLING (POINTER OBSERVABLE) ---
+            sceneInstance.onPointerObservable.add((pointerInfo) => {
+                if (pointerInfo.type === 1) { // POINTERDOWN
+                    const pickedMesh = pointerInfo.pickInfo?.pickedMesh as Mesh | InstancedMesh;
+                    // Check if it's a node or edge
+                    if (pickedMesh && pickedMesh.metadata && (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge')) {
+                        console.log("XR Select:", pickedMesh.metadata.type, pickedMesh.metadata);
+                        detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr, pickedMesh);
+                    }
+                }
+            });
 
-            // --- XR Input Handling (One-time Setup) ---
+            // --- XR Controller Inputs (Menu & Locomotion) ---
             xr.input.onControllerAddedObservable.add((controller) => {
-                console.log("XR Controller Added:", controller.inputSource.handedness, "Profiles:", controller.inputSource.profiles);
-
                 controller.onMotionControllerInitObservable.add((motionController) => {
-                    console.log("XR MotionController Init:", motionController.profileId, "Hand:", motionController.handedness);
                     const ids = motionController.getComponentIds();
-                    console.log("XR Components found:", ids);
-
-                    // DEBUG: Attach listener to ALL components to see what works
-                    ids.forEach(id => {
-                        const comp = motionController.getComponent(id);
-                        if (comp) {
-                            comp.onButtonStateChangedObservable.add(() => {
-                                if (comp.changes.pressed) {
-                                    console.log(`XR DEBUG: Component ${id} pressed state changed to ${comp.pressed}`);
-                                }
-                            });
-                        }
-                    });
 
                     // 1. Menu Toggle (A / X)
                     const primaryId = ids.find(id => id === 'a-button' || id === 'x-button');
@@ -230,7 +225,6 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                         if (primaryButton) {
                             primaryButton.onButtonStateChangedObservable.add(() => {
                                 if (primaryButton.changes.pressed && primaryButton.pressed) {
-                                    // Toggle Menu
                                     if (vrMenuRef.current) {
                                         vrMenuRef.current.dispose();
                                         vrMenuRef.current = null;
@@ -241,94 +235,12 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             });
                         }
                     }
-
-                    // 2. Node Grab (Trigger)
-                    const triggerId = ids.find(id => id === 'xr-standard-trigger' || id === 'trigger');
-                    const trigger = triggerId ? motionController.getComponent(triggerId) : null;
-
-                    let grabbedNode: Mesh | InstancedMesh | null = null;
-                    if (trigger) {
-                        console.log("XR Trigger Component Linked:", trigger.id);
-                        trigger.onButtonStateChangedObservable.add(() => {
-                            if (trigger.changes.pressed) {
-                                console.log("XR Trigger State Changed. Pressed:", trigger.pressed);
-                                if (trigger.pressed) {
-                                    // Pick mesh using Native XR method (Best Practice)
-                                    const ray = new Ray(new Vector3(), new Vector3());
-                                    controller.getWorldPointerRayToRef(ray);
-
-                                    // FIX: Add predicate to ignore controller meshes (spoon) and require metadata
-                                    const pick = sceneInstance.pickWithRay(ray, (mesh) => {
-                                        return mesh.isPickable && mesh.isVisible && mesh.name !== "spoon" && !mesh.name.toLowerCase().includes("controller") && mesh.metadata !== null;
-                                    });
-
-                                    if (pick && pick.pickedMesh && pick.pickedMesh.isPickable) {
-                                        const pickedMesh = pick.pickedMesh as Mesh | InstancedMesh;
-                                        console.log("XR Ray Valid Pick:", pickedMesh.name);
-
-                                        // Priority: Selection vs Grab
-                                        // If we just click cleanly, it's a select.
-                                        // If we hold, it creates a grab.
-                                        // For now, let's do BOTH: Select it (show details) AND grab it.
-
-                                        // 1. Trigger Selection Panel
-                                        if (pickedMesh.metadata) {
-                                            const type = pickedMesh.metadata.type === 'edge' ? 'edge' : 'node';
-                                            detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, type, xr, pickedMesh);
-                                        }
-
-                                        // 2. Grab Logic (Only for nodes)
-                                        // We don't want to grab/move edges directly (they are dependent on nodes)
-                                        if (!pickedMesh.metadata.type || pickedMesh.metadata.type === 'node') {
-                                            grabbedNode = pickedMesh;
-                                            grabbedNode.setParent(controller.grip || controller.pointer);
-                                        }
-                                    }
-                                } else {
-                                    // Release
-                                    if (grabbedNode) {
-                                        const root = graphRenderer.current.getGraphRoot();
-                                        if (root) {
-                                            grabbedNode.setParent(root);
-                                        } else {
-                                            grabbedNode.setParent(null);
-                                        }
-                                        grabbedNode = null;
-                                    }
-                                }
-                            }
-                        });
-                    } else {
-                        console.error("XR ERROR: No trigger component found on controller!");
-                    }
-
-                    // 3. World Grab (Grip)
-                    const grip = motionController.getComponent('squeeze') || motionController.getComponent('grip');
-                    if (grip) {
-                        grip.onButtonStateChangedObservable.add(() => {
-                            if (grip.changes.pressed) {
-                                const root = graphRenderer.current.getGraphRoot();
-                                if (root) {
-                                    if (grip.pressed) {
-                                        root.setParent(controller.grip || controller.pointer);
-                                    } else {
-                                        root.setParent(null);
-                                    }
-                                }
-                            }
-                        });
-                    }
                 });
             });
 
-            // DEBUG: Global Pointer Observer
-            sceneInstance.onPointerObservable.add((pointerInfo) => {
-                if (pointerInfo.type === 1) { // POINTERDOWN
-                    console.log("XR/Scene Global POINTERDOWN detected", pointerInfo.pickInfo?.pickedMesh?.name);
-                }
-            });
-
             // --- Render Loop (Locomotion) ---
+            const speed = 0.5;
+            const rotationSpeed = 0.05;
             sceneInstance.onBeforeRenderObservable.add(() => {
                 if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) return;
 
@@ -342,15 +254,10 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             const camera = xr.baseExperience.camera;
                             // Movement Layer (Left Hand)
                             if (controller.inputSource.handedness === 'left') {
-                                // 1. Get Camera Direction (True 3D Forward)
                                 const forward = camera.getForwardRay().direction;
-                                const right = camera.getDirection(Vector3.Right()); // Local Right
+                                const right = camera.getDirection(Vector3.Right());
 
-                                // 2. Calculate Move Vector
-                                // Forward/Back follows Gaze (Free Fly)
                                 const moveDir = forward.scale(-axes.y * speed);
-                                // Left/Right follows flat horizon or local right? 
-                                // Ideally strafe is perpendicular to look.
                                 moveDir.addInPlace(right.scale(axes.x * speed));
 
                                 camera.position.addInPlace(moveDir);
@@ -358,7 +265,6 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             // Right Hand: Rotate
                             else if (controller.inputSource.handedness === 'right') {
                                 if (Math.abs(axes.x) > 0.5) {
-                                    // Smooth turn
                                     camera.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), -axes.x * rotationSpeed));
                                 }
                             }
@@ -366,6 +272,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     }
                 });
             });
+
+
 
         } catch (e) {
             console.log("WebXR not supported", e);
