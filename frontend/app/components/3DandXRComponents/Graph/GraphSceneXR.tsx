@@ -183,21 +183,30 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             });
             xrHelperRef.current = xr;
 
-            // Force visual configuration if needed
+            // --- ENSURE POINTERS ARE VISIBLE ---
             try {
+                // Get the feature that was automatically enabled by createDefaultXRExperienceAsync
                 const pointerSelection = xr.baseExperience.featuresManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION) as WebXRControllerPointerSelection;
+
                 if (pointerSelection) {
-                    pointerSelection.displayLaserPointer = true;
-                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green
+                    pointerSelection.displayLaserPointer = true; // Always show laser
+                    pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green laser
+
+                    // Explicitly allow selection on all controllers (redundant with options, but safe)
+                    // Note: enablePointerSelectionOnAllControllers is a creation-time option, 
+                    // but we can ensure the feature is active.
+                    console.log("VR Pointer Selection Feature Found and Configured");
+                } else {
+                    console.error("VR Pointer Selection Feature NOT found!");
                 }
             } catch (e) {
-                console.warn("Could not configure pointer selection manually", e);
+                console.error("Error configuring VR pointers:", e);
             }
 
             // Listen to XR state
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
-                    console.log("VR started");
+                    console.log("VR started - Checking Pointers");
                 }
             });
 
