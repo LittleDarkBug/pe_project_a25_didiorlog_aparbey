@@ -324,6 +324,14 @@ export class VRDetailsPanel {
         if (Array.isArray(value)) {
             // ARRAY handling
             value.forEach(item => {
+                const itemContainer = new GUI.Rectangle();
+                itemContainer.adaptHeightToChildren = true;
+                itemContainer.thickness = 0;
+                itemContainer.background = this.theme.codeBg;
+                itemContainer.paddingBottom = "5px";
+                itemContainer.width = "100%";
+                itemContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+
                 const itemTxt = new GUI.TextBlock();
                 itemTxt.text = `• ${typeof item === 'object' ? JSON.stringify(item) : String(item)}`;
                 itemTxt.color = this.theme.textMuted;
@@ -331,9 +339,9 @@ export class VRDetailsPanel {
                 itemTxt.textWrapping = true;
                 itemTxt.resizeToFit = true;
                 itemTxt.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                itemTxt.background = this.theme.codeBg;
-                itemTxt.paddingBottom = "5px";
-                contentArea.addControl(itemTxt);
+
+                itemContainer.addControl(itemTxt);
+                contentArea.addControl(itemContainer);
             });
         } else if (typeof value === 'object' && value !== null) {
             // NESTED OBJECT handling
@@ -350,6 +358,13 @@ export class VRDetailsPanel {
                 k.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
                 row.addControl(k);
 
+                const valContainer = new GUI.Rectangle();
+                valContainer.adaptHeightToChildren = true;
+                valContainer.thickness = 0;
+                valContainer.background = this.theme.codeBg;
+                valContainer.width = "100%";
+                valContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+
                 const v = new GUI.TextBlock();
                 v.text = typeof nVal === 'object' ? JSON.stringify(nVal, null, 2) : String(nVal);
                 v.color = this.theme.text;
@@ -358,13 +373,24 @@ export class VRDetailsPanel {
                 v.textWrapping = true;
                 v.resizeToFit = true;
                 v.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                v.background = this.theme.codeBg;
-                row.addControl(v);
+
+                valContainer.addControl(v);
+                row.addControl(valContainer);
 
                 contentArea.addControl(row);
             });
         } else {
             // SIMPLE VALUE
+            const valContainer = new GUI.Rectangle();
+            valContainer.adaptHeightToChildren = true;
+            valContainer.thickness = 0;
+            valContainer.background = this.theme.codeBg;
+            valContainer.width = "100%";
+            valContainer.paddingTop = "5px";
+            valContainer.paddingBottom = "5px";
+            valContainer.paddingLeft = "10px";
+            valContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+
             const valTxt = new GUI.TextBlock();
             valTxt.text = String(value);
             valTxt.color = this.theme.text;
@@ -373,11 +399,9 @@ export class VRDetailsPanel {
             valTxt.textWrapping = true;
             valTxt.resizeToFit = true;
             valTxt.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-            valTxt.background = this.theme.codeBg;
-            valTxt.paddingTop = "5px";
-            valTxt.paddingBottom = "5px";
-            valTxt.paddingLeft = "10px";
-            contentArea.addControl(valTxt);
+
+            valContainer.addControl(valTxt);
+            contentArea.addControl(valContainer);
         }
 
         wrapper.addControl(contentArea);
