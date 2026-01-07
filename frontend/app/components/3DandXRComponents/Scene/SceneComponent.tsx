@@ -37,11 +37,11 @@ export default function SceneComponent({
 
     if (!canvas) return;
 
-    // Moteur - with loseContextOnDispose for proper React cleanup
+    // Moteur
     const engine = new Engine(
       canvas,
       antialias,
-      { ...engineOptions, loseContextOnDispose: true },
+      engineOptions,
       adaptToDeviceRatio
     );
 
