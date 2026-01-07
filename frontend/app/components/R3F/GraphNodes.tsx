@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useCallback } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
-import { Html, Text } from '@react-three/drei';
+import { Html, Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface NodeData {
@@ -115,10 +115,10 @@ export default function GraphNodes({
             >
                 <sphereGeometry args={[nodeSize, 16, 16]} />
                 <meshStandardMaterial
-                    metalness={0.3}
-                    roughness={0.4}
+                    metalness={0.6}
+                    roughness={0.2}
                     emissive="#1e40af"
-                    emissiveIntensity={0.2}
+                    emissiveIntensity={0.3}
                 />
             </instancedMesh>
 
@@ -130,7 +130,7 @@ export default function GraphNodes({
                     center
                     style={{ pointerEvents: 'none' }}
                 >
-                    <div className="px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap backdrop-blur-sm border border-white/20">
+                    <div className="px-3 py-1.5 bg-black/60 text-white text-sm font-medium rounded-lg whitespace-nowrap backdrop-blur-md border border-white/10 shadow-xl">
                         {node.label || node.id}
                     </div>
                 </Html>
@@ -147,30 +147,37 @@ export default function GraphNodes({
                     center
                     style={{ pointerEvents: 'none' }}
                 >
-                    <div className="px-3 py-2 bg-blue-600/90 text-white text-sm rounded-lg whitespace-nowrap backdrop-blur-sm border border-blue-400/50 shadow-lg">
+                    <div className="px-4 py-2 bg-blue-600/90 text-white text-base font-semibold rounded-xl whitespace-nowrap backdrop-blur-lg border border-blue-400/50 shadow-2xl">
                         {nodeMap.get(hoveredId)!.label || nodeMap.get(hoveredId)!.id}
                     </div>
                 </Html>
             )}
 
-            {/* VR Labels (3D Text) */}
+            {/* VR Labels (3D Text with Billboard) */}
             {isVR && (showLabels || hoveredId !== null) && nodes.map((node, i) => {
                 const isHovered = hoveredId === i;
                 if (!showLabels && !isHovered) return null;
 
                 return (
-                    <Text
+                    <Billboard
                         key={`vr-label-${node.id}`}
-                        position={[node.x || 0, (node.y || 0) + nodeSize + 0.8, node.z || 0]}
-                        fontSize={0.5}
-                        color="white"
-                        anchorX="center"
-                        anchorY="middle"
-                        outlineWidth={0.02}
-                        outlineColor="#000000"
+                        position={[node.x || 0, (node.y || 0) + nodeSize + 1.2, node.z || 0]}
+                        follow={true}
+                        lockX={false}
+                        lockY={false}
+                        lockZ={false}
                     >
-                        {node.label || node.id}
-                    </Text>
+                        <Text
+                            fontSize={isHovered ? 1.2 : 0.8}
+                            color="white"
+                            anchorX="center"
+                            anchorY="middle"
+                            outlineWidth={0.05}
+                            outlineColor="#000000"
+                        >
+                            {node.label || node.id}
+                        </Text>
+                    </Billboard>
                 );
             })}
         </group>
