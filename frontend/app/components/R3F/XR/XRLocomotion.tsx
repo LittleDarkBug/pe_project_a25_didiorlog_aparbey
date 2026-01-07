@@ -53,11 +53,17 @@ export default function XRLocomotion({
                     const moveVector = new THREE.Vector3();
 
                     // -yAxis is Forward (pushing stick up gives negative value usually)
-                    // But standard can vary. Usually Push Up = -1. 
                     moveVector.addScaledVector(forward, -yAxis * speed);
                     moveVector.addScaledVector(right, xAxis * speed);
 
-                    camera.position.add(moveVector);
+                    // IMPORTANT: Move the RIG (camera parent), not the camera itself.
+                    // In WebXR, camera position is overwritten by headset pose relative to rig.
+                    if (camera.parent) {
+                        camera.parent.position.add(moveVector);
+                    } else {
+                        // Fallback if no parent (unlikely in XR)
+                        camera.position.add(moveVector);
+                    }
                 }
             }
         }
@@ -69,12 +75,12 @@ export default function XRLocomotion({
             const xAxis = axes && axes.length > 2 ? axes[2] : (axes ? axes[0] : 0);
 
             if (xAxis !== undefined && Math.abs(xAxis) > 0.2) {
-                // Rotate camera rig (if using an XROrigin) or camera itself
-                // Note: directly rotating camera parent is better if available, but rotating camera works for simple free flight
-                // However, in R3F XR, we usually move the Player/Origin, not the camera directly. 
-                // But simply modifying camera.position works for "flying" in simple scenes.
-                // For rotation, we rotate around Y.
-                camera.rotation.y -= xAxis * rotationSpeed;
+                // Rotate camera rig around Y axis
+                if (camera.parent) {
+                    camera.parent.rotation.y -= xAxis * rotationSpeed;
+                } else {
+                    camera.rotation.y -= xAxis * rotationSpeed;
+                }
             }
         }
     });
