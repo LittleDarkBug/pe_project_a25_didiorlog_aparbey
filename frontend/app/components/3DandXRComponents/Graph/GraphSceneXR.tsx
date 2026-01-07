@@ -238,8 +238,28 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     controllerMat.diffuseColor = new Color3(0.2, 0.8, 1);
                     controllerMat.disableLighting = true;
                     controllerVisual.material = controllerMat;
-                    controllerVisual.parent = controller.grip; // Attach to grip transform
                     controllerVisual.isPickable = false;
+                    controllerVisual.isVisible = false; // Start hidden
+
+                    // Update position in render loop (like laser) instead of parenting
+                    let posLogged = false;
+                    sceneInstance.onBeforeRenderObservable.add(() => {
+                        if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) {
+                            controllerVisual.isVisible = false;
+                            return;
+                        }
+                        if (controller.grip) {
+                            controllerVisual.isVisible = true;
+                            controllerVisual.position.copyFrom(controller.grip.position);
+                            controllerVisual.rotationQuaternion = controller.grip.rotationQuaternion?.clone() ?? null;
+
+                            if (!posLogged) {
+                                console.log("📍 Controller visual position:", controller.inputSource.handedness, controllerVisual.position.toString());
+                                posLogged = true;
+                            }
+                        }
+                    });
+
                     console.log("✅ Created custom controller visual for:", controller.inputSource.handedness);
                 }
                 if (controller.pointer) {
