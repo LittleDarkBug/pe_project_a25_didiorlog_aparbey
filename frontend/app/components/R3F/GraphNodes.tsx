@@ -65,10 +65,10 @@ export default function GraphNodes({
             meshRef.current!.setMatrixAt(i, tempObject.matrix);
 
             // Update color based on state
-            const baseColor = node.color || '#3b82f6';
+            const baseColor = node.color || '#60a5fa'; // Lighter blue default
             let finalColor = baseColor;
             if (selectedNodeId === node.id) finalColor = '#fbbf24';
-            else if (hoveredId === i) finalColor = '#60a5fa';
+            else if (hoveredId === i) finalColor = '#93c5fd'; // Very light blue on hover
 
             tempColor.set(finalColor);
             meshRef.current!.setColorAt(i, tempColor);
@@ -113,12 +113,12 @@ export default function GraphNodes({
                 onPointerOver={handlePointerOver}
                 onPointerOut={handlePointerOut}
             >
-                <sphereGeometry args={[nodeSize, 16, 16]} />
+                <sphereGeometry args={[nodeSize, 32, 32]} />
                 <meshStandardMaterial
-                    metalness={0.6}
+                    metalness={0.5}
                     roughness={0.2}
-                    emissive="#1e40af"
-                    emissiveIntensity={0.3}
+                    emissive="#2563eb"
+                    emissiveIntensity={0.4}
                 />
             </instancedMesh>
 
@@ -130,7 +130,7 @@ export default function GraphNodes({
                     center
                     style={{ pointerEvents: 'none' }}
                 >
-                    <div className="px-3 py-1.5 bg-black/60 text-white text-sm font-medium rounded-lg whitespace-nowrap backdrop-blur-md border border-white/10 shadow-xl">
+                    <div className="px-2 py-0.5 text-white text-xs font-semibold drop-shadow-md" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                         {node.label || node.id}
                     </div>
                 </Html>
@@ -147,7 +147,7 @@ export default function GraphNodes({
                     center
                     style={{ pointerEvents: 'none' }}
                 >
-                    <div className="px-4 py-2 bg-blue-600/90 text-white text-base font-semibold rounded-xl whitespace-nowrap backdrop-blur-lg border border-blue-400/50 shadow-2xl">
+                    <div className="px-3 py-1.5 bg-slate-900/90 text-blue-200 text-sm font-medium rounded-lg backdrop-blur-md border border-slate-700/50 shadow-xl transform translate-y-[-10px]">
                         {nodeMap.get(hoveredId)!.label || nodeMap.get(hoveredId)!.id}
                     </div>
                 </Html>

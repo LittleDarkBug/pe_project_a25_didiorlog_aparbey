@@ -56,25 +56,22 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
 
     return (
         <div className={className || "h-full w-full relative"}>
-            {/* 
-                We use the official VRButton from @react-three/xr.
-                This allows the user to enter WR mode only when supported.
-                The button handles the store interaction automatically.
-            */}
-            {/* 
-                We use the official VRButton from @react-three/xr.
-                This allows the user to enter WR mode only when supported.
-                The button handles the store interaction automatically.
-                Styled to ensure it appears above other overlays.
-            */}
+            {/** 
+             * WE use the official VRButton.
+             * We ignore TS error for sessionInit as it is passed to enterVR at runtime but missing in type defs.
+             */}
+            {/* @ts-ignore */}
             <VRButton
                 store={xrStore}
+                sessionInit={{
+                    optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
+                }}
                 style={{
                     position: 'absolute',
                     bottom: '24px',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    zIndex: 9999, // Ensure it's above everything
+                    zIndex: 9999,
                     padding: '12px 24px',
                     border: '1px solid white',
                     borderRadius: '8px',
@@ -94,18 +91,15 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
                         <XROrigin position={[0, 0, 0]} />
 
                         {/* Immersive Lighting */}
-                        <ambientLight intensity={0.4} />
-                        <directionalLight position={[10, 20, 10]} intensity={1.2} color="#ffffff" />
-                        <pointLight position={[-10, 5, -10]} intensity={0.5} color="#4080ff" />
-                        <pointLight position={[10, 5, 10]} intensity={0.5} color="#ff8040" />
+                        <ambientLight intensity={0.6} />
+                        <directionalLight position={[10, 20, 10]} intensity={1.5} color="#ffffff" />
+                        <pointLight position={[-10, 5, -10]} intensity={1} color="#4080ff" />
+                        <pointLight position={[10, 5, 10]} intensity={1} color="#ff8040" />
 
                         <Suspense fallback={null}>
-                            {/* Vast Space Environment */}
-                            <color attach="background" args={['#050508']} />
-                            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-
-                            {/* Subtle Floor Grid to give spatial reference */}
-                            <gridHelper args={[50, 50, 0x444444, 0x111111]} position={[0, 0, 0]} />
+                            {/* Vast Black Environment */}
+                            <color attach="background" args={['#000000']} />
+                            <gridHelper args={[50, 50, 0x222222, 0x050505]} position={[0, -2, 0]} />
 
                             {children}
                         </Suspense>

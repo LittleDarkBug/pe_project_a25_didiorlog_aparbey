@@ -107,11 +107,11 @@ const GraphSceneXR = forwardRef<GraphSceneXRRef, GraphSceneXRProps>(({
     return (
         <div className={className || "h-full w-full overflow-hidden rounded-xl bg-black/20 relative"}>
             <XRCanvas>
-                {/* Locomotion */}
-                <XRLocomotion speed={0.15} rotationSpeed={0.05} />
+                {/* Locomotion: Increased speed for better movement perception */}
+                <XRLocomotion speed={0.2} rotationSpeed={0.05} />
 
-                {/* Graph Content - Scaled and positioned for VR */}
-                <group position={[0, 1.5, -2]} scale={0.05}>
+                {/* Graph Content - Positioned 4m away, scaled down to fit view */}
+                <group position={[0, 1.3, -4]} scale={0.02}>
                     <GraphNodes
                         nodes={visibleNodes}
                         onNodeClick={handleNodeClick}

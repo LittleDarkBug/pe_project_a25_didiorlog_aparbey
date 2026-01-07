@@ -162,10 +162,11 @@ export default function GraphEdges({
             <cylinderGeometry args={[0.15, 0.15, 1, 8]} />
             <meshStandardMaterial
                 transparent
-                opacity={edgeOpacity}
+                opacity={0.8}
                 color={edgeColor}
-                emissive={edgeColor}
+                emissive="#ffffff"
                 emissiveIntensity={0.2}
+                depthWrite={false} // Helps with transparency
             />
         </instancedMesh>
     );
