@@ -14,7 +14,7 @@ import {
     MeshBuilder,
     StandardMaterial
 } from '@babylonjs/core';
-import '@babylonjs/loaders/glTF'; // Required for controller models
+import '@babylonjs/loaders'; // Required for glTF controller models - full import ensures registration
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
 import { VRDetailsPanel } from '../components/VRDetailsPanel';
@@ -200,44 +200,75 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             xr.input.onControllerAddedObservable.add((controller) => {
                 console.log("🎮 Controller added:", controller.inputSource.handedness, {
                     targetRayMode: controller.inputSource.targetRayMode,
-                    profiles: controller.inputSource.profiles
+                    profiles: controller.inputSource.profiles,
+                    hasGrip: !!controller.grip,
+                    hasPointer: !!controller.pointer
                 });
+
+                // Debug: Check if controller meshes are loaded
+                if (controller.grip) {
+                    console.log("📦 Grip mesh children:", controller.grip.getChildMeshes().length);
+                }
+                if (controller.pointer) {
+                    console.log("📦 Pointer mesh children:", controller.pointer.getChildMeshes().length);
+                }
 
                 // Create visible laser beam mesh for this controller
                 const laserMaterial = new StandardMaterial(`laser-mat-${controller.inputSource.handedness}`, sceneInstance);
-                laserMaterial.emissiveColor = new Color3(0, 1, 0.5); // Cyan/green glow
+                laserMaterial.emissiveColor = new Color3(0, 1, 0); // Bright green
+                laserMaterial.diffuseColor = new Color3(0, 1, 0);
                 laserMaterial.disableLighting = true;
-                laserMaterial.alpha = 0.6;
+                laserMaterial.alpha = 1.0; // Fully opaque
 
+                // MUCH thicker laser for visibility
                 const laserMesh = MeshBuilder.CreateCylinder(`laser-${controller.inputSource.handedness}`, {
-                    height: 50,
-                    diameterTop: 0.005,
-                    diameterBottom: 0.01
+                    height: 10, // 10 meter long
+                    diameterTop: 0.01,
+                    diameterBottom: 0.02 // 2cm thick at base
                 }, sceneInstance);
                 laserMesh.material = laserMaterial;
                 laserMesh.isPickable = false;
-                laserMesh.setEnabled(false); // Start hidden
+                laserMesh.renderingGroupId = 1; // Render in front of other objects
 
                 // Update laser position/rotation each frame
+                let laserDebugLogged = false;
                 sceneInstance.onBeforeRenderObservable.add(() => {
                     if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) {
-                        laserMesh.setEnabled(false);
+                        laserMesh.isVisible = false;
                         return;
                     }
 
-                    if (controller.pointer) {
-                        laserMesh.setEnabled(true);
-                        // Position at controller pointer
-                        laserMesh.position = controller.pointer.position.clone();
-                        // Add forward offset (laser extends forward)
-                        const forward = controller.pointer.forward.scale(25);
-                        laserMesh.position.addInPlace(forward);
-                        // Match rotation to pointer
-                        laserMesh.rotationQuaternion = controller.pointer.rotationQuaternion?.clone() ?? null;
-                        // Rotate 90° to align cylinder with forward direction  
-                        if (laserMesh.rotationQuaternion) {
-                            laserMesh.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Right(), Math.PI / 2));
+                    // Debug controller.pointer availability once
+                    if (!laserDebugLogged) {
+                        console.log("📍 Controller state:", controller.inputSource.handedness, {
+                            hasPointer: !!controller.pointer,
+                            hasGrip: !!controller.grip
+                        });
+                        laserDebugLogged = true;
+                    }
+
+                    // Use pointer if available, fallback to grip
+                    const pointerTransform = controller.pointer || controller.grip;
+                    if (pointerTransform) {
+                        laserMesh.isVisible = true;
+
+                        // Position: start at controller, extend forward
+                        // Cylinder center should be 5m forward (half of 10m length)
+                        const origin = pointerTransform.position.clone();
+                        const forward = pointerTransform.forward.clone();
+                        laserMesh.position = origin.add(forward.scale(5)); // Center at 5m forward
+
+                        // Rotation: align cylinder with forward direction
+                        const up = Vector3.Up();
+                        const rotationMatrix = new Quaternion();
+                        Quaternion.FromUnitVectorsToRef(up, forward, rotationMatrix);
+                        laserMesh.rotationQuaternion = rotationMatrix;
+
+                        if (!laserDebugLogged) {
+                            console.log("🔦 Laser visible at:", laserMesh.position.toString());
                         }
+                    } else {
+                        laserMesh.isVisible = false;
                     }
                 });
 
@@ -254,12 +285,25 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     if (triggerId) {
                         const trigger = motionController.getComponent(triggerId);
                         if (trigger) {
+                            let lastTriggerTime = 0;
+                            const DEBOUNCE_MS = 300;
+
                             trigger.onButtonStateChangedObservable.add(() => {
-                                // Only trigger when pressed > 80%
-                                if (trigger.pressed && trigger.value > 0.8) {
-                                    // Create ray from controller pointer
-                                    const origin = controller.pointer.position;
-                                    const direction = controller.pointer.forward;
+                                // Only fire on press start (not hold), with debounce
+                                const now = Date.now();
+                                if (trigger.changes.pressed && trigger.pressed && trigger.value > 0.8 && (now - lastTriggerTime > DEBOUNCE_MS)) {
+                                    lastTriggerTime = now;
+
+                                    // Use pointer if available, fallback to grip
+                                    const pointerTransform = controller.pointer || controller.grip;
+                                    if (!pointerTransform) {
+                                        console.warn("⚠️ No pointer/grip available for picking");
+                                        return;
+                                    }
+
+                                    // Create ray from controller
+                                    const origin = pointerTransform.position;
+                                    const direction = pointerTransform.forward;
                                     const ray = new Ray(origin, direction, 100);
 
                                     const hit = sceneInstance.pickWithRay(ray);
@@ -268,7 +312,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
                                         // Check for node/edge (graph elements)
                                         if (mesh.metadata && (mesh.metadata.type === 'node' || mesh.metadata.type === 'edge')) {
-                                            console.log("🎯 Trigger hit:", mesh.metadata.type, mesh.metadata.id);
+                                            const itemId = mesh.metadata.id || `${mesh.metadata.source}->${mesh.metadata.target}`;
+                                            console.log("🎯 Trigger hit:", mesh.metadata.type, itemId);
                                             detailsPanelRef.current.create(sceneInstance, mesh.metadata, mesh.metadata.type, xr);
                                         }
                                         // Check for GUI mesh (menus, panels) - simulate pointer events
