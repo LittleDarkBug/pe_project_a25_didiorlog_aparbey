@@ -224,8 +224,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </div>
             </div>
 
-            {/* Details Panel Overlay */}
-            {selectedItem && (
+            {/* Details Panel Overlay - Web Only */}
+            {!isVRMode && selectedItem && (
                 <DetailsPanel
                     data={selectedItem}
                     type={selectionType}
@@ -233,8 +233,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 />
             )}
 
-            {/* Filter Panel Overlay */}
-            {isFilterOpen && project?.graph_data?.nodes && (
+            {/* Filter Panel Overlay - Web Only */}
+            {!isVRMode && isFilterOpen && project?.graph_data?.nodes && (
                 <FilterPanel
                     nodes={project.graph_data.nodes}
                     edges={project.graph_data.edges}
