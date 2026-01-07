@@ -35,10 +35,11 @@ export class VRDetailsPanel {
         const mat = this.panelMesh.material as StandardMaterial;
         if (mat) {
             mat.disableLighting = true;
-            mat.emissiveColor = Color3.White();
+            // Reduced brightness for VR comfort - not pure white
+            mat.emissiveColor = new Color3(0.6, 0.6, 0.65);
             mat.backFaceCulling = false;
             // Force diffuse texture to be used (not just emissive)
-            mat.diffuseColor = Color3.White();
+            mat.diffuseColor = new Color3(0.8, 0.8, 0.85);
         }
 
         // 4. PARENT TO XR CAMERA (The "1 unit away as child of WebXR camera" pattern)
@@ -122,7 +123,20 @@ export class VRDetailsPanel {
             row.addControl(keyText, 0, 0);
 
             const valText = new GUI.TextBlock();
-            valText.text = String(value);
+            // Handle nested objects properly - format as JSON
+            let displayValue: string;
+            if (typeof value === 'object' && value !== null) {
+                try {
+                    const jsonStr = JSON.stringify(value, null, 2);
+                    // Truncate if too long for readability
+                    displayValue = jsonStr.length > 100 ? jsonStr.substring(0, 97) + '...' : jsonStr;
+                } catch {
+                    displayValue = '[Complex Object]';
+                }
+            } else {
+                displayValue = String(value ?? 'N/A');
+            }
+            valText.text = displayValue;
             valText.color = "#FFFFFF";
             valText.fontSize = 35;
             valText.fontWeight = "bold";

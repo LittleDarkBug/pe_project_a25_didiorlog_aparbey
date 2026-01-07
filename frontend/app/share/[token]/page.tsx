@@ -23,6 +23,7 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
+    const [isInXR, setIsInXR] = useState(false); // Track actual XR session state
 
     const graphSceneRef = useRef<GraphSceneRef>(null);
     const { addToast } = useToastStore();
@@ -74,6 +75,11 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
         }
     }, []);
 
+    // Handle XR state changes from GraphSceneXR
+    const handleXRStateChange = useCallback((inXR: boolean) => {
+        setIsInXR(inXR);
+    }, []);
+
     if (isLoading) {
         return <ProjectSkeleton />;
     }
@@ -94,6 +100,25 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
 
     return (
         <div className="relative h-screen w-full overflow-hidden bg-black">
+            {/* VR Session Active Screen - Shown when user is in headset */}
+            {isInXR && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-surface-950 via-surface-900 to-surface-950">
+                    <div className="text-center animate-pulse">
+                        <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
+                            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2">Session VR Active</h2>
+                        <p className="text-gray-400 max-w-sm">
+                            Regardez dans votre casque VR pour explorer le graphe.
+                            <br />
+                            <span className="text-sm text-gray-500">Retirez le casque pour revenir ici.</span>
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Header minimaliste pour le mode partagé */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-4 pointer-events-auto">
                 <Link href="/" className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md">
@@ -114,6 +139,7 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
                         data={project.graph_data}
                         onSelect={handleSelect}
                         visibleNodeIds={visibleNodeIds}
+                        onXRStateChange={handleXRStateChange}
                     />
                 ) : (
                     <GraphSceneWeb
@@ -145,8 +171,8 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
                 />
             )}
 
-            {/* VR Instructions Overlay */}
-            {isVRMode && (
+            {/* VR Instructions Overlay - Hidden when actually in XR headset */}
+            {isVRMode && !isInXR && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
                     <div className="bg-black/60 backdrop-blur-xl border border-primary-500/30 rounded-2xl p-6 text-center shadow-2xl max-w-md animate-in fade-in slide-in-from-top-4 duration-500">
                         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
@@ -161,7 +187,7 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
                             <span className="text-primary-400 font-medium">Cliquez sur l'icône de lunettes en bas à droite</span> pour entrer en immersion.
                         </p>
                         <div className="text-xs text-gray-500">
-                            Compatible Meta Quest, HTC Vive, Apple Vision Pro
+                            Compatible Meta Quest, HTC Vive
                         </div>
                     </div>
                 </div>

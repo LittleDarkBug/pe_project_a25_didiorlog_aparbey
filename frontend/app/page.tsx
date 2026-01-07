@@ -115,7 +115,7 @@ export default function LandingPage() {
                 <Glasses className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-xl font-bold">Mode VR Immersif</h3>
-              <p className="text-surface-400">Explorez vos graphes de l'intérieur avec WebXR. Compatible Meta Quest, HTC Vive et Apple Vision Pro.</p>
+              <p className="text-surface-400">Explorez vos graphes de l'intérieur avec WebXR. Compatible Meta Quest et HTC Vive.</p>
             </div>
           </div>
         </div>

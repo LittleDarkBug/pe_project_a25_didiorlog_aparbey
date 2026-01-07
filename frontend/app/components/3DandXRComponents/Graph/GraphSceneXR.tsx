@@ -47,13 +47,14 @@ interface GraphSceneProps {
     visibleNodeIds?: Set<string> | null;
     projectId?: string;
     onLayoutUpdate?: (newData: any) => void;
+    onXRStateChange?: (isInXR: boolean) => void;
 }
 
 export interface GraphSceneRef {
     resetCamera: () => void;
 }
 
-const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, projectId, onLayoutUpdate }, ref) => {
+const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, projectId, onLayoutUpdate, onXRStateChange }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const xrHelperRef = useRef<any>(null);
@@ -114,10 +115,10 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     }));
 
     const { createVRMenu } = useVRMenu();
-    const vrUtilsRef = useRef({ createVRMenu, handleLayoutRequest });
+    const vrUtilsRef = useRef({ createVRMenu, handleLayoutRequest, onXRStateChange });
     useEffect(() => {
-        vrUtilsRef.current = { createVRMenu, handleLayoutRequest };
-    }, [createVRMenu, handleLayoutRequest]);
+        vrUtilsRef.current = { createVRMenu, handleLayoutRequest, onXRStateChange };
+    }, [createVRMenu, handleLayoutRequest, onXRStateChange]);
 
     // Handle visibility updates
     useEffect(() => {
@@ -192,10 +193,20 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 }
             });
 
-            // 5. XR State Logging
+            // 5. XR State Management - Notify parent of state changes
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR Experience Started - Features Configured");
+                    // Notify parent that we're now in XR
+                    if (vrUtilsRef.current.onXRStateChange) {
+                        vrUtilsRef.current.onXRStateChange(true);
+                    }
+                } else if (state === WebXRState.EXITING_XR) {
+                    console.log("VR Experience Ending");
+                    // Notify parent that we're leaving XR
+                    if (vrUtilsRef.current.onXRStateChange) {
+                        vrUtilsRef.current.onXRStateChange(false);
+                    }
                 }
             });
 
