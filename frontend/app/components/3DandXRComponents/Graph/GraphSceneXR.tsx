@@ -152,12 +152,21 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
         // --- WebXR Canonical Setup (Following Official BabylonJS Documentation) ---
         try {
-            // 1. Initialize Default Experience
+            // 1. Initialize Default Experience with proper Quest controller configuration
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [], // No floor meshes - we use free-flight locomotion
                 disableTeleportation: true, // We use custom free-flight
                 disableHandTracking: true,
-                // Note: pointerSelection is enabled by default in Default Experience Helper
+                // Input options for Quest controllers
+                inputOptions: {
+                    doNotLoadControllerMeshes: false, // Load controller meshes
+                },
+                // Pointer selection options
+                pointerSelectionOptions: {
+                    enablePointerSelectionOnAllControllers: true,
+                    forceGazeMode: false, // Use controller ray, not gaze
+                    gazeCamera: undefined,
+                },
                 uiOptions: {
                     sessionMode: 'immersive-vr',
                 }
@@ -175,11 +184,15 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             // Documentation: "The default experience initializes both pointer selection and teleportation automatically"
             if (xr.pointerSelection) {
                 xr.pointerSelection.displayLaserPointer = true;
+                xr.pointerSelection.displaySelectionMesh = true;
                 xr.pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green Cursor
                 xr.pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green Beam
-                console.log("WebXR Pointer Selection configured");
+                console.log("WebXR Pointer Selection configured:", {
+                    displayLaserPointer: xr.pointerSelection.displayLaserPointer,
+                    displaySelectionMesh: xr.pointerSelection.displaySelectionMesh
+                });
             } else {
-                console.warn("WebXR Pointer Selection not available on this device");
+                console.warn("WebXR Pointer Selection not available - check console for errors");
             }
 
             // 4. Standard Event Handling (PointerObservable)
