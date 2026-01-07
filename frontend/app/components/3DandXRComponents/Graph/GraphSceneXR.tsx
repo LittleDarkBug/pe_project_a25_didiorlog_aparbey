@@ -208,6 +208,21 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 // Debug: Check if controller meshes are loaded
                 if (controller.grip) {
                     console.log("📦 Grip mesh children:", controller.grip.getChildMeshes().length);
+
+                    // Create custom controller visual since external models don't load
+                    const controllerVisual = MeshBuilder.CreateBox(
+                        `controller-visual-${controller.inputSource.handedness}`,
+                        { width: 0.05, height: 0.03, depth: 0.15 },
+                        sceneInstance
+                    );
+                    const controllerMat = new StandardMaterial(`controller-mat-${controller.inputSource.handedness}`, sceneInstance);
+                    controllerMat.emissiveColor = new Color3(0.2, 0.8, 1); // Cyan glow
+                    controllerMat.diffuseColor = new Color3(0.2, 0.8, 1);
+                    controllerMat.disableLighting = true;
+                    controllerVisual.material = controllerMat;
+                    controllerVisual.parent = controller.grip; // Attach to grip transform
+                    controllerVisual.isPickable = false;
+                    console.log("✅ Created custom controller visual for:", controller.inputSource.handedness);
                 }
                 if (controller.pointer) {
                     console.log("📦 Pointer mesh children:", controller.pointer.getChildMeshes().length);
