@@ -2,10 +2,11 @@
 
 import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { shareService } from '@/app/services/shareService';
-import GraphSceneWeb, { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
-import GraphSceneXR from '@/app/components/3DandXRComponents/Graph/GraphSceneXR';
-import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
-import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
+// R3F Components (replacing Babylon.js)
+import { GraphScene3D, GraphSceneXR } from '@/app/components/R3F';
+import type { GraphScene3DRef } from '@/app/components/R3F/GraphScene3D';
+// Web UI Components
+import { DetailsPanel, OverlayControls } from '@/app/components/R3F/UI';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
 import { ArrowLeft } from 'lucide-react';
@@ -24,7 +25,7 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
 
-    const graphSceneRef = useRef<GraphSceneRef>(null);
+    const graphSceneRef = useRef<GraphScene3DRef>(null);
     const { addToast } = useToastStore();
 
     useEffect(() => {
@@ -116,7 +117,7 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
                         visibleNodeIds={visibleNodeIds}
                     />
                 ) : (
-                    <GraphSceneWeb
+                    <GraphScene3D
                         ref={graphSceneRef}
                         key={`web-${project.updated_at || 'initial'}`}
                         data={project.graph_data}

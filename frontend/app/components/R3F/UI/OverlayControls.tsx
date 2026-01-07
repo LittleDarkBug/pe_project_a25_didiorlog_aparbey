@@ -5,10 +5,20 @@ interface OverlayControlsProps {
     onToggleVR: () => void;
     onShare?: () => void;
     onEdit?: () => void;
+    showLabels?: boolean;
+    onToggleLabels?: () => void;
     children?: React.ReactNode;
 }
 
-export default function OverlayControls({ onResetCamera, onToggleVR, onShare, onEdit, children }: OverlayControlsProps) {
+export default function OverlayControls({
+    onResetCamera,
+    onToggleVR,
+    onShare,
+    onEdit,
+    showLabels = false,
+    onToggleLabels,
+    children
+}: OverlayControlsProps) {
     return (
         <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl items-center">
             <button
@@ -24,6 +34,26 @@ export default function OverlayControls({ onResetCamera, onToggleVR, onShare, on
 
             <div className="w-px h-6 bg-white/10"></div>
 
+            {/* Labels Toggle */}
+            {onToggleLabels && (
+                <>
+                    <button
+                        onClick={onToggleLabels}
+                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${showLabels
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
+                                : 'bg-white/5 text-gray-300 hover:bg-cyan-500/20 hover:text-white'
+                            }`}
+                        title="Afficher les labels"
+                    >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <span className="hidden sm:inline">Labels</span>
+                    </button>
+                    <div className="w-px h-6 bg-white/10"></div>
+                </>
+            )}
+
             {children}
 
             {children && <div className="w-px h-6 bg-white/10"></div>}
@@ -33,8 +63,9 @@ export default function OverlayControls({ onResetCamera, onToggleVR, onShare, on
                 className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-purple-500/20 hover:text-white hover:scale-105 cursor-pointer"
                 title="Mode VR Immersif"
             >
+                {/* VR Headset Icon */}
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
                 <span className="hidden sm:inline">VR</span>
             </button>

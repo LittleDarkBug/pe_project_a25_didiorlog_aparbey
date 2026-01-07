@@ -3,11 +3,12 @@
 import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectsService } from '@/app/services/projectsService';
-import GraphSceneWeb from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
-import GraphSceneXR from '@/app/components/3DandXRComponents/Graph/GraphSceneXR';
-import { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
-import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
-import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
+import { apiClient } from '@/app/lib/apiClient';
+import { useJobPolling } from '@/app/hooks/useJobPolling';
+import { GraphScene3D, GraphSceneXR } from '@/app/components/R3F';
+import type { GraphScene3DRef } from '@/app/components/R3F/GraphScene3D';
+// Web UI Components
+import { DetailsPanel, OverlayControls } from '@/app/components/R3F/UI';
 import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
@@ -27,38 +28,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
+    const [showLabels, setShowLabels] = useState(false);
     const [currentAlgorithm, setCurrentAlgorithm] = useState<string>('auto'); // Track algorithm locally
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
-    const graphSceneRef = useRef<GraphSceneRef>(null);
+    const graphSceneRef = useRef<GraphScene3DRef>(null);
     const { addToast } = useToastStore();
 
     const router = useRouter();
-
-    const handleResetCamera = useCallback(() => {
-        if (graphSceneRef.current) {
-            graphSceneRef.current.resetCamera();
-        }
-    }, []);
-
-    useEffect(() => {
-        const loadProject = async () => {
-            try {
-                setIsLoading(true);
-                const data = await projectsService.getById(id);
-                setProject(data);
-                setCurrentAlgorithm(data.algorithm || 'auto'); // Initialize with project's algorithm
-            } catch (err) {
-                console.error(err);
-                setError("Impossible de charger le projet");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        if (id) {
-            loadProject();
-        }
-    }, [id]);
 
     const handleSelect = useCallback((data: any, type: 'node' | 'edge' | null) => {
         setSelectedItem(data);
@@ -77,6 +54,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         }
     }, []);
 
+    const handleResetCamera = useCallback(() => {
+        if (graphSceneRef.current) {
+            graphSceneRef.current.resetCamera();
+        }
+    }, []);
+
     const handleLayoutUpdate = useCallback((newGraphData: any) => {
         if (!newGraphData || !newGraphData.nodes || newGraphData.nodes.length === 0) {
             console.warn("Mise à jour du layout ignorée car les données sont invalides", newGraphData);
@@ -88,6 +71,69 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             updated_at: new Date().toISOString()
         }));
     }, []);
+
+    // Polling logic for async layout updates
+    useJobPolling(currentJobId, {
+        onSuccess: (result) => {
+            const graphData = result.graph_data || result;
+            if (graphData && graphData.nodes && graphData.nodes.length > 0) {
+                handleLayoutUpdate(graphData);
+                addToast('Disposition mise à jour avec succès', 'success');
+            } else {
+                addToast('Données de layout vides', 'warning');
+            }
+            setCurrentJobId(null);
+            setIsLoading(false);
+        },
+        onError: (error) => {
+            addToast(error || 'Erreur calcul layout', 'error');
+            setCurrentJobId(null);
+            setIsLoading(false);
+        }
+    });
+
+    useEffect(() => {
+        const loadProject = async () => {
+            try {
+                setIsLoading(true);
+                const data = await projectsService.getById(id);
+                setProject(data);
+                setCurrentAlgorithm(data.algorithm || 'auto');
+            } catch (err) {
+                console.error(err);
+                setError("Impossible de charger le projet");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (id) {
+            loadProject();
+        }
+    }, [id]);
+
+    const handleLayoutChange = useCallback(async (algorithm: string) => {
+        setIsLoading(true);
+        setCurrentAlgorithm(algorithm);
+
+        try {
+            const response: any = await apiClient.post(`/projects/${id}/layout`, { algorithm });
+
+            if (response && response.job_id) {
+                setCurrentJobId(response.job_id);
+            } else if (response && response.graph_data) {
+                handleLayoutUpdate(response.graph_data);
+                setIsLoading(false);
+            } else {
+                handleLayoutUpdate(response);
+                setIsLoading(false);
+            }
+        } catch (error: any) {
+            console.error('Layout update error:', error);
+            addToast(error.message, 'error');
+            setIsLoading(false);
+        }
+    }, [id, addToast, handleLayoutUpdate]);
 
     if (isLoading) {
         return <ProjectSkeleton />;
@@ -109,26 +155,45 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
     return (
         <div className="relative h-screen w-full overflow-hidden bg-black">
-            {/* 3D Scene Layer */}
             <div className="absolute inset-0 z-0" style={{ touchAction: 'none' }}>
                 {project.graph_data ? (
                     isVRMode ? (
-                        <GraphSceneXR
-                            ref={graphSceneRef}
-                            key={`xr-${project.updated_at || 'initial'}`}
-                            data={project.graph_data}
-                            onSelect={handleSelect}
-                            visibleNodeIds={visibleNodeIds}
-                            projectId={id}
-                            onLayoutUpdate={handleLayoutUpdate}
-                        />
+                        <>
+                            <GraphSceneXR
+                                ref={graphSceneRef}
+                                key={`xr-${project.updated_at || 'initial'}`}
+                                data={project.graph_data}
+                                onSelect={handleSelect}
+                                visibleNodeIds={visibleNodeIds}
+                                projectId={id}
+                                onLayoutUpdate={handleLayoutUpdate}
+                                onClearFilters={() => setVisibleNodeIds(null)}
+                                hasActiveFilters={visibleNodeIds !== null}
+                                onLayoutChange={handleLayoutChange}
+                            />
+                            {/* VR Instruction Overlay - Blocks interaction with preview, sits below VRButton (z-high) */}
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[1px]">
+                                <div className="bg-surface-950/80 p-6 rounded-2xl border border-primary-500/30 text-center max-w-md shadow-2xl backdrop-blur-md">
+                                    <h2 className="text-xl font-bold text-white mb-3">Mode VR Prêt</h2>
+                                    <p className="text-gray-300 mb-4 text-sm">
+                                        Veuillez mettre votre casque et cliquer sur le bouton <span className="font-bold text-primary-400">ENTER VR</span> situé au bas de l'écran.
+                                    </p>
+                                    <div className="flex items-center justify-center gap-2 text-xs text-blue-300/80">
+                                        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                                        En attente d'activation VR
+                                    </div>
+                                </div>
+                            </div>
+                        </>
                     ) : (
-                        <GraphSceneWeb
+                        <GraphScene3D
                             ref={graphSceneRef}
                             key={`web-${project.updated_at || 'initial'}`}
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}
+                            showLabels={showLabels}
+                            selectedNodeId={selectedItem?.id || null}
                         />
                     )
                 ) : (
@@ -215,64 +280,46 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 />
             )}
 
-            {/* VR Instructions Overlay */}
-            {isVRMode && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-xl border border-primary-500/30 rounded-2xl p-6 text-center shadow-2xl max-w-md animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
-                            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            {/* Bottom Controls Overlay - Hidden in VR mode */}
+            {!isVRMode && (
+                <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
+                    <OverlayControls
+                        onResetCamera={handleResetCamera}
+                        onToggleVR={() => setIsVRMode(!isVRMode)}
+                        onShare={() => setIsShareModalOpen(true)}
+                        onEdit={() => setIsEditModalOpen(true)}
+                        showLabels={showLabels}
+                        onToggleLabels={() => setShowLabels(!showLabels)}
+                    >
+                        <LayoutSelector
+                            projectId={id}
+                            onLayoutUpdate={handleLayoutUpdate}
+                            currentAlgorithm={currentAlgorithm}
+                            onAlgorithmChange={setCurrentAlgorithm}
+                        />
+
+                        {/* Filter Toggle Button */}
+                        <button
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isFilterOpen || visibleNodeIds !== null
+                                ? 'bg-primary-500/20 text-white border border-primary-500/50'
+                                : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
+                                }`}
+                            title="Filtrer le graphe"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
-                        </div>
-                        <h3 className="text-xl font-bold text-white mb-2">Mode VR Prêt</h3>
-                        <p className="text-gray-300 mb-4">
-                            La scène est configurée pour la réalité virtuelle.
-                            <br />
-                            <span className="text-primary-400 font-medium">Cliquez sur l'icône de lunettes en bas à droite</span> pour entrer en immersion.
-                        </p>
-                        <div className="text-xs text-gray-500">
-                            Compatible Meta Quest, HTC Vive, Apple Vision Pro
-                        </div>
-                    </div>
+                            <span className="hidden sm:inline">Filtres</span>
+
+                            {/* Active Indicator */}
+                            {visibleNodeIds !== null && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>
+                            )}
+                        </button>
+                    </OverlayControls>
                 </div>
             )}
-
-            {/* Bottom Controls Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
-                <OverlayControls
-                    onResetCamera={handleResetCamera}
-                    onToggleVR={() => setIsVRMode(!isVRMode)}
-                    onShare={() => setIsShareModalOpen(true)}
-                    onEdit={() => setIsEditModalOpen(true)}
-                >
-                    <LayoutSelector
-                        projectId={id}
-                        onLayoutUpdate={handleLayoutUpdate}
-                        currentAlgorithm={currentAlgorithm}
-                        onAlgorithmChange={setCurrentAlgorithm}
-                    />
-
-                    {/* Filter Toggle Button */}
-                    <button
-                        onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isFilterOpen || visibleNodeIds !== null
-                            ? 'bg-primary-500/20 text-white border border-primary-500/50'
-                            : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
-                            }`}
-                        title="Filtrer le graphe"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                        </svg>
-                        <span className="hidden sm:inline">Filtres</span>
-
-                        {/* Active Indicator */}
-                        {visibleNodeIds !== null && (
-                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>
-                        )}
-                    </button>
-                </OverlayControls>
-            </div>
         </div>
     );
 }

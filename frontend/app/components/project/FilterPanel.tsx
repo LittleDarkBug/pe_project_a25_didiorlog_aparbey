@@ -210,8 +210,8 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                 <button
                     onClick={() => { setActiveTab('attributes'); setTopologyMode(null); }}
                     className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === 'attributes'
-                            ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5'
-                            : 'text-surface-400 hover:text-surface-200'
+                        ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5'
+                        : 'text-surface-400 hover:text-surface-200'
                         }`}
                 >
                     Attributs
@@ -219,8 +219,8 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                 <button
                     onClick={() => setActiveTab('topology')}
                     className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === 'topology'
-                            ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5'
-                            : 'text-surface-400 hover:text-surface-200'
+                        ? 'text-primary-400 border-b-2 border-primary-400 bg-surface-50/5'
+                        : 'text-surface-400 hover:text-surface-200'
                         }`}
                 >
                     Topologie
@@ -271,8 +271,8 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                                 key={value}
                                                 onClick={() => toggleFilter(category, value)}
                                                 className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer ${isActive
-                                                        ? 'bg-primary-500/20 border-primary-500/50 text-primary-100'
-                                                        : 'bg-surface-50/5 border-surface-50/10 text-surface-400 hover:border-surface-50/30 hover:text-surface-200'
+                                                    ? 'bg-primary-500/20 border-primary-500/50 text-primary-100'
+                                                    : 'bg-surface-50/5 border-surface-50/10 text-surface-400 hover:border-surface-50/30 hover:text-surface-200'
                                                     }`}
                                             >
                                                 {value}
@@ -323,8 +323,8 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                     onClick={() => setTopologyMode(topologyMode === 'neighbors' ? null : 'neighbors')}
                                     disabled={!sourceNodeId}
                                     className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${topologyMode === 'neighbors'
-                                            ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20'
-                                            : 'bg-surface-50/10 text-surface-300 hover:bg-surface-50/20 hover:text-surface-100'
+                                        ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20'
+                                        : 'bg-surface-50/10 text-surface-300 hover:bg-surface-50/20 hover:text-surface-100'
                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     {topologyMode === 'neighbors' ? 'Désactiver' : 'Afficher Voisins'}
@@ -359,8 +359,8 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                     onClick={() => setTopologyMode(topologyMode === 'path' ? null : 'path')}
                                     disabled={!sourceNodeId || !targetNodeId}
                                     className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${topologyMode === 'path'
-                                            ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
-                                            : 'bg-surface-50/10 text-surface-300 hover:bg-surface-50/20 hover:text-surface-100'
+                                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                                        : 'bg-surface-50/10 text-surface-300 hover:bg-surface-50/20 hover:text-surface-100'
                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     {topologyMode === 'path' ? 'Désactiver' : 'Trouver Chemin'}
@@ -371,13 +371,31 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                 )}
             </div>
 
-            {/* Footer Stats */}
-            <div className="p-3 border-t border-surface-50/10 bg-surface-900/30 text-center">
+            {/* Footer with Clear All */}
+            <div className="p-3 border-t border-surface-50/10 bg-surface-900/30 flex items-center justify-between">
                 <p className="text-xs text-surface-400">
                     {(searchTerm || Object.keys(activeFilters).length > 0 || topologyMode)
                         ? "Filtres actifs"
-                        : "Affichage de tous les éléments"}
+                        : "Tous les éléments"}
                 </p>
+                {(searchTerm || Object.keys(activeFilters).length > 0 || topologyMode) && (
+                    <button
+                        onClick={() => {
+                            setSearchTerm('');
+                            setActiveFilters({});
+                            setTopologyMode(null);
+                            setSourceNodeId('');
+                            setTargetNodeId('');
+                            onFilterChange(null);
+                        }}
+                        className="text-xs px-3 py-1 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Effacer tout
+                    </button>
+                )}
             </div>
         </div>
     );

@@ -17,13 +17,19 @@ export function ProjectSkeleton() {
             </div>
 
             {/* Main Canvas Area */}
-            <div className="absolute inset-0 z-0 flex items-center justify-center">
-                <div className="relative h-full w-full">
-                    {/* Simulated Nodes */}
-                    <Skeleton className="absolute left-1/4 top-1/3 h-12 w-12 rounded-full opacity-20" />
-                    <Skeleton className="absolute left-1/2 top-1/2 h-16 w-16 rounded-full opacity-20" />
-                    <Skeleton className="absolute right-1/3 bottom-1/4 h-10 w-10 rounded-full opacity-20" />
-                    
+            <div className="absolute inset-0 z-0 flex items-center justify-center bg-black/50">
+                <div className="relative h-full w-full flex items-center justify-center flex-col gap-4">
+                    {/* Spinner & Text */}
+                    <div className="flex flex-col items-center gap-3 z-20">
+                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+                        <p className="text-white font-medium text-lg animate-pulse">Chargement du graphe...</p>
+                    </div>
+
+                    {/* Simulated Nodes - Background */}
+                    <Skeleton className="absolute left-1/4 top-1/3 h-12 w-12 rounded-full opacity-10" />
+                    <Skeleton className="absolute left-1/2 top-1/2 h-16 w-16 rounded-full opacity-10" />
+                    <Skeleton className="absolute right-1/3 bottom-1/4 h-10 w-10 rounded-full opacity-10" />
+
                     {/* Simulated Connections (using thin divs) */}
                     <div className="absolute left-[28%] top-[38%] h-[1px] w-[20%] rotate-12 bg-white/5" />
                     <div className="absolute left-[50%] top-[50%] h-[1px] w-[15%] rotate-45 bg-white/5" />
