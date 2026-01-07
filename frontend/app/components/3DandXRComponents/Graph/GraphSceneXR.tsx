@@ -12,9 +12,12 @@ import {
     Color3,
     Ray,
     MeshBuilder,
-    StandardMaterial
+    StandardMaterial,
+    WebXRMotionControllerManager
 } from '@babylonjs/core';
-import '@babylonjs/loaders'; // Required for glTF controller models - full import ensures registration
+import '@babylonjs/core/XR/motionController/webXROculusTouchMotionController'; // Local Oculus Touch controller
+import '@babylonjs/loaders'; // Required for glTF controller models
+import '@babylonjs/core/Materials/Node/Blocks'; // Required for NodeMaterial in controller models
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
 import { VRDetailsPanel } from '../components/VRDetailsPanel';
@@ -154,6 +157,11 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
         // --- WebXR Setup (Using manual rays per article, native pointer disabled) ---
         try {
+            // Configure to use local controller models (Oculus Touch) instead of online repository
+            // This fixes issues where online repository models don't load
+            WebXRMotionControllerManager.PrioritizeOnlineRepository = false;
+            console.log("🎮 Using local controller models (PrioritizeOnlineRepository = false)");
+
             // 1. Initialize Default Experience
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [], // No floor meshes - we use free-flight locomotion
@@ -182,6 +190,16 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR Experience Started - Features Configured");
+
+                    // DEBUG: Create test sphere at fixed position to verify rendering
+                    const testSphere = MeshBuilder.CreateSphere("debug-sphere", { diameter: 0.5 }, sceneInstance);
+                    testSphere.position = new Vector3(0, 1.5, -2); // 2m in front, at head height
+                    const testMat = new StandardMaterial("debug-mat", sceneInstance);
+                    testMat.emissiveColor = new Color3(1, 0, 0); // BRIGHT RED
+                    testMat.disableLighting = true;
+                    testSphere.material = testMat;
+                    console.log("🔴 DEBUG: Created red test sphere at (0, 1.5, -2)");
+
                     // Notify parent that we're now in XR
                     if (vrUtilsRef.current.onXRStateChange) {
                         vrUtilsRef.current.onXRStateChange(true);
