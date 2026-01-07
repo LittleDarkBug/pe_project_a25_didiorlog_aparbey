@@ -9,8 +9,6 @@ import {
     InstancedMesh,
     WebXRState,
     Quaternion,
-    WebXRFeatureName,
-    WebXRControllerPointerSelection,
     Color3,
     PointerEventTypes
 } from '@babylonjs/core';
@@ -152,31 +150,37 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         }
 
 
-        // --- WebXR Canonical Setup ---
+        // --- WebXR Canonical Setup (Following Official BabylonJS Documentation) ---
         try {
-            // 1. Initialize Experience
+            // 1. Initialize Default Experience
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
-                floorMeshes: [], // Space mode
+                floorMeshes: [], // No floor meshes - we use free-flight locomotion
                 disableTeleportation: true, // We use custom free-flight
                 disableHandTracking: true,
-                disablePointerSelection: false, // Enable default to ensure standard wiring
+                // Note: pointerSelection is enabled by default in Default Experience Helper
                 uiOptions: {
                     sessionMode: 'immersive-vr',
                 }
             });
+
+            // 2. Validate XR initialization (per documentation)
+            if (!xr.baseExperience) {
+                console.error("WebXR not supported or failed to initialize");
+                return;
+            }
             xrHelperRef.current = xr;
+            console.log("WebXR Default Experience initialized successfully");
 
-            // 2. Configure Pointers (The "Right" Way via FeaturesManager)
-            const featureManager = xr.baseExperience.featuresManager;
-
-            // Retrieve the automatically enabled feature
-            const pointerSelection = featureManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION) as WebXRControllerPointerSelection;
-
-            // 3. Visual Configuration
-            // Ensure lasers are visible and colored correctly
-            pointerSelection.displayLaserPointer = true;
-            pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green Cursor
-            pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green Beam
+            // 3. Configure Pointer Selection (uses auto-initialized feature from Default Helper)
+            // Documentation: "The default experience initializes both pointer selection and teleportation automatically"
+            if (xr.pointerSelection) {
+                xr.pointerSelection.displayLaserPointer = true;
+                xr.pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green Cursor
+                xr.pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green Beam
+                console.log("WebXR Pointer Selection configured");
+            } else {
+                console.warn("WebXR Pointer Selection not available on this device");
+            }
 
             // 4. Standard Event Handling (PointerObservable)
             sceneInstance.onPointerObservable.add((pointerInfo) => {

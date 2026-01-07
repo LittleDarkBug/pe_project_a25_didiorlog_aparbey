@@ -19,14 +19,14 @@ export interface SceneComponentProps extends CanvasHTMLAttributes<HTMLCanvasElem
  * Composant wrapper pour intégrer Babylon.js dans React
  * Gère le cycle de vie du moteur et de la scène
  */
-export default function SceneComponent({ 
-  antialias, 
-  engineOptions, 
-  adaptToDeviceRatio, 
-  sceneOptions, 
-  onRender, 
-  onSceneReady, 
-  ...rest 
+export default function SceneComponent({
+  antialias,
+  engineOptions,
+  adaptToDeviceRatio,
+  sceneOptions,
+  onRender,
+  onSceneReady,
+  ...rest
 }: SceneComponentProps) {
   const reactCanvas = useRef<HTMLCanvasElement>(null);
   const loaded = useRef(false);
@@ -37,11 +37,11 @@ export default function SceneComponent({
 
     if (!canvas) return;
 
-    // Moteur
+    // Moteur - with loseContextOnDispose for proper React cleanup
     const engine = new Engine(
-      canvas, 
-      antialias, 
-      engineOptions, 
+      canvas,
+      antialias,
+      { ...engineOptions, loseContextOnDispose: true },
       adaptToDeviceRatio
     );
 
@@ -72,7 +72,7 @@ export default function SceneComponent({
     if (window) {
       window.addEventListener("resize", resize);
     }
-    
+
     loaded.current = true;
     return () => {
       scene.getEngine().dispose();
