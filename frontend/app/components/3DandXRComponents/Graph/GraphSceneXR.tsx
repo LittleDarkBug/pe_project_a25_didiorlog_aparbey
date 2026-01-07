@@ -197,16 +197,20 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
             // 4. Standard Event Handling (PointerObservable)
             sceneInstance.onPointerObservable.add((pointerInfo) => {
-                switch (pointerInfo.type) {
-                    case PointerEventTypes.POINTERDOWN:
-                        // Check if we hit a mesh with metadata (Node or Edge)
-                        const pickedMesh = pointerInfo.pickInfo?.pickedMesh as Mesh | InstancedMesh;
-                        if (pickedMesh && pickedMesh.metadata && (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge')) {
-                            console.log("XR Interaction: POINTERDOWN on", pickedMesh.metadata.id);
+                if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+                    const pickedMesh = pointerInfo.pickInfo?.pickedMesh as Mesh | InstancedMesh;
+
+                    if (pickedMesh && pickedMesh.metadata) {
+                        if (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge') {
+                            console.log("XR Interaction: POINTERDOWN on", pickedMesh.metadata.type, pickedMesh.metadata.id);
                             // Trigger Details Panel
                             detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr);
                         }
-                        break;
+                    }
+                    // Only log if we picked something (avoid undefined spam)
+                    // else if (pickedMesh) {
+                    //     console.log("XR: Picked non-interactive mesh:", pickedMesh.name);
+                    // }
                 }
             });
 
@@ -230,7 +234,17 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             // 6. Custom Controller Logic (Menu & Locomotion)
             // This is additive and does not conflict with standard features
             xr.input.onControllerAddedObservable.add((controller) => {
+                console.log("🎮 Controller added:", controller.inputSource.handedness, {
+                    targetRayMode: controller.inputSource.targetRayMode,
+                    profiles: controller.inputSource.profiles
+                });
+
                 controller.onMotionControllerInitObservable.add((motionController) => {
+                    console.log("🕹️ Motion Controller initialized:", motionController.handedness, {
+                        profileId: motionController.profileId,
+                        componentIds: motionController.getComponentIds()
+                    });
+
                     const ids = motionController.getComponentIds();
 
                     // Menu Toggle (A / X)
