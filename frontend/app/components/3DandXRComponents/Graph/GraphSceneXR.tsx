@@ -158,9 +158,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 floorMeshes: [], // Space mode
                 disableTeleportation: true, // We use custom free-flight
                 disableHandTracking: true,
-                // We rely on standard pointer selection. 
-                // We do NOT set pointerSelectionOptions here to avoid initialization race conditions.
-                // We will configure features explicitly via featuresManager.
+                disablePointerSelection: false, // Enable default to ensure standard wiring
                 uiOptions: {
                     sessionMode: 'immersive-vr',
                 }
@@ -170,14 +168,8 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             // 2. Configure Pointers (The "Right" Way via FeaturesManager)
             const featureManager = xr.baseExperience.featuresManager;
 
-            // Explicitly enable/configure pointer selection
-            const pointerSelection = featureManager.enableFeature(WebXRFeatureName.POINTER_SELECTION, "latest", {
-                xrInput: xr.input,
-                enablePointerSelectionOnAllControllers: true,
-                forceGazeMode: false,
-                disablePointerUpOnTouchOut: false,
-                disableScenePointerVectorUpdate: false
-            }) as WebXRControllerPointerSelection;
+            // Retrieve the automatically enabled feature
+            const pointerSelection = featureManager.getEnabledFeature(WebXRFeatureName.POINTER_SELECTION) as WebXRControllerPointerSelection;
 
             // 3. Visual Configuration
             // Ensure lasers are visible and colored correctly
@@ -194,7 +186,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                         if (pickedMesh && pickedMesh.metadata && (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge')) {
                             console.log("XR Interaction: POINTERDOWN on", pickedMesh.metadata.id);
                             // Trigger Details Panel
-                            detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr, pickedMesh);
+                            detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr);
                         }
                         break;
                 }

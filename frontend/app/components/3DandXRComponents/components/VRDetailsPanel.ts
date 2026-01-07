@@ -1,438 +1,193 @@
-import { Vector3, Scene, Mesh, TransformNode, MeshBuilder } from '@babylonjs/core';
+import { Vector3, Scene, Mesh, MeshBuilder, StandardMaterial, Color3, GlowLayer } from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
 
 export class VRDetailsPanel {
     private panelMesh: Mesh | null = null;
     private texture: GUI.AdvancedDynamicTexture | null = null;
+    private scene: Scene | null = null;
 
-    // Theme mirroring the React component (approximate hex values for Tailwind classes)
-    private theme = {
-        bg: "#020617",         // surface-950
-        panelBg: "#0f172a",    // slightly lighter for contrast
-        text: "#f8fafc",       // surface-50
-        textMuted: "#94a3b8",  // surface-400
-        border: "rgba(248, 250, 252, 0.1)", // surface-50/10
+    constructor() { }
 
-        // Node Colors (Blue)
-        nodePrimary: "#60a5fa", // blue-400
-        nodeBg: "rgba(59, 130, 246, 0.1)", // blue-500/10
-        nodeBorder: "rgba(59, 130, 246, 0.2)", // blue-500/20
-
-        // Edge Colors (Purple/Pink)
-        edgePrimary: "#c084fc", // purple-400
-        edgeSecondary: "#f472b6", // pink-400
-        edgeBgPurple: "rgba(168, 85, 247, 0.1)", // purple-500/10
-        edgeBgPink: "rgba(236, 72, 153, 0.1)", // pink-500/10
-
-        // Data Types
-        objBorder: "rgba(59, 130, 246, 0.3)", // blueish border for objects
-        arrayColor: "#4ade80", // green-400 for arrays
-        codeBg: "rgba(248, 250, 252, 0.05)" // surface-50/5
-    };
-
-    create(scene: Scene, data: any, type: string, xrHelper?: any, anchorMesh?: Mesh | TransformNode | any) {
+    public create(
+        scene: Scene,
+        data: any,
+        type: string,
+        xrHelper?: any
+    ) {
+        // Nettoyage propre
         this.dispose();
         if (!data) return;
+        this.scene = scene;
 
-        console.log("VRDetailsPanel: Creating Enhanced Panel for", type);
+        console.log("VRDetailsPanel: Creating Safe Panel");
 
-        // --- 1. Panel Mesh ---
-        // 1.2 x 1.4 to accommodate more vertical content structure
-        this.panelMesh = MeshBuilder.CreatePlane("detailsPanel", { width: 1.2, height: 1.4 }, scene);
+        // 1. CRÉATION DU MESH
+        this.panelMesh = MeshBuilder.CreatePlane("VR_UI_Panel", { width: 1.5, height: 1.5 }, scene);
 
-        // --- 2. Texture ---
-        this.texture = GUI.AdvancedDynamicTexture.CreateForMesh(this.panelMesh, 1200, 1400);
+        // 2. CRÉATION DE LA TEXTURE
+        this.texture = GUI.AdvancedDynamicTexture.CreateForMesh(this.panelMesh, 1024, 1024);
 
-        // Main Container (Glassmorphism effect)
+        // CRITICAL FIX: Force full texture rendering (no alpha channel issues)
+        this.texture.hasAlpha = false;
+        this.texture.renderScale = 1; // Ensure full resolution
+
+        // 3. SÉCURISATION DU MATÉRIAU (CRITIQUE)
+        const mat = this.panelMesh.material as StandardMaterial;
+        if (mat) {
+            mat.disableLighting = true;
+            mat.emissiveColor = Color3.White();
+            mat.backFaceCulling = false;
+            // Force diffuse texture to be used (not just emissive)
+            mat.diffuseColor = Color3.White();
+        }
+
+        // 4. PARENT TO XR CAMERA (The "1 unit away as child of WebXR camera" pattern)
+        // This ensures the mesh is always in the camera's render list
+        let xrCamera = null;
+        if (xrHelper && xrHelper.baseExperience && xrHelper.baseExperience.camera) {
+            xrCamera = xrHelper.baseExperience.camera;
+            this.panelMesh.parent = xrCamera;
+            // Position relative to camera (1.5m in front)
+            this.panelMesh.position = new Vector3(0, 0, 1.5);
+            // Billboard mode so it faces the user
+            this.panelMesh.billboardMode = Mesh.BILLBOARDMODE_ALL;
+        } else if (scene.activeCamera) {
+            // Fallback for non-VR
+            this.placePanel(scene, xrHelper);
+        }
+
+        // 5. PROTECTION CONTRE LE BLOOM/GLOW
+        const glowLayer = scene.effectLayers?.find(l => l.getClassName() === "GlowLayer") as GlowLayer;
+        if (glowLayer) {
+            glowLayer.addExcludedMesh(this.panelMesh);
+        }
+
+        // 6. CONSTRUCTION DE L'INTERFACE (GUI)
         const container = new GUI.Rectangle();
         container.width = 1;
         container.height = 1;
         container.cornerRadius = 40;
-        container.thickness = 2; // Border
-        container.color = this.theme.border;
-        container.background = this.theme.bg;
-        // Babylon GUI doesn't do backdrop blur, so we just use opaque dark bg
+        container.color = "#00FFFF"; // Cyan
+        container.thickness = 4;
+        // Fond sombre très opaque pour éviter la transparence confuse en VR
+        container.background = "rgb(20, 20, 30)";
+        container.alpha = 0.95; // Gestion alpha via le conteneur GUI, plus sûr
         this.texture.addControl(container);
 
-        // Grid Layout
-        const grid = new GUI.Grid();
-        grid.addColumnDefinition(1);
-        grid.addRowDefinition(140, true); // Header
-        grid.addRowDefinition(1.0);       // Scroll Content
-        grid.addRowDefinition(140, true); // Footer
-        container.addControl(grid);
+        // --- HEADER ---
+        const header = new GUI.TextBlock();
+        header.text = (type === 'node' ? "NODE: " : "EDGE: ") + (data.id || "Unknown");
+        header.color = "white";
+        header.fontSize = 60;
+        header.fontFamily = "Consolas, monospace";
+        header.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+        header.top = "30px";
+        header.height = "100px";
+        container.addControl(header);
 
-        // ================= HEADER =================
-        const headerPanel = new GUI.StackPanel();
-        headerPanel.isVertical = false;
-        headerPanel.height = "100%";
-        headerPanel.background = this.theme.border; // faint header bg
-        grid.addControl(headerPanel, 0, 0);
+        // --- SCROLLVIEWER ---
+        const sv = new GUI.ScrollViewer();
+        sv.width = 0.9;
+        sv.height = 0.7;
+        sv.top = -50;
+        sv.color = "white";
+        sv.thickness = 0;
+        sv.barSize = 20;
+        sv.barColor = "#00FFFF";
+        container.addControl(sv);
 
-        // Title
-        const titleText = new GUI.TextBlock();
-        titleText.text = type === 'node' ? "DÉTAILS DU NŒUD" : "DÉTAILS DU LIEN";
-        titleText.color = type === 'node' ? this.theme.nodePrimary : this.theme.edgePrimary;
-        titleText.fontSize = 50;
-        titleText.fontWeight = "bold";
-        titleText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        titleText.paddingLeft = "40px";
-        headerPanel.addControl(titleText);
+        // --- STACKPANEL ---
+        const stackPanel = new GUI.StackPanel();
+        stackPanel.width = "100%";
+        sv.addControl(stackPanel);
 
-        // We can't easily put accurate close icon, but the footer has a big button.
+        // --- DATA ROWS ---
+        // Filtrage des données techniques
+        const entries = Object.entries(data)
+            .filter(([k]) => !['x', 'y', 'z', 'fx', 'fy', 'fz', '__index', 'geometryId', 'vx', 'vy', 'vz'].includes(k));
 
-        // ================= CONTENT =================
-        const scrollViewer = new GUI.ScrollViewer();
-        scrollViewer.thickness = 0;
-        scrollViewer.paddingLeft = "20px";
-        scrollViewer.paddingRight = "10px"; // space for bar
-        scrollViewer.paddingTop = "20px";
-        scrollViewer.paddingBottom = "20px";
-        scrollViewer.barColor = type === 'node' ? this.theme.nodePrimary : this.theme.edgePrimary;
-        scrollViewer.barSize = 20;
-        scrollViewer.thumbHeight = 0.2;
-        grid.addControl(scrollViewer, 1, 0);
+        entries.forEach(([key, value]) => {
+            const row = new GUI.Grid();
+            row.height = "80px";
+            row.width = "100%";
+            row.addColumnDefinition(0.4);
+            row.addColumnDefinition(0.6);
 
-        const contentStack = new GUI.StackPanel();
-        contentStack.isVertical = true;
-        contentStack.width = 1.0;
-        scrollViewer.addControl(contentStack);
+            const keyText = new GUI.TextBlock();
+            keyText.text = key.toUpperCase() + ":";
+            keyText.color = "#AAAAAA";
+            keyText.fontSize = 35;
+            keyText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            keyText.paddingRight = "20px";
+            row.addControl(keyText, 0, 0);
 
-        // --- SECTION 1: MAIN METADATA (ID / Source-Target) ---
-        if (type === 'node') {
-            // ID Box
-            const idBox = this.createSpecialBox(
-                "IDENTIFIANT",
-                data.id || 'N/A',
-                this.theme.nodePrimary,
-                this.theme.nodeBg,
-                this.theme.nodeBorder
-            );
-            contentStack.addControl(idBox);
+            const valText = new GUI.TextBlock();
+            valText.text = String(value);
+            valText.color = "#FFFFFF";
+            valText.fontSize = 35;
+            valText.fontWeight = "bold";
+            valText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            valText.textWrapping = true;
+            row.addControl(valText, 0, 1);
 
-            // Label Box (if exists)
-            if (data.label) {
-                const labelContainer = new GUI.StackPanel();
-                labelContainer.height = "100px";
-                labelContainer.isVertical = true;
-                labelContainer.paddingTop = "20px";
-                labelContainer.paddingLeft = "20px";
+            stackPanel.addControl(row);
 
-                const helpText = new GUI.TextBlock();
-                helpText.text = "LABEL";
-                helpText.color = this.theme.textMuted;
-                helpText.fontSize = 28;
-                helpText.height = "30px";
-                helpText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                labelContainer.addControl(helpText);
-
-                const labelVal = new GUI.TextBlock();
-                labelVal.text = data.label;
-                labelVal.color = this.theme.text;
-                labelVal.fontSize = 36;
-                labelVal.fontWeight = "bold";
-                labelVal.height = "50px";
-                labelVal.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                labelContainer.addControl(labelVal);
-
-                contentStack.addControl(labelContainer);
-            }
-
-        } else {
-            // Edge: Source & Target
-            // Side-by-side handled via Grid
-            const edgeGrid = new GUI.Grid();
-            edgeGrid.height = "180px";
-            edgeGrid.paddingTop = "20px";
-            edgeGrid.addColumnDefinition(0.5);
-            edgeGrid.addColumnDefinition(0.5);
-
-            const sourceBox = this.createSpecialBox("SOURCE", data.source, this.theme.edgePrimary, this.theme.edgeBgPurple, this.theme.edgePrimary);
-            const targetBox = this.createSpecialBox("CIBLE", data.target, this.theme.edgeSecondary, this.theme.edgeBgPink, this.theme.edgeSecondary);
-
-            // Adjust margins for grid cells
-            sourceBox.paddingRight = "10px";
-            targetBox.paddingLeft = "10px";
-
-            edgeGrid.addControl(sourceBox, 0, 0);
-            edgeGrid.addControl(targetBox, 0, 1);
-            contentStack.addControl(edgeGrid);
-        }
-
-        // --- SECTION 2: SEPARATOR ---
-        const separatorConfig = new GUI.StackPanel();
-        separatorConfig.height = "80px";
-        separatorConfig.paddingTop = "40px";
-        const sepTitle = new GUI.TextBlock();
-        sepTitle.text = `PROPRIÉTÉS DU ${type === 'node' ? 'NŒUD' : 'LIEN'}`;
-        sepTitle.color = this.theme.textMuted;
-        sepTitle.fontSize = 32;
-        sepTitle.fontWeight = "bold";
-        sepTitle.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        sepTitle.paddingLeft = "20px";
-        separatorConfig.addControl(sepTitle);
-
-        const sepLine = new GUI.Rectangle();
-        sepLine.height = "2px";
-        sepLine.width = "95%";
-        sepLine.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        sepLine.paddingLeft = "20px";
-        sepLine.background = this.theme.border;
-        separatorConfig.addControl(sepLine);
-
-        contentStack.addControl(separatorConfig);
-
-        // --- SECTION 3: DYNAMIC PROPERTIES ---
-        // Filter keys
-        const ignoredKeys = ['id', 'x', 'y', 'z', 'source', 'target', 'label', 'fx', 'fy', 'fz', 'vx', 'vy', 'vz', '__index', 'index', 'geometryId'];
-
-        let propsCount = 0;
-        Object.entries(data).forEach(([key, value]) => {
-            if (ignoredKeys.includes(key)) return;
-
-            // Attempt JSON parse if string
-            let parsedVal = value;
-            if (typeof value === 'string' && (value.trim().startsWith('{') || value.trim().startsWith('['))) {
-                try { parsedVal = JSON.parse(value); } catch (e) { }
-            }
-
-            const propBlock = this.createPropertyBlock(key, parsedVal, type);
-            if (propBlock) {
-                contentStack.addControl(propBlock);
-                propsCount++;
-            }
+            const line = new GUI.Rectangle();
+            line.height = "2px";
+            line.width = "90%";
+            line.color = "#333333";
+            line.background = "#333333";
+            stackPanel.addControl(line);
         });
 
-        if (propsCount === 0) {
-            const noData = new GUI.TextBlock();
-            noData.text = "Aucune propriété supplémentaire";
-            noData.color = "gray";
-            noData.fontSize = 30;
-            noData.height = "80px";
-            contentStack.addControl(noData);
-        }
-
-        // ================= FOOTER =================
-        const footerCont = new GUI.Container();
-        footerCont.paddingTop = "20px";
-        footerCont.paddingBottom = "20px";
-        grid.addControl(footerCont, 2, 0);
-
-        const closeBtn = GUI.Button.CreateSimpleButton("close", "FERMER");
-        closeBtn.width = "400px";
-        closeBtn.height = "100px";
+        // --- BOUTON FERMER ---
+        const closeBtn = GUI.Button.CreateSimpleButton("closeBtn", "FERMER");
+        closeBtn.width = "300px";
+        closeBtn.height = "80px";
         closeBtn.color = "white";
-        closeBtn.background = "#ef4444"; // red-500
-        closeBtn.cornerRadius = 50;
+        closeBtn.background = "#ef4444";
+        closeBtn.cornerRadius = 20;
         closeBtn.fontSize = 40;
-        closeBtn.onPointerClickObservable.add(() => this.dispose());
-        footerCont.addControl(closeBtn);
+        closeBtn.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+        closeBtn.top = "-30px";
+        closeBtn.onPointerClickObservable.add(() => {
+            this.dispose();
+        });
+        container.addControl(closeBtn);
 
-        // Positioning
-        this.positionPanel(scene, xrHelper, anchorMesh);
+        // 6. POSITIONNEMENT
+        this.placePanel(scene, xrHelper);
     }
 
-    // --- HELPER: Special Header Box (ID, Source, Target) ---
-    private createSpecialBox(label: string, value: any, textColor: string, bgColor: string, borderColor: string): GUI.Container {
-        const container = new GUI.Rectangle();
-        container.height = "150px";
-        container.width = "100%";
-        container.background = bgColor;
-        container.color = borderColor; // border color
-        container.thickness = 2;
-        container.cornerRadius = 20;
-        container.paddingLeft = "20px";
-        container.paddingRight = "20px";
+    private placePanel(scene: Scene, xrHelper: any) {
+        if (!this.panelMesh) return;
 
-        const stack = new GUI.StackPanel();
-        stack.isVertical = true;
-        stack.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-        container.addControl(stack);
-
-        const lbl = new GUI.TextBlock();
-        lbl.text = label;
-        lbl.color = textColor;
-        lbl.fontSize = 24;
-        lbl.fontWeight = "bold";
-        lbl.height = "40px";
-        lbl.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        stack.addControl(lbl);
-
-        const val = new GUI.TextBlock();
-        val.text = String(value);
-        val.color = this.theme.text;
-        val.fontSize = 34; // Monospace-ish feel
-        val.fontFamily = "Monospace, Consolas, Courier New";
-        val.height = "50px";
-        val.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        stack.addControl(val);
-
-        return container;
-    }
-
-    // --- HELPER: Property Block Generator ---
-    private createPropertyBlock(key: string, value: any, type: string): GUI.Control {
-        const wrapper = new GUI.StackPanel();
-        wrapper.isVertical = true;
-        wrapper.height = "auto";
-        wrapper.paddingBottom = "30px";
-        wrapper.paddingLeft = "20px";
-        wrapper.paddingRight = "20px";
-
-        // Title Row
-        const titleRow = new GUI.StackPanel();
-        titleRow.isVertical = false;
-        titleRow.height = "40px";
-        titleRow.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        wrapper.addControl(titleRow);
-
-        // Indicator Pill
-        const pill = new GUI.Rectangle();
-        pill.width = "10px";
-        pill.height = "25px";
-        pill.background = (Array.isArray(value)) ? this.theme.arrayColor :
-            (type === 'node' ? this.theme.nodePrimary : this.theme.edgePrimary);
-        pill.thickness = 0;
-        pill.cornerRadius = 4;
-        titleRow.addControl(pill);
-
-        // Key Text
-        const keyTxt = new GUI.TextBlock();
-        keyTxt.text = key.toUpperCase();
-        keyTxt.color = pill.background;
-        keyTxt.fontSize = 28;
-        keyTxt.fontWeight = "bold";
-        keyTxt.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        keyTxt.paddingLeft = "15px";
-        keyTxt.resizeToFit = true;
-        titleRow.addControl(keyTxt);
-
-        // Content Area
-        const contentArea = new GUI.StackPanel();
-        contentArea.isVertical = true;
-        contentArea.paddingLeft = "25px"; // Indent
-        contentArea.paddingTop = "10px";
-
-        // Border Line on Left
-        const leftBorder = new GUI.Rectangle();
-        leftBorder.width = "2px";
-        leftBorder.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        leftBorder.background = this.theme.border;
-        // Babylon GUI doesn't easily support "full height left border" inside a stack that grows.
-        // Instead we just indent.
-
-        if (Array.isArray(value)) {
-            // ARRAY handling
-            value.forEach(item => {
-                const itemContainer = new GUI.Rectangle();
-                itemContainer.adaptHeightToChildren = true;
-                itemContainer.thickness = 0;
-                itemContainer.background = this.theme.codeBg;
-                itemContainer.paddingBottom = "5px";
-                itemContainer.width = "100%";
-                itemContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-                const itemTxt = new GUI.TextBlock();
-                itemTxt.text = `• ${typeof item === 'object' ? JSON.stringify(item) : String(item)}`;
-                itemTxt.color = this.theme.textMuted;
-                itemTxt.fontSize = 26;
-                itemTxt.textWrapping = true;
-                itemTxt.resizeToFit = true;
-                itemTxt.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-                itemContainer.addControl(itemTxt);
-                contentArea.addControl(itemContainer);
-            });
-        } else if (typeof value === 'object' && value !== null) {
-            // NESTED OBJECT handling
-            Object.entries(value).forEach(([nKey, nVal]) => {
-                const row = new GUI.StackPanel();
-                row.isVertical = true;
-                row.paddingBottom = "10px";
-
-                const k = new GUI.TextBlock();
-                k.text = nKey + ":";
-                k.color = this.theme.textMuted;
-                k.fontSize = 24;
-                k.resizeToFit = true;
-                k.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                row.addControl(k);
-
-                const valContainer = new GUI.Rectangle();
-                valContainer.adaptHeightToChildren = true;
-                valContainer.thickness = 0;
-                valContainer.background = this.theme.codeBg;
-                valContainer.width = "100%";
-                valContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-                const v = new GUI.TextBlock();
-                v.text = typeof nVal === 'object' ? JSON.stringify(nVal, null, 2) : String(nVal);
-                v.color = this.theme.text;
-                v.fontSize = 26;
-                v.fontFamily = "Monospace";
-                v.textWrapping = true;
-                v.resizeToFit = true;
-                v.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-                valContainer.addControl(v);
-                row.addControl(valContainer);
-
-                contentArea.addControl(row);
-            });
-        } else {
-            // SIMPLE VALUE
-            const valContainer = new GUI.Rectangle();
-            valContainer.adaptHeightToChildren = true;
-            valContainer.thickness = 0;
-            valContainer.background = this.theme.codeBg;
-            valContainer.width = "100%";
-            valContainer.paddingTop = "5px";
-            valContainer.paddingBottom = "5px";
-            valContainer.paddingLeft = "10px";
-            valContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-            const valTxt = new GUI.TextBlock();
-            valTxt.text = String(value);
-            valTxt.color = this.theme.text;
-            valTxt.fontSize = 30;
-            valTxt.fontFamily = "Monospace";
-            valTxt.textWrapping = true;
-            valTxt.resizeToFit = true;
-            valTxt.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-            valContainer.addControl(valTxt);
-            contentArea.addControl(valContainer);
-        }
-
-        wrapper.addControl(contentArea);
-        return wrapper;
-    }
-
-    private positionPanel(scene: Scene, xrHelper: any, anchorMesh: any) {
         let camera = scene.activeCamera;
+        // Priorité à la caméra VR
         if (xrHelper && xrHelper.baseExperience && xrHelper.baseExperience.camera) {
             camera = xrHelper.baseExperience.camera;
         }
 
-        if (camera && anchorMesh) {
-            const nodePos = anchorMesh.absolutePosition;
-            const camPos = camera.position;
-            const direction = camPos.subtract(nodePos).normalize();
+        if (camera) {
+            // Position : 1.5m devant
+            const forward = camera.getDirection(Vector3.Forward());
+            const pos = camera.position.add(forward.scale(1.5));
+            // Optionnel : Verrouiller la hauteur pour confort (éviter de lever la tête)
+            // pos.y = camera.position.y;
 
-            // 1.5m away, slightly up
-            const targetPos = nodePos.add(direction.scale(1.5)).add(new Vector3(0, 0.3, 0));
-            this.panelMesh!.position = targetPos;
-            this.panelMesh!.lookAt(camPos);
-            this.panelMesh!.rotation.y += Math.PI;
-        } else if (camera) {
-            const front = camera.getDirection(Vector3.Forward());
-            this.panelMesh!.position = camera.position.add(front.scale(2.0));
-            this.panelMesh!.lookAt(camera.position);
-            this.panelMesh!.rotation.y += Math.PI;
+            this.panelMesh.position = pos;
+
+            // Orientation
+            this.panelMesh.lookAt(camera.position);
+            // Retourner car Plane regarde -Z
+            this.panelMesh.rotation.y += Math.PI;
+
+            // Billboard pour suivre l'utilisateur
+            this.panelMesh.billboardMode = Mesh.BILLBOARDMODE_ALL;
         }
     }
 
-    dispose() {
+    public dispose() {
         if (this.panelMesh) {
             this.panelMesh.dispose();
             this.panelMesh = null;
