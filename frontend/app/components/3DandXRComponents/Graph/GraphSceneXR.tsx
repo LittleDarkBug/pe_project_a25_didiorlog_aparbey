@@ -10,7 +10,6 @@ import {
     WebXRState,
     Quaternion,
     Color3,
-    PointerEventTypes,
     Ray,
     MeshBuilder,
     StandardMaterial
@@ -153,22 +152,16 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         }
 
 
-        // --- WebXR Canonical Setup (Following Official BabylonJS Documentation) ---
+        // --- WebXR Setup (Using manual rays per article, native pointer disabled) ---
         try {
-            // 1. Initialize Default Experience with proper Quest controller configuration
+            // 1. Initialize Default Experience
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
                 floorMeshes: [], // No floor meshes - we use free-flight locomotion
                 disableTeleportation: true, // We use custom free-flight
                 disableHandTracking: true,
-                // Input options for Quest controllers
+                disablePointerSelection: true, // Disabled - we build rays manually per article
                 inputOptions: {
                     doNotLoadControllerMeshes: false, // Load controller meshes
-                },
-                // Pointer selection options
-                pointerSelectionOptions: {
-                    enablePointerSelectionOnAllControllers: true,
-                    forceGazeMode: false, // Use controller ray, not gaze
-                    gazeCamera: undefined,
                 },
                 uiOptions: {
                     sessionMode: 'immersive-vr',
@@ -181,41 +174,9 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 return;
             }
             xrHelperRef.current = xr;
-            console.log("WebXR Default Experience initialized successfully");
+            console.log("WebXR initialized - using manual ray picking");
 
-            // 3. Configure Pointer Selection (uses auto-initialized feature from Default Helper)
-            // Documentation: "The default experience initializes both pointer selection and teleportation automatically"
-            if (xr.pointerSelection) {
-                xr.pointerSelection.displayLaserPointer = true;
-                xr.pointerSelection.displaySelectionMesh = true;
-                xr.pointerSelection.selectionMeshDefaultColor = new Color3(0, 1, 0); // Green Cursor
-                xr.pointerSelection.laserPointerDefaultColor = new Color3(0, 1, 0); // Green Beam
-                console.log("WebXR Pointer Selection configured:", {
-                    displayLaserPointer: xr.pointerSelection.displayLaserPointer,
-                    displaySelectionMesh: xr.pointerSelection.displaySelectionMesh
-                });
-            } else {
-                console.warn("WebXR Pointer Selection not available - check console for errors");
-            }
-
-            // 4. Standard Event Handling (PointerObservable)
-            sceneInstance.onPointerObservable.add((pointerInfo) => {
-                if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
-                    const pickedMesh = pointerInfo.pickInfo?.pickedMesh as Mesh | InstancedMesh;
-
-                    if (pickedMesh && pickedMesh.metadata) {
-                        if (pickedMesh.metadata.type === 'node' || pickedMesh.metadata.type === 'edge') {
-                            console.log("XR Interaction: POINTERDOWN on", pickedMesh.metadata.type, pickedMesh.metadata.id);
-                            // Trigger Details Panel
-                            detailsPanelRef.current.create(sceneInstance, pickedMesh.metadata, pickedMesh.metadata.type, xr);
-                        }
-                    }
-                    // Only log if we picked something (avoid undefined spam)
-                    // else if (pickedMesh) {
-                    //     console.log("XR: Picked non-interactive mesh:", pickedMesh.name);
-                    // }
-                }
-            });
+            // Note: Native pointerSelection disabled, we use manual rays per article
 
             // 5. XR State Management - Notify parent of state changes
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
@@ -304,9 +265,20 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                                     const hit = sceneInstance.pickWithRay(ray);
                                     if (hit && hit.hit && hit.pickedMesh) {
                                         const mesh = hit.pickedMesh as Mesh | InstancedMesh;
+
+                                        // Check for node/edge (graph elements)
                                         if (mesh.metadata && (mesh.metadata.type === 'node' || mesh.metadata.type === 'edge')) {
                                             console.log("🎯 Trigger hit:", mesh.metadata.type, mesh.metadata.id);
                                             detailsPanelRef.current.create(sceneInstance, mesh.metadata, mesh.metadata.type, xr);
+                                        }
+                                        // Check for GUI mesh (menus, panels) - simulate pointer events
+                                        else if (hit.pickedPoint) {
+                                            // Simulate pointer click for GUI elements
+                                            sceneInstance.simulatePointerDown(hit);
+                                            setTimeout(() => {
+                                                sceneInstance.simulatePointerUp(hit);
+                                            }, 50);
+                                            console.log("🖱️ GUI click simulated on:", mesh.name);
                                         }
                                     }
                                 }
