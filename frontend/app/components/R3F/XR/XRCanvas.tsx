@@ -62,10 +62,16 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
              */}
             {/** 
              * WE use the official VRButton.
-             * The button handles the store interaction automatically, using config from store.ts.
+             * We force sessionInit via 'as any' to restrict features and avoid 'unrecognized feature' errors.
+             * This method is proven to work for headset detection compared to store-based config.
              */}
             <VRButton
                 store={xrStore}
+                {...({
+                    sessionInit: {
+                        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
+                    }
+                } as any)}
                 style={{
                     position: 'absolute',
                     bottom: '24px',
