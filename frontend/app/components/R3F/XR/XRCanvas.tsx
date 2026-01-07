@@ -61,7 +61,29 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
                 This allows the user to enter WR mode only when supported.
                 The button handles the store interaction automatically.
             */}
-            <VRButton store={xrStore} />
+            {/* 
+                We use the official VRButton from @react-three/xr.
+                This allows the user to enter WR mode only when supported.
+                The button handles the store interaction automatically.
+                Styled to ensure it appears above other overlays.
+            */}
+            <VRButton
+                store={xrStore}
+                style={{
+                    position: 'absolute',
+                    bottom: '24px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 9999, // Ensure it's above everything
+                    padding: '12px 24px',
+                    border: '1px solid white',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    color: 'white',
+                    font: 'bold 16px sans-serif',
+                    cursor: 'pointer'
+                }}
+            />
 
             <XRErrorBoundary fallback={xrFallback}>
                 <Canvas
