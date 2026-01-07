@@ -10,7 +10,10 @@ import {
     WebXRState,
     Quaternion,
     Color3,
-    PointerEventTypes
+    PointerEventTypes,
+    Ray,
+    MeshBuilder,
+    StandardMaterial
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF'; // Required for controller models
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
@@ -239,6 +242,44 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     profiles: controller.inputSource.profiles
                 });
 
+                // Create visible laser beam mesh for this controller
+                const laserMaterial = new StandardMaterial(`laser-mat-${controller.inputSource.handedness}`, sceneInstance);
+                laserMaterial.emissiveColor = new Color3(0, 1, 0.5); // Cyan/green glow
+                laserMaterial.disableLighting = true;
+                laserMaterial.alpha = 0.6;
+
+                const laserMesh = MeshBuilder.CreateCylinder(`laser-${controller.inputSource.handedness}`, {
+                    height: 50,
+                    diameterTop: 0.005,
+                    diameterBottom: 0.01
+                }, sceneInstance);
+                laserMesh.material = laserMaterial;
+                laserMesh.isPickable = false;
+                laserMesh.setEnabled(false); // Start hidden
+
+                // Update laser position/rotation each frame
+                sceneInstance.onBeforeRenderObservable.add(() => {
+                    if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) {
+                        laserMesh.setEnabled(false);
+                        return;
+                    }
+
+                    if (controller.pointer) {
+                        laserMesh.setEnabled(true);
+                        // Position at controller pointer
+                        laserMesh.position = controller.pointer.position.clone();
+                        // Add forward offset (laser extends forward)
+                        const forward = controller.pointer.forward.scale(25);
+                        laserMesh.position.addInPlace(forward);
+                        // Match rotation to pointer
+                        laserMesh.rotationQuaternion = controller.pointer.rotationQuaternion?.clone() ?? null;
+                        // Rotate 90° to align cylinder with forward direction  
+                        if (laserMesh.rotationQuaternion) {
+                            laserMesh.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Right(), Math.PI / 2));
+                        }
+                    }
+                });
+
                 controller.onMotionControllerInitObservable.add((motionController) => {
                     console.log("🕹️ Motion Controller initialized:", motionController.handedness, {
                         profileId: motionController.profileId,
@@ -247,8 +288,34 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
                     const ids = motionController.getComponentIds();
 
+                    // Trigger for selection (per article: use trigger button for picking)
+                    const triggerId = ids.find((id: string) => id.includes('trigger'));
+                    if (triggerId) {
+                        const trigger = motionController.getComponent(triggerId);
+                        if (trigger) {
+                            trigger.onButtonStateChangedObservable.add(() => {
+                                // Only trigger when pressed > 80%
+                                if (trigger.pressed && trigger.value > 0.8) {
+                                    // Create ray from controller pointer
+                                    const origin = controller.pointer.position;
+                                    const direction = controller.pointer.forward;
+                                    const ray = new Ray(origin, direction, 100);
+
+                                    const hit = sceneInstance.pickWithRay(ray);
+                                    if (hit && hit.hit && hit.pickedMesh) {
+                                        const mesh = hit.pickedMesh as Mesh | InstancedMesh;
+                                        if (mesh.metadata && (mesh.metadata.type === 'node' || mesh.metadata.type === 'edge')) {
+                                            console.log("🎯 Trigger hit:", mesh.metadata.type, mesh.metadata.id);
+                                            detailsPanelRef.current.create(sceneInstance, mesh.metadata, mesh.metadata.type, xr);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
                     // Menu Toggle (A / X)
-                    const primaryId = ids.find(id => id === 'a-button' || id === 'x-button');
+                    const primaryId = ids.find((id: string) => id === 'a-button' || id === 'x-button');
                     if (primaryId) {
                         const primaryButton = motionController.getComponent(primaryId);
                         if (primaryButton) {
