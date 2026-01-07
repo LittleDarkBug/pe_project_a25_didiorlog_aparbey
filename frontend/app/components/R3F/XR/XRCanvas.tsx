@@ -60,12 +60,12 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
              * WE use the official VRButton.
              * We ignore TS error for sessionInit as it is passed to enterVR at runtime but missing in type defs.
              */}
-            {/* @ts-ignore */}
+            {/** 
+             * WE use the official VRButton.
+             * The button handles the store interaction automatically, using config from store.ts.
+             */}
             <VRButton
                 store={xrStore}
-                sessionInit={{
-                    optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
-                }}
                 style={{
                     position: 'absolute',
                     bottom: '24px',
