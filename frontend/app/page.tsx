@@ -68,11 +68,19 @@ export default function LandingPage() {
             Analysez, explorez et collaborez en Réalité Virtuelle.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up delay-300">
-            <Link href="/register">
-              <Button size="lg" className="rounded-full px-8" rightIcon={<ArrowRight className="h-5 w-5" />}>
-                Créer un compte gratuit
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <Link href="/dashboard">
+                <Button size="lg" className="rounded-full px-8" rightIcon={<ArrowRight className="h-5 w-5" />}>
+                  Accéder au Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/register">
+                <Button size="lg" className="rounded-full px-8" rightIcon={<ArrowRight className="h-5 w-5" />}>
+                  Créer un compte gratuit
+                </Button>
+              </Link>
+            )}
             <Link href="#demo">
               <Button variant="outline" size="lg" className="rounded-full px-8 backdrop-blur-sm">
                 Voir la démo
