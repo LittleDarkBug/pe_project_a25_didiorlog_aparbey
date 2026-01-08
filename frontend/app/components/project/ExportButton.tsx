@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useToastStore } from '@/app/store/useToastStore';
+import { useSession } from 'next-auth/react';
 
 interface ExportButtonProps {
     projectId: string;
@@ -12,14 +13,19 @@ export default function ExportButton({ projectId, projectName }: ExportButtonPro
     const [isOpen, setIsOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const { addToast } = useToastStore();
+    const { data: session } = useSession();
 
     const handleExport = async (format: 'json' | 'csv') => {
         setIsExporting(true);
         setIsOpen(false);
 
         try {
-            // Recuperer le token d'authentification
-            const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+            // Recuperer le token d'authentification depuis la session NextAuth
+            const token = (session?.user as any)?.accessToken;
+
+            if (!token) {
+                throw new Error("Vous n'êtes pas connecté");
+            }
 
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/projects/${projectId}/export?format=${format}`, {
                 method: 'GET',
