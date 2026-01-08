@@ -1,11 +1,11 @@
 'use client';
 
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { XR, XROrigin } from '@react-three/xr';
-import { Stars } from '@react-three/drei';
-import { Suspense, ReactNode, useState, useEffect, Component, ErrorInfo } from 'react';
-import { xrStore } from './store'; // Import shared store
+import { Suspense, ReactNode, Component, ErrorInfo, useRef, createContext, useContext } from 'react';
+import { xrStore } from './store';
 import { VRButton } from '@react-three/xr';
+import * as THREE from 'three';
 
 interface XRCanvasProps {
     children: ReactNode;
@@ -20,6 +20,13 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
     hasError: boolean;
     error: string | null;
+}
+
+// Context to share the origin ref with child components
+export const XROriginContext = createContext<React.RefObject<THREE.Group | null> | null>(null);
+
+export function useXROriginRef() {
+    return useContext(XROriginContext);
 }
 
 class XRErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -44,7 +51,32 @@ class XRErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> 
     }
 }
 
+// Inner component that provides origin ref via context
+function XRSceneContent({ children, originRef }: { children: ReactNode, originRef: React.RefObject<THREE.Group | null> }) {
+    return (
+        <XROriginContext.Provider value={originRef}>
+            <XROrigin ref={originRef} position={[0, 0, 0]} />
+
+            {/* Immersive Lighting */}
+            <ambientLight intensity={0.6} />
+            <directionalLight position={[10, 20, 10]} intensity={1.5} color="#ffffff" />
+            <pointLight position={[-10, 5, -10]} intensity={1} color="#4080ff" />
+            <pointLight position={[10, 5, 10]} intensity={1} color="#ff8040" />
+
+            <Suspense fallback={null}>
+                {/* Vast Black Environment */}
+                <color attach="background" args={['#000000']} />
+                <gridHelper args={[50, 50, 0x222222, 0x050505]} position={[0, -2, 0]} />
+
+                {children}
+            </Suspense>
+        </XROriginContext.Provider>
+    );
+}
+
 export default function XRCanvas({ children, className }: XRCanvasProps) {
+    const originRef = useRef<THREE.Group | null>(null);
+
     const xrFallback = (
         <div className="h-full w-full flex items-center justify-center bg-black text-white">
             <div className="text-center p-8">
@@ -56,20 +88,12 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
 
     return (
         <div className={className || "h-full w-full relative"}>
-            {/** 
-             * WE use the official VRButton.
-             * We ignore TS error for sessionInit as it is passed to enterVR at runtime but missing in type defs.
-             */}
-            {/** 
-             * WE use the official VRButton.
-             * We force sessionInit via 'as any' to restrict features and avoid 'unrecognized feature' errors.
-             * This method is proven to work for headset detection compared to store-based config.
-             */}
             <VRButton
                 store={xrStore}
                 {...({
                     sessionInit: {
-                        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
+                        // Minimal features for polyfill compatibility
+                        optionalFeatures: ['local']
                     }
                 } as any)}
                 style={{
@@ -94,21 +118,9 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
                     gl={{ antialias: true, alpha: false }}
                 >
                     <XR store={xrStore}>
-                        <XROrigin position={[0, 0, 0]} />
-
-                        {/* Immersive Lighting */}
-                        <ambientLight intensity={0.6} />
-                        <directionalLight position={[10, 20, 10]} intensity={1.5} color="#ffffff" />
-                        <pointLight position={[-10, 5, -10]} intensity={1} color="#4080ff" />
-                        <pointLight position={[10, 5, 10]} intensity={1} color="#ff8040" />
-
-                        <Suspense fallback={null}>
-                            {/* Vast Black Environment */}
-                            <color attach="background" args={['#000000']} />
-                            <gridHelper args={[50, 50, 0x222222, 0x050505]} position={[0, -2, 0]} />
-
+                        <XRSceneContent originRef={originRef}>
                             {children}
-                        </Suspense>
+                        </XRSceneContent>
                     </XR>
                 </Canvas>
             </XRErrorBoundary>

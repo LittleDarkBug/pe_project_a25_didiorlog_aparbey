@@ -7,6 +7,7 @@ networks:
 volumes:
   mongodb-data:
   redis-data:
+  frontend-prod-node-modules:
 
 services:
   # MongoDB database
@@ -97,18 +98,21 @@ services:
 
   # Next.js frontend (production)
   frontend-prod:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: node:22
     container_name: frontend-prod
     restart: unless-stopped
-    command: npm start
+    working_dir: /app
+    command: sh -c "npm install && npm run build && npm start"
     ports:
       - "3001:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
       - AUTH_TRUST_HOST=true
       - AUTH_SECRET=${JWT_SECRET}
+      - NODE_ENV=production
+    volumes:
+      - ./frontend:/app
+      - frontend-prod-node-modules:/app/node_modules
     networks:
       - app-network
     depends_on:

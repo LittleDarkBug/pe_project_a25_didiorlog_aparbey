@@ -1,89 +1,171 @@
 'use client';
 
-import { useXRInputSourceState } from '@react-three/xr';
+import { useXRInputSourceState, useXR } from '@react-three/xr';
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import * as THREE from 'three';
+import { useXROriginRef } from './XRCanvas';
 
 interface XRLocomotionProps {
     speed?: number;
     rotationSpeed?: number;
+    /** Enable vertical movement (fly up/down with controller triggers) */
+    enableVertical?: boolean;
 }
 
 /**
  * XR Locomotion component for free-flight navigation.
- * Uses standard WebXR Gamepad API.
- * Left Controller: Move (Axes 2, 3)
- * Right Controller: Rotate (Axes 2, 3)
+ * Uses XROriginContext to get direct ref to the origin group.
+ * 
+ * Controls:
+ * - Left Controller Thumbstick: Move forward/backward/strafe
+ * - Right Controller Thumbstick: Snap rotation (horizontal)
+ * - Left Trigger: Fly up
+ * - Left Grip: Fly down
  */
 export default function XRLocomotion({
-    speed = 0.1, // Increased default speed
-    rotationSpeed = 0.02
+    speed = 0.08,
+    rotationSpeed = 0.04,
+    enableVertical = true
 }: XRLocomotionProps) {
+    // Get XR state for session check
+    const xr = useXR();
+
+    // Get origin ref from context (direct ref to Three.js group)
+    const originRef = useXROriginRef();
+
     // Get controller states
     const leftState = useXRInputSourceState('controller', 'left');
     const rightState = useXRInputSourceState('controller', 'right');
 
+    // Refs for snap turn debounce
+    const lastSnapTime = useRef(0);
+    const tempVector = useRef(new THREE.Vector3());
+
     useFrame(({ camera }) => {
-        // --- MOVEMENT (Left Controller) ---
-        if (leftState && leftState.gamepad) {
-            const gamepad = leftState.gamepad as any;
+        // Only process in XR mode with active session
+        if (!xr.session) return;
 
-            // Standard XR mapping: Axes 2 (X) and 3 (Y) are usually the thumbstick
-            // Fallback to 0 and 1 if 2/3 are empty (some emulators)
-            const axes = gamepad.axes;
-            const xAxis = axes && axes.length > 2 ? axes[2] : (axes ? axes[0] : 0);
-            const yAxis = axes && axes.length > 3 ? axes[3] : (axes ? axes[1] : 0);
-
-            if (xAxis !== undefined && yAxis !== undefined) {
-                // Deadzone
-                if (Math.abs(xAxis) > 0.1 || Math.abs(yAxis) > 0.1) {
-
-                    // Get forward direction relative to user view
-                    const forward = new THREE.Vector3();
-                    camera.getWorldDirection(forward);
-                    forward.y = 0; // Constrain to horizontal plane (walking/flying level)
-                    forward.normalize();
-
-                    // Get right direction
-                    const right = new THREE.Vector3();
-                    right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
-
-                    // Calculate movement vector
-                    const moveVector = new THREE.Vector3();
-
-                    // -yAxis is Forward (pushing stick up gives negative value usually)
-                    moveVector.addScaledVector(forward, -yAxis * speed);
-                    moveVector.addScaledVector(right, xAxis * speed);
-
-                    // IMPORTANT: Move the RIG (camera parent), not the camera itself.
-                    // In WebXR, camera position is overwritten by headset pose relative to rig.
-                    if (camera.parent) {
-                        camera.parent.position.add(moveVector);
-                    } else {
-                        // Fallback if no parent (unlikely in XR)
-                        camera.position.add(moveVector);
-                    }
-                }
-            }
+        // Get origin from context ref
+        const origin = originRef?.current;
+        if (!origin) {
+            // Fallback: try useXR().origin if context not available
+            const xrOrigin = xr.origin as THREE.Group | null;
+            if (!xrOrigin) return;
+            processMovement(xrOrigin, camera);
+            return;
         }
 
-        // --- ROTATION (Right Controller) ---
-        if (rightState && rightState.gamepad) {
-            const gamepad = rightState.gamepad as any;
-            const axes = gamepad.axes;
-            const xAxis = axes && axes.length > 2 ? axes[2] : (axes ? axes[0] : 0);
-
-            if (xAxis !== undefined && Math.abs(xAxis) > 0.2) {
-                // Rotate camera rig around Y axis
-                if (camera.parent) {
-                    camera.parent.rotation.y -= xAxis * rotationSpeed;
-                } else {
-                    camera.rotation.y -= xAxis * rotationSpeed;
-                }
-            }
-        }
+        processMovement(origin, camera);
     });
+
+    function processMovement(origin: THREE.Group, camera: THREE.Camera) {
+        const now = performance.now();
+
+        // --- MOVEMENT (Left Controller Thumbstick) ---
+        if (leftState?.gamepad) {
+            // Cast to any to access raw WebXR Gamepad API properties
+            const gamepad = leftState.gamepad as any;
+            const axes = gamepad.axes as number[] | undefined;
+
+            // Read thumbstick axes - try both mappings
+            let xAxis = 0;
+            let yAxis = 0;
+
+            if (axes && axes.length >= 4) {
+                // Standard XR mapping: axes 2,3 are thumbstick
+                xAxis = axes[2] ?? 0;
+                yAxis = axes[3] ?? 0;
+            } else if (axes && axes.length >= 2) {
+                // Fallback for some controllers
+                xAxis = axes[0] ?? 0;
+                yAxis = axes[1] ?? 0;
+            }
+
+            // Apply deadzone
+            const deadzone = 0.12;
+            if (Math.abs(xAxis) < deadzone) xAxis = 0;
+            if (Math.abs(yAxis) < deadzone) yAxis = 0;
+
+            if (xAxis !== 0 || yAxis !== 0) {
+                // Get forward direction from camera (world space)
+                camera.getWorldDirection(tempVector.current);
+
+                // For horizontal movement, zero out Y
+                tempVector.current.y = 0;
+                tempVector.current.normalize();
+
+                const forward = tempVector.current.clone();
+
+                // Right direction (cross product with world up)
+                const right = new THREE.Vector3();
+                right.crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
+
+                // Calculate movement: -yAxis = forward (push up = move forward)
+                const movement = new THREE.Vector3();
+                movement.addScaledVector(forward, -yAxis * speed);
+                movement.addScaledVector(right, -xAxis * speed);
+
+                // Apply movement to origin position
+                origin.position.add(movement);
+            }
+
+            // Vertical movement via triggers/grip
+            if (enableVertical && gamepad.buttons) {
+                const buttons = gamepad.buttons as Array<{ pressed?: boolean; value?: number }>;
+                const trigger = buttons[0];
+                const grip = buttons[1];
+
+                // Trigger = fly up, Grip = fly down
+                if (trigger?.pressed || (trigger?.value && trigger.value > 0.1)) {
+                    origin.position.y += (trigger.value ?? 0.5) * speed * 0.7;
+                }
+                if (grip?.pressed || (grip?.value && grip.value > 0.1)) {
+                    origin.position.y -= (grip.value ?? 0.5) * speed * 0.7;
+                }
+            }
+        }
+
+        // --- ROTATION (Right Controller Thumbstick - Snap Turn) ---
+        if (rightState?.gamepad) {
+            const gamepad = rightState.gamepad as any;
+            const axes = gamepad.axes as number[] | undefined;
+
+            let xAxis = 0;
+            if (axes && axes.length >= 4) {
+                xAxis = axes[2] ?? 0;
+            } else if (axes && axes.length >= 2) {
+                xAxis = axes[0] ?? 0;
+            }
+
+            // Snap turn with debounce
+            const snapThreshold = 0.65;
+            const snapCooldown = 280; // ms
+
+            if (Math.abs(xAxis) > snapThreshold && (now - lastSnapTime.current) > snapCooldown) {
+                // Snap turn: ±30 degrees
+                const snapAngle = xAxis > 0 ? -Math.PI / 6 : Math.PI / 6;
+
+                // Rotate around camera position (user's head)
+                const cameraWorldPos = new THREE.Vector3();
+                camera.getWorldPosition(cameraWorldPos);
+
+                // Translate, rotate, translate back
+                origin.position.sub(cameraWorldPos);
+                origin.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), snapAngle);
+                origin.position.add(cameraWorldPos);
+                origin.rotation.y += snapAngle;
+
+                lastSnapTime.current = now;
+            }
+
+            // Smooth rotation (for smaller stick deflections)
+            const smoothThreshold = 0.25;
+            if (Math.abs(xAxis) > smoothThreshold && Math.abs(xAxis) <= snapThreshold) {
+                origin.rotation.y -= xAxis * rotationSpeed;
+            }
+        }
+    }
 
     return null;
 }
