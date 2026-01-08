@@ -19,6 +19,7 @@ import {
 import '@babylonjs/core/XR/motionController/webXROculusTouchMotionController'; // Local Oculus Touch controller
 import '@babylonjs/loaders'; // Required for glTF controller models
 import '@babylonjs/core/Materials/Node/Blocks'; // Required for NodeMaterial in controller models
+import * as GUI from '@babylonjs/gui';
 import SceneComponent from '@/app/components/3DandXRComponents/Scene/SceneComponent';
 import { useVRMenu } from '../hooks/useVRMenu';
 import { VRDetailsPanel } from '../components/VRDetailsPanel';
@@ -230,11 +231,12 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             } catch (error) {
                 console.error('[VR] Error enabling locomotion:', error);
             }
-            // 6. Simple Controller Interaction for Menu
+            // 6. Interactions (Menu & Grab)
             xr.input.onControllerAddedObservable.add((controller) => {
                 controller.onMotionControllerInitObservable.add((motionController) => {
                     const ids = motionController.getComponentIds();
-                    // Menu Toggle (A / X)
+
+                    // A. Menu Toggle (A / X)
                     const primaryId = ids.find((id: string) => id === 'a-button' || id === 'x-button');
                     if (primaryId) {
                         const primaryButton = motionController.getComponent(primaryId);
@@ -257,36 +259,73 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             });
                         }
                     }
+
+                    // B. Graph Grabbing (Grip / Squeeze)
+                    const squeezeId = ids.find((id: string) => id === 'squeeze');
+                    if (squeezeId) {
+                        const squeeze = motionController.getComponent(squeezeId);
+                        if (squeeze) {
+                            squeeze.onButtonStateChangedObservable.add(() => {
+                                const root = graphRenderer.current.getGraphRoot();
+                                if (root) {
+                                    if (squeeze.changes.pressed) {
+                                        if (squeeze.pressed) {
+                                            // Grab: Parent root to controller
+                                            // Use rootMesh of controller for stability
+                                            root.setParent(motionController.rootMesh || controller.pointer, true);
+                                            console.log("Graph Grabbed");
+                                        } else {
+                                            // Release: Unparent
+                                            root.setParent(null, true);
+                                            console.log("Graph Released");
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
                 });
             });
 
-            // 5. Create Exit Door
-            const createExitDoor = () => {
-                const doorFrame = MeshBuilder.CreateBox('doorFrame', { width: 5, height: 8, depth: 0.5 }, sceneInstance);
-                doorFrame.position = new Vector3(0, 4, -10); // Positioned visible to user (z -10)
+            // 7. HUD (Instructions)
+            const createVRHUD = () => {
+                // Ensure no duplicates
+                const oldHud = sceneInstance.getMeshByName("VR_HUD");
+                if (oldHud) oldHud.dispose();
 
-                const frameMaterial = new StandardMaterial('frameMat', sceneInstance);
-                frameMaterial.diffuseColor = new Color3(0.1, 0.1, 0.15);
-                frameMaterial.emissiveColor = new Color3(0.05, 0.05, 0.1);
-                doorFrame.material = frameMaterial;
+                const hudPlane = MeshBuilder.CreatePlane("VR_HUD", { width: 1, height: 0.3 }, sceneInstance);
+                // Parent to camera to stay in view
+                hudPlane.parent = xr.baseExperience.camera;
+                hudPlane.position = new Vector3(0, -0.3, 0.8); // Low center, 0.8m away
+                // Tilt up slightly
+                hudPlane.rotation.x = -Math.PI / 6;
 
-                const door = MeshBuilder.CreateBox('exitDoor', { width: 4.5, height: 7.5, depth: 0.2 }, sceneInstance);
-                door.position = doorFrame.position.clone();
-                door.position.z += 0.3;
+                const hudTexture = GUI.AdvancedDynamicTexture.CreateForMesh(hudPlane, 512, 156);
+                hudTexture.background = "rgba(0,0,0,0.5)"; // Semi-transparent black
 
-                const doorMaterial = new StandardMaterial('doorMat', sceneInstance);
-                doorMaterial.diffuseColor = new Color3(0.2, 0.3, 0.5);
-                doorMaterial.emissiveColor = new Color3(0.1, 0.2, 0.4);
-                door.material = doorMaterial;
+                const stack = new GUI.StackPanel();
+                hudTexture.addControl(stack);
 
-                // Simple action to exit VR
-                sceneInstance.onPointerObservable.add((pointerInfo) => {
-                    if (pointerInfo.type === 1) { // POINTERDOWN
-                        if (pointerInfo.pickInfo && pointerInfo.pickInfo.pickedMesh === door) {
-                            console.log('[VR] Porte de sortie activée');
-                            xr.baseExperience.exitXRAsync();
-                        }
-                    }
+                const title = new GUI.TextBlock();
+                title.text = "COMMANDES VR";
+                title.color = "#4ade80"; // Green
+                title.fontSize = 30;
+                title.height = "40px";
+                stack.addControl(title);
+
+                const instructions = [
+                    "Gâchette (Grip): Saisir le graphe",
+                    "Stick L: Voler/Avancer  |  Stick R: Tourner",
+                    "Bouton A/X: Menu Options  |  Pointer: Interactions"
+                ];
+
+                instructions.forEach(line => {
+                    const t = new GUI.TextBlock();
+                    t.text = line;
+                    t.color = "white";
+                    t.fontSize = 20;
+                    t.height = "30px";
+                    stack.addControl(t);
                 });
             };
 
@@ -294,17 +333,16 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
                     console.log("VR Experience Started");
-                    createExitDoor(); // Add door
+                    createVRHUD(); // Create HUD
                     if (vrUtilsRef.current.onXRStateChange) {
                         vrUtilsRef.current.onXRStateChange(true);
                     }
                 } else if (state === WebXRState.EXITING_XR) {
                     console.log("VR Experience Ending");
-                    // Cleanup door
-                    const door = sceneInstance.getMeshByName("exitDoor");
-                    const frame = sceneInstance.getMeshByName("doorFrame");
-                    if (door) door.dispose();
-                    if (frame) frame.dispose();
+
+                    // Cleanup
+                    const hud = sceneInstance.getMeshByName("VR_HUD");
+                    if (hud) hud.dispose();
 
                     if (vrUtilsRef.current.onXRStateChange) {
                         vrUtilsRef.current.onXRStateChange(false);

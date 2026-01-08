@@ -6,9 +6,19 @@ interface OverlayControlsProps {
     onShare?: () => void;
     onEdit?: () => void;
     children?: React.ReactNode;
+    hideEdit?: boolean;
+    hideShare?: boolean;
 }
 
-export default function OverlayControls({ onResetCamera, onToggleVR, onShare, onEdit, children }: OverlayControlsProps) {
+export default function OverlayControls({
+    onResetCamera,
+    onToggleVR,
+    onShare,
+    onEdit,
+    children,
+    hideEdit = false,
+    hideShare = false
+}: OverlayControlsProps) {
     return (
         <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl items-center">
             <button
@@ -39,7 +49,7 @@ export default function OverlayControls({ onResetCamera, onToggleVR, onShare, on
                 <span className="hidden sm:inline">VR</span>
             </button>
 
-            {onEdit && (
+            {!hideEdit && onEdit && (
                 <>
                     <div className="w-px bg-white/10"></div>
                     <button
@@ -55,7 +65,7 @@ export default function OverlayControls({ onResetCamera, onToggleVR, onShare, on
                 </>
             )}
 
-            {onShare && (
+            {!hideShare && onShare && (
                 <>
                     <div className="w-px bg-white/10"></div>
                     <button

@@ -4,15 +4,22 @@ interface DetailsPanelProps {
     data: any;
     type: 'node' | 'edge' | null;
     onClose: () => void;
+    height?: string;
 }
 
-export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps) {
+export default function DetailsPanel({ data, type, onClose, height }: DetailsPanelProps) {
     if (!data || !type) return null;
 
     return (
         <div
-            className="fixed z-50 w-80 flex flex-col max-h-[60vh] animate-slide-up rounded-xl border border-surface-50/10 bg-surface-950/95 backdrop-blur-xl shadow-2xl"
-            style={{ right: '2rem', bottom: '6rem', left: 'auto', top: 'auto' }}
+            className="fixed z-50 w-80 flex flex-col animate-slide-up rounded-xl border border-surface-50/10 bg-surface-950/95 backdrop-blur-xl shadow-2xl"
+            style={{
+                right: '2rem',
+                bottom: '6rem',
+                left: 'auto',
+                top: 'auto',
+                maxHeight: height || '60vh'
+            }}
         >
             <div className="flex items-center justify-between p-4 border-b border-surface-50/10 bg-surface-950/95 rounded-t-xl shrink-0">
                 <h3 className={`text-lg font-bold ${type === 'node' ? 'text-blue-400' : 'text-purple-400'}`}>
@@ -36,7 +43,7 @@ export default function DetailsPanel({ data, type, onClose }: DetailsPanelProps)
                             <p className="text-xs text-blue-400 font-semibold mb-1">Identifiant</p>
                             <p className="font-mono text-surface-50 break-words text-lg">{data.id || 'N/A'}</p>
                         </div>
-                        
+
                         {data.label && (
                             <div>
                                 <p className="text-sm text-surface-400">Label</p>

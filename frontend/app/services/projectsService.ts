@@ -69,6 +69,10 @@ export const projectsService = {
         return apiClient.get<TaskStatus>(`/projects/tasks/${job_id}`);
     },
 
+    getByToken: async (token: string): Promise<Project> => {
+        return apiClient.get<Project>(`/projects/share/${token}`);
+    },
+
     delete: async (id: string): Promise<void> => {
         return apiClient.delete(`/projects/${id}`);
     }
