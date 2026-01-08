@@ -5,7 +5,7 @@ import { XR, XROrigin, useXRInputSourceState, useXR } from '@react-three/xr';
 import { Suspense, ReactNode, Component, ErrorInfo, useRef, createContext, useContext, useState } from 'react';
 import { xrStore } from './store';
 import { VRButton } from '@react-three/xr';
-import { Stars } from '@react-three/drei';
+import { Stars, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface XRCanvasProps {
@@ -112,6 +112,21 @@ function XRSceneContent({ children, originRef }: { children: ReactNode, originRe
 
                 {/* Subtle Grid for orientation, matching the dark aesthetic */}
                 <gridHelper args={[50, 50, 0x1a1a2e, 0x050510]} position={[0, -2, 0]} />
+
+                {/* DEBUG: Status Panel for Controller Detection */}
+                <mesh position={[0, 1.6, -2]}>
+                    <planeGeometry args={[2, 1]} />
+                    <meshBasicMaterial color="black" transparent opacity={0.6} />
+                    <Text
+                        position={[0, 0, 0.01]}
+                        fontSize={0.1}
+                        color="white"
+                        anchorX="center"
+                        anchorY="middle"
+                    >
+                        {`Inputs Detected: ${useXR().session?.inputSources?.length || 0}\nLook at your hands/controllers!`}
+                    </Text>
+                </mesh>
 
                 {children}
             </Suspense>
