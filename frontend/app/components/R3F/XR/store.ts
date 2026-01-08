@@ -9,4 +9,15 @@ export const xrStore = createXRStore({
 
     // Essential: disable emulator for real hardware
     emulate: false,
+
+    // Explicitly disable features not supported in immersive-vr or causing issues
+    domOverlay: false,
+    meshDetection: false,
+    planeDetection: false,
+    depthSensing: false,
+    anchors: false,
+
+    // Ensure controllers are prioritized for debugging
+    controller: true,
+    hand: false, // Temporarily disable hands to isolate controller detection issues
 });
