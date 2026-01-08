@@ -127,14 +127,8 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
 
     return (
         <div className={className || "h-full w-full relative"}>
-            <VRButton
-                store={xrStore}
-                {...({
-                    sessionInit: {
-                        // Quest 3 compatible features
-                        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
-                    }
-                } as any)}
+            <button
+                onClick={() => xrStore.enterVR()}
                 style={{
                     position: 'absolute',
                     bottom: '24px',
@@ -149,7 +143,9 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
                     font: 'bold 16px sans-serif',
                     cursor: 'pointer'
                 }}
-            />
+            >
+                Enter VR
+            </button>
 
             <XRErrorBoundary fallback={xrFallback}>
                 <Canvas
