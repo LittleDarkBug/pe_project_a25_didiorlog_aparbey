@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { XR, XROrigin, useXRInputSourceState, useXR } from '@react-three/xr';
+import { XR, XROrigin, useXRInputSourceState, useXR, XRSpace } from '@react-three/xr';
 import { Suspense, ReactNode, Component, ErrorInfo, useRef, createContext, useContext, useState } from 'react';
 import { xrStore } from './store';
 import { VRButton } from '@react-three/xr';
