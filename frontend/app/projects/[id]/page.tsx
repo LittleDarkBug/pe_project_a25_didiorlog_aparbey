@@ -28,6 +28,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
     const [isInXR, setIsInXR] = useState(false); // Track actual XR session state
+    const [showLabels, setShowLabels] = useState(false); // Toggle labels
     const [currentAlgorithm, setCurrentAlgorithm] = useState<string>('auto'); // Track algorithm locally
 
     const graphSceneRef = useRef<GraphSceneRef>(null);
@@ -95,6 +96,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         setIsInXR(inXR);
     }, []);
 
+    const handleResetFilters = useCallback(() => {
+        setVisibleNodeIds(null);
+        setIsFilterOpen(false);
+    }, []);
+
     if (isLoading) {
         return <ProjectSkeleton />;
     }
@@ -125,11 +131,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             </svg>
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-2">Session VR Active</h2>
-                        <p className="text-gray-400 max-w-sm">
+                        <p className="text-gray-400 max-w-sm mb-6">
                             Regardez dans votre casque VR pour explorer le graphe.
                             <br />
                             <span className="text-sm text-gray-500">Retirez le casque pour revenir ici.</span>
                         </p>
+                        <button
+                            onClick={() => window.location.reload()} // Forcing reload to kill session cleanly if needed, or we could try accessing XR helper to exit
+                            className="rounded-full bg-red-500/20 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/30 transition-colors border border-red-500/30"
+                        >
+                            Arrêter la session VR
+                        </button>
                     </div>
                 </div>
             )}
@@ -147,6 +159,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             projectId={id}
                             onLayoutUpdate={handleLayoutUpdate}
                             onXRStateChange={handleXRStateChange}
+                            showLabels={showLabels}
+                            onResetFilters={handleResetFilters}
+                            onToggleLabels={() => setShowLabels(prev => !prev)}
                         />
                     ) : (
                         <GraphSceneWeb
@@ -155,6 +170,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}
+                            showLabels={showLabels}
                         />
                     )
                 ) : (
@@ -263,42 +279,59 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </div>
             )}
 
-            {/* Bottom Controls Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
-                <OverlayControls
-                    onResetCamera={handleResetCamera}
-                    onToggleVR={() => setIsVRMode(!isVRMode)}
-                    onShare={() => setIsShareModalOpen(true)}
-                    onEdit={() => setIsEditModalOpen(true)}
-                >
-                    <LayoutSelector
-                        projectId={id}
-                        onLayoutUpdate={handleLayoutUpdate}
-                        currentAlgorithm={currentAlgorithm}
-                        onAlgorithmChange={setCurrentAlgorithm}
-                    />
-
-                    {/* Filter Toggle Button */}
-                    <button
-                        onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isFilterOpen || visibleNodeIds !== null
-                            ? 'bg-primary-500/20 text-white border border-primary-500/50'
-                            : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
-                            }`}
-                        title="Filtrer le graphe"
+            {/* Bottom Controls Overlay - Hidden in XR */}
+            {!isInXR && (
+                <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
+                    <OverlayControls
+                        onResetCamera={handleResetCamera}
+                        onToggleVR={() => setIsVRMode(!isVRMode)}
+                        onShare={() => setIsShareModalOpen(true)}
+                        onEdit={() => setIsEditModalOpen(true)}
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                        </svg>
-                        <span className="hidden sm:inline">Filtres</span>
+                        <LayoutSelector
+                            projectId={id}
+                            onLayoutUpdate={handleLayoutUpdate}
+                            currentAlgorithm={currentAlgorithm}
+                            onAlgorithmChange={setCurrentAlgorithm}
+                        />
 
-                        {/* Active Indicator */}
-                        {visibleNodeIds !== null && (
-                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>
-                        )}
-                    </button>
-                </OverlayControls>
-            </div>
+                        {/* Labels Toggle */}
+                        <button
+                            onClick={() => setShowLabels(!showLabels)}
+                            className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${showLabels
+                                ? 'bg-primary-500/20 text-white border border-primary-500/50'
+                                : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
+                                }`}
+                            title={showLabels ? "Masquer les labels" : "Afficher les labels"}
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            <span className="hidden sm:inline">Labels</span>
+                        </button>
+
+                        {/* Filter Toggle Button */}
+                        <button
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isFilterOpen || visibleNodeIds !== null
+                                ? 'bg-primary-500/20 text-white border border-primary-500/50'
+                                : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
+                                }`}
+                            title="Filtrer le graphe"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            <span className="hidden sm:inline">Filtres</span>
+
+                            {/* Active Indicator */}
+                            {visibleNodeIds !== null && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>
+                            )}
+                        </button>
+                    </OverlayControls>
+                </div>
+            )}
         </div>
     );
 }

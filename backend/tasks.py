@@ -216,6 +216,7 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
         raise ValueError("Format JSON non reconnu")
 
 
+def _process_gexf_graph_sync(file_path: Path, mapping: dict, algorithm: str = "auto") -> dict:
     """Version synchrone du traitement GEXF pour Celery."""
     from io import BytesIO
     import re

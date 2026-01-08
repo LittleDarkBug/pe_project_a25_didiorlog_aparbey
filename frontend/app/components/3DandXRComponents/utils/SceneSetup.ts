@@ -47,9 +47,16 @@ export const setupCommonScene = async (scene: Scene) => {
         star.material = starMatClone;
     }
 
-    // Glow Layer
-    const gl = new GlowLayer("glow", scene);
-    gl.intensity = 0.5;
+    // Environment
+    const envHelper = scene.createDefaultEnvironment({
+        createSkybox: false,
+        createGround: false,
+        toneMappingEnabled: true,
+    });
 
-    return { light, dirLight, spaceSphere, gl };
+    // Disable GlowLayer to prevent WebGL errors and artifacts in VR
+    // const gl = new GlowLayer("glow", scene);
+    // gl.intensity = 0.5;
+
+    return { light, dirLight, spaceSphere, gl: null }; // gl is now null as it's disabled
 };

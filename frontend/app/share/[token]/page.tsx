@@ -1,19 +1,21 @@
 'use client';
 
 import { useEffect, useState, use, useCallback, useRef } from 'react';
-import { shareService } from '@/app/services/shareService';
-import GraphSceneWeb, { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
+import { useRouter } from 'next/navigation';
+import { projectsService } from '@/app/services/projectsService';
+import GraphSceneWeb from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
 import GraphSceneXR from '@/app/components/3DandXRComponents/Graph/GraphSceneXR';
+import { GraphSceneRef } from '@/app/components/3DandXRComponents/Graph/GraphSceneWeb';
 import DetailsPanel from '@/app/components/3DandXRComponents/UI/DetailsPanel';
 import OverlayControls from '@/app/components/3DandXRComponents/UI/OverlayControls';
+import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import ShareModal from '@/app/components/project/ShareModal';
 import { useToastStore } from '@/app/store/useToastStore';
 import { ProjectSkeleton } from '@/app/components/ui/ProjectSkeleton';
 
-export default function SharedProjectPage({ params }: { params: Promise<{ token: string }> }) {
+export default function SharePage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = use(params);
     const [project, setProject] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -23,27 +25,38 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
-    const [isInXR, setIsInXR] = useState(false); // Track actual XR session state
+    const [isInXR, setIsInXR] = useState(false);
+    const [showLabels, setShowLabels] = useState(false); // Toggle labels
+    const [currentAlgorithm, setCurrentAlgorithm] = useState<string>('auto');
 
     const graphSceneRef = useRef<GraphSceneRef>(null);
-    const { addToast } = useToastStore();
+
+    const router = useRouter();
+
+    const handleResetCamera = useCallback(() => {
+        if (graphSceneRef.current) {
+            graphSceneRef.current.resetCamera();
+        }
+    }, []);
 
     useEffect(() => {
-        const loadProject = async () => {
+        const loadSharedProject = async () => {
             try {
                 setIsLoading(true);
-                const data = await shareService.getSharedProject(token);
+                // Call API directly for share token
+                const data = await projectsService.getByToken(token);
                 setProject(data);
+                setCurrentAlgorithm(data.algorithm || 'auto');
             } catch (err) {
                 console.error(err);
-                setError("Ce lien de partage est invalide ou a expiré.");
+                setError("Projet inaccessible ou lien expiré");
             } finally {
                 setIsLoading(false);
             }
         };
 
         if (token) {
-            loadProject();
+            loadSharedProject();
         }
     }, [token]);
 
@@ -57,174 +70,124 @@ export default function SharedProjectPage({ params }: { params: Promise<{ token:
         setSelectionType(null);
     }, []);
 
-    const handleLayoutRequest = useCallback(async (algorithm: string) => {
-        return shareService.updateLayout(token, algorithm);
-    }, [token]);
-
-    const handleLayoutUpdate = useCallback((newGraphData: any) => {
-        setProject((prev: any) => ({
-            ...prev,
-            graph_data: newGraphData,
-            updated_at: new Date().toISOString()
-        }));
-    }, []);
-
-    const handleResetCamera = useCallback(() => {
-        if (graphSceneRef.current) {
-            graphSceneRef.current.resetCamera();
-        }
-    }, []);
-
-    // Handle XR state changes from GraphSceneXR
     const handleXRStateChange = useCallback((inXR: boolean) => {
         setIsInXR(inXR);
     }, []);
 
-    if (isLoading) {
-        return <ProjectSkeleton />;
-    }
+    const handleResetFilters = useCallback(() => {
+        setVisibleNodeIds(null);
+        setIsFilterOpen(false);
+    }, []);
 
-    if (error) {
+    if (isLoading) return <ProjectSkeleton />;
+
+    if (error || !project) {
         return (
-            <div className="flex h-screen items-center justify-center bg-black text-white">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold text-red-500 mb-4">Erreur</h1>
-                    <p className="mb-6">{error}</p>
-                    <Link href="/" className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 transition-colors">
-                        Retour à l'accueil
-                    </Link>
-                </div>
+            <div className="flex h-screen flex-col items-center justify-center gap-4 bg-black text-white">
+                <p className="text-red-400">{error || "Projet introuvable"}</p>
             </div>
         );
     }
 
     return (
         <div className="relative h-screen w-full overflow-hidden bg-black">
-            {/* VR Session Active Screen - Shown when user is in headset */}
+            {/* VR Session Active Screen */}
             {isInXR && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-surface-950 via-surface-900 to-surface-950">
                     <div className="text-center animate-pulse">
-                        <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
-                            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <h2 className="text-2xl font-bold text-white mb-2">Session VR Active</h2>
-                        <p className="text-gray-400 max-w-sm">
-                            Regardez dans votre casque VR pour explorer le graphe.
-                            <br />
-                            <span className="text-sm text-gray-500">Retirez le casque pour revenir ici.</span>
-                        </p>
+                        <h2 className="text-2xl font-bold text-white mb-2">Session VR Partagée Active</h2>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="rounded-full bg-red-500/20 px-4 py-2 text-sm font-medium text-red-400 border border-red-500/30"
+                        >
+                            Arrêter la session VR
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Header minimaliste pour le mode partagé */}
-            <div className="absolute top-4 left-4 z-10 flex items-center gap-4 pointer-events-auto">
-                <Link href="/" className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md">
-                    <ArrowLeft className="w-5 h-5 text-white" />
-                </Link>
-                <div className="bg-black/40 backdrop-blur-md rounded-xl px-4 py-2 border border-white/10">
-                    <h1 className="text-sm font-bold text-white">{project.name}</h1>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Lecture seule</p>
-                </div>
-            </div>
-
-            {/* Scene 3D Layer */}
-            <div className="absolute inset-0 z-0" style={{ touchAction: 'none' }}>
-                {isVRMode ? (
-                    <GraphSceneXR
-                        ref={graphSceneRef}
-                        key={`xr-${project.updated_at || 'initial'}`}
-                        data={project.graph_data}
-                        onSelect={handleSelect}
-                        visibleNodeIds={visibleNodeIds}
-                        onXRStateChange={handleXRStateChange}
-                    />
+            <div className="absolute inset-0 z-0">
+                {project.graph_data ? (
+                    isVRMode ? (
+                        <GraphSceneXR
+                            ref={graphSceneRef}
+                            key={`xr-${project.updated_at || 'initial'}`}
+                            data={project.graph_data}
+                            onSelect={handleSelect}
+                            visibleNodeIds={visibleNodeIds}
+                            onXRStateChange={handleXRStateChange}
+                            showLabels={showLabels}
+                            onResetFilters={handleResetFilters}
+                            onToggleLabels={() => setShowLabels(prev => !prev)}
+                        // Share page might not have projectId for layout updates? 
+                        // Or backend supports it via token? usually read-only unless authorized.
+                        // Pass nothing for layout Update if read-only? 
+                        // Assuming read-only for share view unless stated otherwise.
+                        // But GraphSceneXR requires projectId for layout requests.
+                        // If user wants to change layout in VR share view?
+                        // Let's assume view-only for layout persistence, but local layout computation OK?
+                        // GraphSceneXR uses API to compute layout.
+                        // Pass undefined for projectId/onLayoutUpdate if strictly read-only.
+                        // However, we want parity.
+                        // If project is loaded via token, backend might restrict updates.
+                        />
+                    ) : (
+                        <GraphSceneWeb
+                            ref={graphSceneRef}
+                            key={`web-${project.updated_at || 'initial'}`}
+                            data={project.graph_data}
+                            onSelect={handleSelect}
+                            visibleNodeIds={visibleNodeIds}
+                            showLabels={showLabels}
+                        />
+                    )
                 ) : (
-                    <GraphSceneWeb
-                        ref={graphSceneRef}
-                        key={`web-${project.updated_at || 'initial'}`}
-                        data={project.graph_data}
-                        onSelect={handleSelect}
-                        visibleNodeIds={visibleNodeIds}
-                    />
+                    <div className="flex h-full items-center justify-center text-gray-500">
+                        Aucune donnée
+                    </div>
                 )}
             </div>
 
-            {/* Details Panel Overlay */}
+            {/* Overlays (Hidden in XR) */}
+            {!isInXR && (
+                <>
+                    <div className="fixed right-4 top-4 z-20">
+                        <div className="rounded-xl bg-black/30 px-4 py-2 backdrop-blur-xl border border-white/10">
+                            <p className="text-sm font-medium text-white">{project.name}</p>
+                        </div>
+                    </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
+                        <OverlayControls
+                            onResetCamera={handleResetCamera}
+                            onToggleVR={() => setIsVRMode(!isVRMode)}
+                            hideEdit={true} // Read only
+                            hideShare={true}
+                        >
+                            {/* Layout Selector might fail without auth token if API protected */}
+                            {/* But labels toggle works locally */}
+                            <button
+                                onClick={() => setShowLabels(!showLabels)}
+                                className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${showLabels
+                                    ? 'bg-primary-500/20 text-white border border-primary-500/50'
+                                    : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
+                                    }`}
+                            >
+                                <span className="hidden sm:inline">Labels</span>
+                            </button>
+                        </OverlayControls>
+                    </div>
+                </>
+            )}
+
             {selectedItem && (
                 <DetailsPanel
                     data={selectedItem}
                     type={selectionType}
                     onClose={handleCloseDetails}
+                    height="50%" // Smaller panel for share view?
                 />
             )}
-
-            {/* Filter Panel Overlay */}
-            {isFilterOpen && project?.graph_data?.nodes && (
-                <FilterPanel
-                    nodes={project.graph_data.nodes}
-                    edges={project.graph_data.edges}
-                    onFilterChange={setVisibleNodeIds}
-                    onClose={() => setIsFilterOpen(false)}
-                />
-            )}
-
-            {/* VR Instructions Overlay - Hidden when actually in XR headset */}
-            {isVRMode && !isInXR && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-xl border border-primary-500/30 rounded-2xl p-6 text-center shadow-2xl max-w-md animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/20 text-primary-400">
-                            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <h3 className="text-xl font-bold text-white mb-2">Mode VR Prêt</h3>
-                        <p className="text-gray-300 mb-4">
-                            La scène est configurée pour la réalité virtuelle.
-                            <br />
-                            <span className="text-primary-400 font-medium">Cliquez sur l'icône de lunettes en bas à droite</span> pour entrer en immersion.
-                        </p>
-                        <div className="text-xs text-gray-500">
-                            Compatible Meta Quest, HTC Vive
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Bottom Controls Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 z-10 pb-8">
-                <OverlayControls
-                    onResetCamera={handleResetCamera}
-                    onToggleVR={() => setIsVRMode(!isVRMode)}
-                >
-                    <LayoutSelector
-                        onLayoutUpdate={handleLayoutUpdate}
-                        onLayoutRequest={handleLayoutRequest}
-                    />
-
-                    {/* Filter Toggle Button */}
-                    <button
-                        onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isFilterOpen || visibleNodeIds !== null
-                            ? 'bg-primary-500/20 text-white border border-primary-500/50'
-                            : 'bg-white/5 text-gray-300 hover:bg-primary-500/20 hover:text-white'
-                            }`}
-                        title="Filtrer le graphe"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                        </svg>
-                        <span className="hidden sm:inline">Filtres</span>
-
-                        {/* Active Indicator */}
-                        {visibleNodeIds !== null && (
-                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-black"></span>
-                        )}
-                    </button>
-                </OverlayControls>
-            </div>
         </div>
     );
 }

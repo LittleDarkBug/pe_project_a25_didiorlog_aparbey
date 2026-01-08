@@ -13,7 +13,8 @@ import {
     Ray,
     MeshBuilder,
     StandardMaterial,
-    WebXRMotionControllerManager
+    WebXRMotionControllerManager,
+    WebXRFeatureName
 } from '@babylonjs/core';
 import '@babylonjs/core/XR/motionController/webXROculusTouchMotionController'; // Local Oculus Touch controller
 import '@babylonjs/loaders'; // Required for glTF controller models
@@ -51,13 +52,16 @@ interface GraphSceneProps {
     projectId?: string;
     onLayoutUpdate?: (newData: any) => void;
     onXRStateChange?: (isInXR: boolean) => void;
+    showLabels?: boolean;
+    onResetFilters?: () => void;
+    onToggleLabels?: () => void;
 }
 
 export interface GraphSceneRef {
     resetCamera: () => void;
 }
 
-const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, projectId, onLayoutUpdate, onXRStateChange }, ref) => {
+const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, projectId, onLayoutUpdate, onXRStateChange, showLabels, onResetFilters, onToggleLabels }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const xrHelperRef = useRef<any>(null);
@@ -118,10 +122,10 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     }));
 
     const { createVRMenu } = useVRMenu();
-    const vrUtilsRef = useRef({ createVRMenu, handleLayoutRequest, onXRStateChange });
+    const vrUtilsRef = useRef({ createVRMenu, handleLayoutRequest, onXRStateChange, onResetFilters, onToggleLabels });
     useEffect(() => {
-        vrUtilsRef.current = { createVRMenu, handleLayoutRequest, onXRStateChange };
-    }, [createVRMenu, handleLayoutRequest, onXRStateChange]);
+        vrUtilsRef.current = { createVRMenu, handleLayoutRequest, onXRStateChange, onResetFilters, onToggleLabels };
+    }, [createVRMenu, handleLayoutRequest, onXRStateChange, onResetFilters, onToggleLabels]);
 
     // Handle visibility updates
     useEffect(() => {
@@ -129,6 +133,13 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
         }
     }, [visibleNodeIds, scene]);
+
+    // Handle Label Visibility
+    useEffect(() => {
+        if (scene && nodeMeshesRef.current.size > 0) {
+            graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene);
+        }
+    }, [showLabels, scene]);
 
     const onSceneReady = useCallback(async (sceneInstance: Scene) => {
         setScene(sceneInstance);
@@ -164,226 +175,65 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
             // 1. Initialize Default Experience
             const xr = await sceneInstance.createDefaultXRExperienceAsync({
-                floorMeshes: [], // No floor meshes - we use free-flight locomotion
-                disableTeleportation: true, // We use custom free-flight
-                disableHandTracking: true,
-                disablePointerSelection: true, // Disabled - we build rays manually per article
+                floorMeshes: [],
+                disableTeleportation: true, // Disable teleport for Free Fly
                 inputOptions: {
-                    doNotLoadControllerMeshes: false, // Load controller meshes
+                    doNotLoadControllerMeshes: false,
                 },
                 uiOptions: {
                     sessionMode: 'immersive-vr',
                 }
             });
 
-            // 2. Validate XR initialization (per documentation)
+            // 2. Validate XR initialization
             if (!xr.baseExperience) {
                 console.error("WebXR not supported or failed to initialize");
                 return;
             }
+
             xrHelperRef.current = xr;
-            console.log("WebXR initialized - using manual ray picking");
+            console.log("WebXR initialized - using standard pointers");
 
-            // Note: Native pointerSelection disabled, we use manual rays per article
-
-            // 5. XR State Management - Notify parent of state changes
+            // 5. XR State Management
             xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
                 if (state === WebXRState.IN_XR) {
-                    console.log("VR Experience Started - Features Configured");
-
-                    // DEBUG: Create test sphere at fixed position to verify rendering
-                    const testSphere = MeshBuilder.CreateSphere("debug-sphere", { diameter: 0.5 }, sceneInstance);
-                    testSphere.position = new Vector3(0, 1.5, -2); // 2m in front, at head height
-                    const testMat = new StandardMaterial("debug-mat", sceneInstance);
-                    testMat.emissiveColor = new Color3(1, 0, 0); // BRIGHT RED
-                    testMat.disableLighting = true;
-                    testSphere.material = testMat;
-                    console.log("DEBUG: Created red test sphere at (0, 1.5, -2)");
-
-                    // Notify parent that we're now in XR
+                    console.log("VR Experience Started");
                     if (vrUtilsRef.current.onXRStateChange) {
                         vrUtilsRef.current.onXRStateChange(true);
                     }
                 } else if (state === WebXRState.EXITING_XR) {
                     console.log("VR Experience Ending");
-                    // Notify parent that we're leaving XR
                     if (vrUtilsRef.current.onXRStateChange) {
                         vrUtilsRef.current.onXRStateChange(false);
                     }
                 }
             });
 
-            // 6. Custom Controller Logic (Menu & Locomotion)
-            // This is additive and does not conflict with standard features
+            // 3. Setup Locomotion (Free Fly)
+            const featuresManager = xr.baseExperience.featuresManager;
+            try {
+                const locomotion = featuresManager.enableFeature(
+                    WebXRFeatureName.MOVEMENT,
+                    'latest',
+                    {
+                        xrInput: xr.input,
+                        movementOrientationFollowsViewerPose: false,
+                        movementOrientationFollowsController: true, // Direction follows controller
+                        movementSpeed: 0.5, // Reasonable speed
+                        rotationSpeed: 0.5,
+                        movementEnabled: true,
+                        rotationEnabled: true, // Smooth rotation
+                        movementThreshold: 0.05
+                    }
+                );
+                console.log('[VR] Free Fly Locomotion enabled');
+            } catch (error) {
+                console.error('[VR] Error enabling locomotion:', error);
+            }
+            // 6. Simple Controller Interaction for Menu
             xr.input.onControllerAddedObservable.add((controller) => {
-                console.log("🎮 Controller added:", controller.inputSource.handedness, {
-                    targetRayMode: controller.inputSource.targetRayMode,
-                    profiles: controller.inputSource.profiles,
-                    hasGrip: !!controller.grip,
-                    hasPointer: !!controller.pointer
-                });
-
-                // Debug: Check if controller meshes are loaded
-                if (controller.grip) {
-                    console.log("Grip mesh children:", controller.grip.getChildMeshes().length);
-
-                    // Create custom controller visual since external models don't load
-                    const controllerVisual = MeshBuilder.CreateBox(
-                        `controller-visual-${controller.inputSource.handedness}`,
-                        { width: 0.05, height: 0.03, depth: 0.15 },
-                        sceneInstance
-                    );
-                    const controllerMat = new StandardMaterial(`controller-mat-${controller.inputSource.handedness}`, sceneInstance);
-                    controllerMat.emissiveColor = new Color3(0.2, 0.8, 1); // Cyan glow
-                    controllerMat.diffuseColor = new Color3(0.2, 0.8, 1);
-                    controllerMat.disableLighting = true;
-                    controllerVisual.material = controllerMat;
-                    controllerVisual.isPickable = false;
-                    controllerVisual.isVisible = false; // Start hidden
-
-                    // Update position in render loop (like laser) instead of parenting
-                    let posLogged = false;
-                    sceneInstance.onBeforeRenderObservable.add(() => {
-                        if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) {
-                            controllerVisual.isVisible = false;
-                            return;
-                        }
-                        if (controller.grip) {
-                            controllerVisual.isVisible = true;
-                            controllerVisual.position.copyFrom(controller.grip.position);
-                            controllerVisual.rotationQuaternion = controller.grip.rotationQuaternion?.clone() ?? null;
-
-                            if (!posLogged) {
-                                console.log("Controller visual position:", controller.inputSource.handedness, controllerVisual.position.toString());
-                                posLogged = true;
-                            }
-                        }
-                    });
-
-                    console.log("Created custom controller visual for:", controller.inputSource.handedness);
-                }
-                if (controller.pointer) {
-                    console.log("Pointer mesh children:", controller.pointer.getChildMeshes().length);
-                }
-
-                // Create visible laser beam mesh for this controller
-                const laserMaterial = new StandardMaterial(`laser-mat-${controller.inputSource.handedness}`, sceneInstance);
-                laserMaterial.emissiveColor = new Color3(0, 1, 0); // Bright green
-                laserMaterial.diffuseColor = new Color3(0, 1, 0);
-                laserMaterial.disableLighting = true;
-                laserMaterial.alpha = 1.0; // Fully opaque
-
-                // MUCH thicker laser for visibility
-                const laserMesh = MeshBuilder.CreateCylinder(`laser-${controller.inputSource.handedness}`, {
-                    height: 10, // 10 meter long
-                    diameterTop: 0.01,
-                    diameterBottom: 0.02 // 2cm thick at base
-                }, sceneInstance);
-                laserMesh.material = laserMaterial;
-                laserMesh.isPickable = false;
-                laserMesh.renderingGroupId = 1; // Render in front of other objects
-
-                // Update laser position/rotation each frame
-                let laserDebugLogged = false;
-                sceneInstance.onBeforeRenderObservable.add(() => {
-                    if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) {
-                        laserMesh.isVisible = false;
-                        return;
-                    }
-
-                    // Debug controller.pointer availability once
-                    if (!laserDebugLogged) {
-                        console.log("📍 Controller state:", controller.inputSource.handedness, {
-                            hasPointer: !!controller.pointer,
-                            hasGrip: !!controller.grip
-                        });
-                        laserDebugLogged = true;
-                    }
-
-                    // Use pointer if available, fallback to grip
-                    const pointerTransform = controller.pointer || controller.grip;
-                    if (pointerTransform) {
-                        laserMesh.isVisible = true;
-
-                        // Position: start at controller, extend forward
-                        // Cylinder center should be 5m forward (half of 10m length)
-                        const origin = pointerTransform.position.clone();
-                        const forward = pointerTransform.forward.clone();
-                        laserMesh.position = origin.add(forward.scale(5)); // Center at 5m forward
-
-                        // Rotation: align cylinder with forward direction
-                        const up = Vector3.Up();
-                        const rotationMatrix = new Quaternion();
-                        Quaternion.FromUnitVectorsToRef(up, forward, rotationMatrix);
-                        laserMesh.rotationQuaternion = rotationMatrix;
-
-                        if (!laserDebugLogged) {
-                            console.log("🔦 Laser visible at:", laserMesh.position.toString());
-                        }
-                    } else {
-                        laserMesh.isVisible = false;
-                    }
-                });
-
                 controller.onMotionControllerInitObservable.add((motionController) => {
-                    console.log("🕹️ Motion Controller initialized:", motionController.handedness, {
-                        profileId: motionController.profileId,
-                        componentIds: motionController.getComponentIds()
-                    });
-
                     const ids = motionController.getComponentIds();
-
-                    // Trigger for selection (per article: use trigger button for picking)
-                    const triggerId = ids.find((id: string) => id.includes('trigger'));
-                    if (triggerId) {
-                        const trigger = motionController.getComponent(triggerId);
-                        if (trigger) {
-                            let lastTriggerTime = 0;
-                            const DEBOUNCE_MS = 300;
-
-                            trigger.onButtonStateChangedObservable.add(() => {
-                                // Only fire on press start (not hold), with debounce
-                                const now = Date.now();
-                                if (trigger.changes.pressed && trigger.pressed && trigger.value > 0.8 && (now - lastTriggerTime > DEBOUNCE_MS)) {
-                                    lastTriggerTime = now;
-
-                                    // Use pointer if available, fallback to grip
-                                    const pointerTransform = controller.pointer || controller.grip;
-                                    if (!pointerTransform) {
-                                        console.warn("⚠️ No pointer/grip available for picking");
-                                        return;
-                                    }
-
-                                    // Create ray from controller
-                                    const origin = pointerTransform.position;
-                                    const direction = pointerTransform.forward;
-                                    const ray = new Ray(origin, direction, 100);
-
-                                    const hit = sceneInstance.pickWithRay(ray);
-                                    if (hit && hit.hit && hit.pickedMesh) {
-                                        const mesh = hit.pickedMesh as Mesh | InstancedMesh;
-
-                                        // Check for node/edge (graph elements)
-                                        if (mesh.metadata && (mesh.metadata.type === 'node' || mesh.metadata.type === 'edge')) {
-                                            const itemId = mesh.metadata.id || `${mesh.metadata.source}->${mesh.metadata.target}`;
-                                            console.log("🎯 Trigger hit:", mesh.metadata.type, itemId);
-                                            detailsPanelRef.current.create(sceneInstance, mesh.metadata, mesh.metadata.type, xr);
-                                        }
-                                        // Check for GUI mesh (menus, panels) - simulate pointer events
-                                        else if (hit.pickedPoint) {
-                                            // Simulate pointer click for GUI elements
-                                            sceneInstance.simulatePointerDown(hit);
-                                            setTimeout(() => {
-                                                sceneInstance.simulatePointerUp(hit);
-                                            }, 50);
-                                            console.log("🖱️ GUI click simulated on:", mesh.name);
-                                        }
-                                    }
-                                }
-                            });
-                        }
-                    }
-
                     // Menu Toggle (A / X)
                     const primaryId = ids.find((id: string) => id === 'a-button' || id === 'x-button');
                     if (primaryId) {
@@ -395,7 +245,13 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                                         vrMenuRef.current.dispose();
                                         vrMenuRef.current = null;
                                     } else {
-                                        vrMenuRef.current = vrUtilsRef.current.createVRMenu(sceneInstance, xr, vrUtilsRef.current.handleLayoutRequest);
+                                        vrMenuRef.current = vrUtilsRef.current.createVRMenu(
+                                            sceneInstance,
+                                            xr,
+                                            vrUtilsRef.current.handleLayoutRequest,
+                                            vrUtilsRef.current.onResetFilters,
+                                            vrUtilsRef.current.onToggleLabels
+                                        );
                                     }
                                 }
                             });
@@ -404,37 +260,56 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 });
             });
 
-            // Locomotion Loop (Free Flight)
-            const speed = 0.5;
-            const rotationSpeed = 0.05;
-            sceneInstance.onBeforeRenderObservable.add(() => {
-                if (!xr.baseExperience || xr.baseExperience.state !== WebXRState.IN_XR) return;
+            // 5. Create Exit Door
+            const createExitDoor = () => {
+                const doorFrame = MeshBuilder.CreateBox('doorFrame', { width: 5, height: 8, depth: 0.5 }, sceneInstance);
+                doorFrame.position = new Vector3(0, 4, -10); // Positioned visible to user (z -10)
 
-                xr.input.controllers.forEach((controller) => {
-                    if (controller.motionController) {
-                        const thumbstick = controller.motionController.getComponent("xr-standard-thumbstick");
-                        if (thumbstick) {
-                            const axes = thumbstick.axes;
-                            if (Math.abs(axes.x) < 0.1 && Math.abs(axes.y) < 0.1) return; // Deadzone
+                const frameMaterial = new StandardMaterial('frameMat', sceneInstance);
+                frameMaterial.diffuseColor = new Color3(0.1, 0.1, 0.15);
+                frameMaterial.emissiveColor = new Color3(0.05, 0.05, 0.1);
+                doorFrame.material = frameMaterial;
 
-                            const camera = xr.baseExperience.camera;
-                            // Movement (Left Hand)
-                            if (controller.inputSource.handedness === 'left') {
-                                const forward = camera.getForwardRay().direction;
-                                const right = camera.getDirection(Vector3.Right());
-                                const moveDir = forward.scale(-axes.y * speed);
-                                moveDir.addInPlace(right.scale(axes.x * speed));
-                                camera.position.addInPlace(moveDir);
-                            }
-                            // Rotation (Right Hand)
-                            else if (controller.inputSource.handedness === 'right') {
-                                if (Math.abs(axes.x) > 0.5) {
-                                    camera.rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), -axes.x * rotationSpeed));
-                                }
-                            }
+                const door = MeshBuilder.CreateBox('exitDoor', { width: 4.5, height: 7.5, depth: 0.2 }, sceneInstance);
+                door.position = doorFrame.position.clone();
+                door.position.z += 0.3;
+
+                const doorMaterial = new StandardMaterial('doorMat', sceneInstance);
+                doorMaterial.diffuseColor = new Color3(0.2, 0.3, 0.5);
+                doorMaterial.emissiveColor = new Color3(0.1, 0.2, 0.4);
+                door.material = doorMaterial;
+
+                // Simple action to exit VR
+                sceneInstance.onPointerObservable.add((pointerInfo) => {
+                    if (pointerInfo.type === 1) { // POINTERDOWN
+                        if (pointerInfo.pickInfo && pointerInfo.pickInfo.pickedMesh === door) {
+                            console.log('[VR] Porte de sortie activée');
+                            xr.baseExperience.exitXRAsync();
                         }
                     }
                 });
+            };
+
+            // 5. XR State Management
+            xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
+                if (state === WebXRState.IN_XR) {
+                    console.log("VR Experience Started");
+                    createExitDoor(); // Add door
+                    if (vrUtilsRef.current.onXRStateChange) {
+                        vrUtilsRef.current.onXRStateChange(true);
+                    }
+                } else if (state === WebXRState.EXITING_XR) {
+                    console.log("VR Experience Ending");
+                    // Cleanup door
+                    const door = sceneInstance.getMeshByName("exitDoor");
+                    const frame = sceneInstance.getMeshByName("doorFrame");
+                    if (door) door.dispose();
+                    if (frame) frame.dispose();
+
+                    if (vrUtilsRef.current.onXRStateChange) {
+                        vrUtilsRef.current.onXRStateChange(false);
+                    }
+                }
             });
 
         } catch (e) {
@@ -451,28 +326,37 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         // Clean up old graph
         graphRenderer.current.disposeGraph(nodeMeshesRef.current, scene);
 
+        // Define VR Selection Callback
+        const handleVRSelect = (itemData: any, type: string) => {
+            console.log("VR Selection Triggered:", itemData);
+            if (detailsPanelRef.current) {
+                detailsPanelRef.current.create(scene, itemData, type, xrHelperRef.current);
+            }
+        };
+
         // Render graph
         graphRenderer.current.createNodes(
             data,
             scene,
             nodeMeshesRef.current,
-            undefined, // No web selection
-            undefined,
+            onSelect, // Web Selection (still useful for monitor view)
+            handleVRSelect, // VR Selection Callback (Fixed!)
             xrHelperRef,
-            true // skip2DUI: ESSENTIAL for VR picking
+            true // skip2DUI
         );
         graphRenderer.current.createEdges(
             data,
             scene,
             nodeMeshesRef.current,
-            undefined,
-            undefined,
+            onSelect,
+            handleVRSelect, // VR Selection Callback
             xrHelperRef
         );
 
         graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
-
-    }, [scene, data, onSelect]);
+        // Pass isXR=true for label handling in VR (needs update in GraphRenderer)
+        graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene, true);
+    }, [scene, data, onSelect, showLabels]);
 
     return (
         <div className="h-full w-full overflow-hidden rounded-xl bg-black/20 relative" style={{ touchAction: 'none' }}>

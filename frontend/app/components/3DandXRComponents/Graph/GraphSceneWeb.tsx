@@ -35,13 +35,14 @@ interface GraphSceneProps {
     data: GraphData;
     onSelect?: (data: any, type: 'node' | 'edge' | null) => void;
     visibleNodeIds?: Set<string> | null;
+    showLabels?: boolean;
 }
 
 export interface GraphSceneRef {
     resetCamera: () => void;
 }
 
-const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds }, ref) => {
+const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, showLabels }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
@@ -68,6 +69,13 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
         }
     }, [visibleNodeIds, scene]);
 
+    // Handle Label Visibility
+    useEffect(() => {
+        if (scene && nodeMeshesRef.current.size > 0) {
+            graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene);
+        }
+    }, [showLabels, scene]);
+
     const onSceneReady = useCallback(async (sceneInstance: Scene) => {
         setScene(sceneInstance);
 
@@ -79,7 +87,7 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
         const canvas = sceneInstance.getEngine().getRenderingCanvas();
 
         camera.attachControl(canvas, true);
-        
+
         // Camera Optimization
         camera.wheelPrecision = 10;
         camera.pinchPrecision = 10;
@@ -102,7 +110,7 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
             canvas.addEventListener('wheel', preventZoom, { passive: false });
             canvas.addEventListener('touchmove', preventTouchZoom, { passive: false });
         }
-        
+
         setIsSceneReady(true);
     }, []);
 
@@ -126,9 +134,11 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
             nodeMeshesRef.current,
             onSelect
         );
-        
+
         // Force visibility update after creation
         graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
+        // Force label update
+        graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene);
 
     }, [scene, data, onSelect]); // visibleNodeIds is handled by separate effect, but we need initial state
 

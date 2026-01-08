@@ -23,6 +23,10 @@ export class GraphRenderer {
     // Store edge references for filtering
     private edgeInstances: Array<{ mesh: InstancedMesh, source: string, target: string }> = [];
     private graphRoot: TransformNode | null = null; // Root for all content
+    private labelsMap: Map<string, GUI.TextBlock> = new Map();
+    private labelsTexture: GUI.AdvancedDynamicTexture | null = null;
+    private tooltip: GUI.TextBlock | null = null;
+    private showLabelsState: boolean = false;
 
     public getGraphRoot(): TransformNode | null {
         return this.graphRoot;
@@ -62,17 +66,23 @@ export class GraphRenderer {
 
         // OPTIMIZATION: Single UI Texture for all tooltips
         // In VR, we skip this to prevent the Fullscreen UI from blocking ray casts
-        let tooltip: GUI.TextBlock | null = null;
         if (!skip2DUI) {
             const labelTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
-            tooltip = new GUI.TextBlock();
-            tooltip.text = "";
-            tooltip.color = "white";
-            tooltip.fontSize = 14;
-            tooltip.outlineWidth = 2;
-            tooltip.outlineColor = "black";
-            tooltip.isVisible = false;
-            labelTexture.addControl(tooltip);
+            this.tooltip = new GUI.TextBlock();
+            this.tooltip.text = "";
+            this.tooltip.color = "white";
+            this.tooltip.fontSize = 14;
+            this.tooltip.outlineWidth = 2;
+            this.tooltip.outlineColor = "black";
+            this.tooltip.isVisible = false;
+            labelTexture.addControl(this.tooltip);
+        }
+
+        // Reset Persistent Labels map
+        this.labelsMap.clear();
+        if (this.labelsTexture) {
+            this.labelsTexture.dispose();
+            this.labelsTexture = null;
         }
 
         data.nodes.forEach(node => {
@@ -105,12 +115,18 @@ export class GraphRenderer {
                     // Bright white/cyan on hover
                     instance.instancedBuffers.color = new Color4(0.8, 1, 1, 1);
 
-                    // Show Tooltip
-                    if (tooltip && (node.label || node.id)) {
-                        tooltip.text = node.label || node.id;
-                        tooltip.linkWithMesh(instance);
-                        tooltip.linkOffsetY = -30;
-                        tooltip.isVisible = true;
+                    // Show Tooltip (Web)
+                    if (this.tooltip && (node.label || node.id)) {
+                        this.tooltip.text = node.label || node.id;
+                        this.tooltip.linkWithMesh(instance);
+                        this.tooltip.linkOffsetY = -30;
+                        this.tooltip.isVisible = true;
+                    }
+
+                    // Show Tooltip (VR)
+                    // Check if XR is active
+                    if (xrHelperRef?.current?.baseExperience?.state === 2) { // 2 = IN_XR
+                        this.showVRTooltip(node, instance, scene);
                     }
                 })
             );
@@ -128,10 +144,12 @@ export class GraphRenderer {
                         instance.instancedBuffers.color = new Color4(0.1, 0.6, 0.9, 1);
                     }
 
-                    // Hide Tooltip
-                    if (tooltip) {
-                        tooltip.isVisible = false;
+                    // Hide Tooltip (Web)
+                    if (this.tooltip) {
+                        this.tooltip.isVisible = false;
                     }
+                    // Hide Tooltip (VR)
+                    this.hideVRTooltip();
                 })
             );
             instance.actionManager.registerAction(
@@ -314,7 +332,150 @@ export class GraphRenderer {
         });
     }
 
+    /**
+     * Updates label visibility.
+     * @param showLabels whether to show labels
+     * @param nodeMeshes map of meshes
+     * @param scene scene
+     * @param isXR whether we are in specific XR mode (requires 3D labels)
+     */
+    updateLabelVisibility(showLabels: boolean, nodeMeshes: Map<string, Mesh | InstancedMesh>, scene: Scene, isXR: boolean = false) {
+        this.showLabelsState = showLabels;
+
+        if (showLabels) {
+            // Web Mode: Use Fullscreen UI (Optimized)
+            if (!isXR) {
+                if (!this.labelsTexture) {
+                    this.labelsTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("LabelsUI", true, scene);
+                }
+                nodeMeshes.forEach((mesh, id) => {
+                    if (!this.labelsMap.has(id)) {
+                        const label = new GUI.TextBlock();
+                        label.text = mesh.metadata?.label || id;
+                        label.color = "white";
+                        label.fontSize = 12;
+                        label.outlineWidth = 1.5;
+                        label.outlineColor = "black";
+                        this.labelsTexture!.addControl(label);
+                        label.linkWithMesh(mesh);
+                        label.linkOffsetY = -30;
+                        this.labelsMap.set(id, label);
+                    }
+                    const label = this.labelsMap.get(id);
+                    if (label) label.isVisible = mesh.isVisible;
+                });
+            }
+            // VR Mode: Use World Space Planes (Necessary for XR visibility)
+            else {
+                // Warning: Creating individual textures for many nodes is heavy. 
+                // Better approach for VR: 3D Text Planes (MeshBuilder + DynamicTexture) or specific XR UI.
+                // For this fix, we will use a simple implementation.
+
+                nodeMeshes.forEach((mesh, id) => {
+                    // Check if 3D label already exists as child
+                    let labelMesh = mesh.getChildren().find(c => c.name === "VR_Label_Tag") as Mesh;
+
+                    if (!labelMesh) {
+                        // Create 3D Label Plane
+                        // Use a smaller plane above the node
+                        labelMesh = MeshBuilder.CreatePlane("VR_Label_Tag", { width: 1.5, height: 0.5 }, scene);
+                        labelMesh.parent = mesh;
+                        labelMesh.position.y = 1.2; // Above node
+                        labelMesh.billboardMode = Mesh.BILLBOARDMODE_ALL;
+
+                        // Create texture for this label
+                        const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(labelMesh, 256, 128);
+                        const text = new GUI.TextBlock();
+                        text.text = mesh.metadata?.label || id;
+                        text.color = "white";
+                        text.fontSize = 40; // Higher res on texture
+                        text.outlineWidth = 4;
+                        text.outlineColor = "black";
+                        advancedTexture.addControl(text);
+
+                        // Prevent picking on label
+                        labelMesh.isPickable = false;
+                    }
+
+                    labelMesh.isVisible = mesh.isVisible;
+                });
+            }
+
+        } else {
+            // Hide all labels
+            if (!isXR) {
+                this.labelsMap.forEach(label => label.isVisible = false);
+                if (this.labelsTexture) {
+                    this.labelsTexture.dispose();
+                    this.labelsTexture = null;
+                    this.labelsMap.clear();
+                }
+            } else {
+                // Dispose VR label meshes
+                nodeMeshes.forEach((mesh) => {
+                    const labelMesh = mesh.getChildren().find(c => c.name === "VR_Label_Tag");
+                    if (labelMesh) labelMesh.dispose();
+                });
+            }
+        }
+    }
+
+    private vrTooltipMesh: Mesh | null = null;
+    private vrTooltipTexture: GUI.AdvancedDynamicTexture | null = null;
+    private vrTooltipText: GUI.TextBlock | null = null;
+
+    private showVRTooltip(node: any, mesh: Mesh | InstancedMesh, scene: Scene) {
+        if (!this.vrTooltipMesh) {
+            // Create the shared tooltip mesh
+            this.vrTooltipMesh = MeshBuilder.CreatePlane("VRTooltip", { width: 2, height: 0.6 }, scene);
+            this.vrTooltipMesh.billboardMode = Mesh.BILLBOARDMODE_ALL;
+            this.vrTooltipMesh.isPickable = false;
+
+            this.vrTooltipTexture = GUI.AdvancedDynamicTexture.CreateForMesh(this.vrTooltipMesh, 256, 128);
+            this.vrTooltipTexture.hasAlpha = true;
+
+            const container = new GUI.Rectangle();
+            container.background = "rgba(0,0,0,0.8)";
+            container.thickness = 0;
+            container.cornerRadius = 20;
+            this.vrTooltipTexture.addControl(container);
+
+            this.vrTooltipText = new GUI.TextBlock();
+            this.vrTooltipText.color = "white";
+            this.vrTooltipText.fontSize = 40;
+            this.vrTooltipText.fontWeight = "bold";
+            container.addControl(this.vrTooltipText);
+        }
+
+        if (this.vrTooltipMesh && this.vrTooltipText) {
+            this.vrTooltipText.text = node.label || node.id;
+            this.vrTooltipMesh.position = mesh.position.clone();
+            this.vrTooltipMesh.position.y += 1.5; // Slightly above
+            this.vrTooltipMesh.isVisible = true;
+        }
+    }
+
+    private hideVRTooltip() {
+        if (this.vrTooltipMesh) {
+            this.vrTooltipMesh.isVisible = false;
+        }
+    }
+
     disposeGraph(nodeMeshes: Map<string, Mesh | InstancedMesh>, scene: Scene) {
+        if (this.vrTooltipMesh) {
+            this.vrTooltipMesh.dispose();
+            this.vrTooltipMesh = null;
+        }
+        if (this.vrTooltipTexture) {
+            this.vrTooltipTexture.dispose();
+            this.vrTooltipTexture = null;
+        }
+        if (this.labelsTexture) {
+            this.labelsTexture.dispose();
+            this.labelsTexture = null;
+        }
+        this.labelsMap.clear();
+        this.tooltip = null;
         // Clear edge references
         this.edgeInstances = [];
 
