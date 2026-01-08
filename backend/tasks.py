@@ -130,7 +130,11 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
             weight = edge.get(weight_col, 1.0)
             
             if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-                G.add_edge(source, target, weight=float(weight) if weight else 1.0)
+                try:
+                    w = float(weight) if weight else 1.0
+                except (ValueError, TypeError):
+                    w = 1.0
+                G.add_edge(source, target, weight=w)
         
         edge_keys = list(edges[0].keys()) if edges else []
 
@@ -175,7 +179,11 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
             weight = row.get(weight_col, 1.0)
             
             if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-                G.add_edge(source, target, weight=float(weight) if weight else 1.0)
+                try:
+                    w = float(weight) if weight else 1.0
+                except (ValueError, TypeError):
+                    w = 1.0
+                G.add_edge(source, target, weight=w)
         
         edge_keys = list(content[0].keys()) if content else []
 
@@ -193,21 +201,21 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
             "columns": edge_keys
         }
         
-        apply_layout(G, algorithm=algorithm)
+        resolved_algorithm = apply_layout(G, algorithm=algorithm)
         graph_data = nx.node_link_data(G)
         
         return {
             "metadata": metadata,
             "nodes": graph_data["nodes"],
             "edges": graph_data["links"],
-            "format": "json_list"
+            "format": "json_list",
+            "algorithm_used": resolved_algorithm
         }
     
     else:
         raise ValueError("Format JSON non reconnu")
 
 
-def _process_gexf_graph_sync(file_path: Path, mapping: dict, algorithm: str = "auto") -> dict:
     """Version synchrone du traitement GEXF pour Celery."""
     from io import BytesIO
     import re
@@ -282,13 +290,18 @@ def _process_gexf_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
     }
     
     apply_layout(G, algorithm=algorithm)
+    resolved_algorithm = apply_layout(G, algorithm=algorithm) # Note: apply_layout modifies G in place, but we need return value. 
+    # Actually, apply_layout is idempotent-ish but running it twice is wasteful. 
+    # Just one call capturing the return value.
+    
     graph_data = nx.node_link_data(G)
     
     return {
         "metadata": metadata,
         "nodes": graph_data["nodes"],
         "edges": graph_data["links"],
-        "format": "gexf"
+        "format": "gexf",
+        "algorithm_used": resolved_algorithm
     }
 
 
@@ -309,7 +322,7 @@ def process_graph_file_sync(file_path: Path, mapping: dict, algorithm: str = "au
 
 
 @celery_app.task(bind=True, name="tasks.async_process_graph_file")
-def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str = "auto", project_id: str = None):
+def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str = "auto", project_id: str = None, is_new_project: bool = True):
     """
     Tâche Celery pour traiter un graphe volumineux de façon asynchrone 
     et sauvegarder le résultat dans le projet.
@@ -340,6 +353,10 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
                     project.updated_at = datetime.now(timezone.utc)
                     # Utiliser l'algorithme résolu (après "auto") au lieu de l'argument original
                     project.algorithm = result.get("algorithm_used", algorithm)
+                    # Si c'était un nouveau projet sans mapping explicite, sauver le mapping utilisé
+                    if not project.mapping and mapping: 
+                        project.mapping = mapping
+                    
                     await project.save()
             
             try:
@@ -354,8 +371,8 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
         import traceback
         traceback.print_exc()
         
-        # Nettoyage: supprimer le projet si le traitement échoue
-        if project_id:
+        # Nettoyage: supprimer le projet UNIQUEMENT si c'est un NOUVEAU projet
+        if project_id and is_new_project:
             try:
                 mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
                 db_name = os.getenv("MONGODB_DB", "pe_def_db")
@@ -376,7 +393,7 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
                             except Exception:
                                 pass
                         await project.delete()
-                        print(f"Projet {project_id} supprimé après échec du traitement")
+                        print(f"Projet {project_id} supprimé après échec du traitement (Nouveau Projet)")
                 
                 try:
                     loop.run_until_complete(cleanup_project())
@@ -385,6 +402,8 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
                     client.close()
             except Exception as cleanup_error:
                 print(f"Erreur lors du nettoyage du projet: {str(cleanup_error)}")
+        else:
+             print(f"Echec du traitement pour le projet {project_id} (Non supprimé car existant). Erreur: {e}")
         
         return {"status": "FAILURE", "error": str(e)}
 

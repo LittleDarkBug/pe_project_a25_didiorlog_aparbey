@@ -143,7 +143,8 @@ async def create_project(
             str(file_path), 
             parsed_mapping, 
             algorithm, 
-            str(project.id)
+            str(project.id),
+            True # is_new_project
         )
 
         # Retourner le job_id au frontend (le front doit poller /tasks/{job_id})
@@ -196,7 +197,8 @@ async def update_project_layout(
             str(file_path),
             project.mapping or {},
             layout_update.algorithm,
-            str(project.id)
+            str(project.id),
+            False # is_new_project
         )
         
         # update metadata or timestamp to show "processing"?
@@ -261,7 +263,8 @@ async def update_project(
                 str(file_path), 
                 project_update.mapping, 
                 "auto", 
-                str(project.id)
+                str(project.id),
+                False # is_new_project
             )
             project.mapping = project_update.mapping
             project.updated_at = datetime.now(timezone.utc)
