@@ -69,7 +69,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     const detailsPanelRef = useRef(new VRDetailsPanel());
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
     const graphRenderer = useRef(new GraphRenderer());
-    const vrMenuRef = useRef<Mesh | null>(null);
+    const vrMenuRef = useRef<{ dispose: () => void } | null>(null);
 
     // --- Async Layout Handling ---
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -293,37 +293,38 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                 const oldHud = sceneInstance.getMeshByName("VR_HUD");
                 if (oldHud) oldHud.dispose();
 
-                const hudPlane = MeshBuilder.CreatePlane("VR_HUD", { width: 1, height: 0.3 }, sceneInstance);
+                const hudPlane = MeshBuilder.CreatePlane("VR_HUD", { width: 0.6, height: 0.2 }, sceneInstance);
                 // Parent to camera to stay in view
                 hudPlane.parent = xr.baseExperience.camera;
-                hudPlane.position = new Vector3(0, -0.3, 0.8); // Low center, 0.8m away
+                hudPlane.position = new Vector3(0, -0.4, 1); // Lower and further for discretion
                 // Tilt up slightly
-                hudPlane.rotation.x = -Math.PI / 6;
+                hudPlane.rotation.x = -Math.PI / 8;
 
-                const hudTexture = GUI.AdvancedDynamicTexture.CreateForMesh(hudPlane, 512, 156);
-                hudTexture.background = "rgba(0,0,0,0.5)"; // Semi-transparent black
+                const hudTexture = GUI.AdvancedDynamicTexture.CreateForMesh(hudPlane, 512, 170); // Higher resolution relative to size
+                hudTexture.background = "rgba(0, 0, 0, 0.2)"; // Very transparent
 
                 const stack = new GUI.StackPanel();
                 hudTexture.addControl(stack);
 
                 const title = new GUI.TextBlock();
-                title.text = "COMMANDES VR";
+                title.text = "COMMANDES";
                 title.color = "#4ade80"; // Green
-                title.fontSize = 30;
+                title.fontSize = 24;
                 title.height = "40px";
+                title.fontWeight = "bold";
                 stack.addControl(title);
 
                 const instructions = [
-                    "Gâchette (Grip): Saisir le graphe",
-                    "Stick L: Voler/Avancer  |  Stick R: Tourner",
-                    "Bouton A/X: Menu Options  |  Pointer: Interactions"
+                    "Grip: Saisir Monde",
+                    "Sticks: Voler/Tourner",
+                    "A/X: Menu | Trigger: Select"
                 ];
 
                 instructions.forEach(line => {
                     const t = new GUI.TextBlock();
                     t.text = line;
-                    t.color = "white";
-                    t.fontSize = 20;
+                    t.color = "rgba(255, 255, 255, 0.8)";
+                    t.fontSize = 18;
                     t.height = "30px";
                     stack.addControl(t);
                 });

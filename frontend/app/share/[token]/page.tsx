@@ -111,7 +111,6 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
                     isVRMode ? (
                         <GraphSceneXR
                             ref={graphSceneRef}
-                            key={`xr-${project.updated_at || 'initial'}`}
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}

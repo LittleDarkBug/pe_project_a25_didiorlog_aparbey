@@ -376,28 +376,39 @@ export class GraphRenderer {
                     let labelMesh = mesh.getChildren().find(c => c.name === "VR_Label_Tag") as Mesh;
 
                     if (!labelMesh) {
-                        // Create 3D Label Plane
-                        // Use a smaller plane above the node
-                        labelMesh = MeshBuilder.CreatePlane("VR_Label_Tag", { width: 1.5, height: 0.5 }, scene);
-                        labelMesh.parent = mesh;
-                        labelMesh.position.y = 1.2; // Above node
-                        labelMesh.billboardMode = Mesh.BILLBOARDMODE_ALL;
+                        // Create 3D Billboard Label for VR
+                        // Larger dimensions for readability
+                        const labelPlane = MeshBuilder.CreatePlane(`label_${id}`, { width: 2.5, height: 0.8 }, scene);
+                        labelPlane.parent = mesh;
+                        labelPlane.position.y = 1.2; // Higher above node
+                        labelPlane.billboardMode = Mesh.BILLBOARDMODE_ALL;
 
-                        // Create texture for this label
-                        const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(labelMesh, 256, 128);
-                        const text = new GUI.TextBlock();
-                        text.text = mesh.metadata?.label || id;
-                        text.color = "white";
-                        text.fontSize = 40; // Higher res on texture
-                        text.outlineWidth = 4;
-                        text.outlineColor = "black";
-                        advancedTexture.addControl(text);
+                        // High resolution texture
+                        const labelTexture = GUI.AdvancedDynamicTexture.CreateForMesh(labelPlane, 512, 128);
+
+                        const rect = new GUI.Rectangle();
+                        rect.width = 1;
+                        rect.height = 1;
+                        rect.cornerRadius = 20;
+                        rect.color = "transparent";
+                        rect.background = "rgba(0, 0, 0, 0.7)"; // Solid enough background
+                        labelTexture.addControl(rect);
+
+                        const labelText = new GUI.TextBlock();
+                        labelText.text = mesh.metadata?.label || id; // Use mesh.metadata and id
+                        labelText.color = "white";
+                        labelText.fontSize = 70; // Big font
+                        labelText.fontWeight = "bold";
+                        rect.addControl(labelText);
 
                         // Prevent picking on label
-                        labelMesh.isPickable = false;
+                        labelPlane.isPickable = false;
+                        labelMesh = labelPlane as Mesh;
                     }
 
-                    labelMesh.isVisible = mesh.isVisible;
+                    if (labelMesh) {
+                        labelMesh.isVisible = mesh.isVisible;
+                    }
                 });
             }
 

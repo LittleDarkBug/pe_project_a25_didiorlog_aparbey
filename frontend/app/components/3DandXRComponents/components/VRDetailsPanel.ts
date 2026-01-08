@@ -100,60 +100,94 @@ export class VRDetailsPanel {
         const sv = new GUI.ScrollViewer();
         sv.width = 0.9;
         sv.height = 0.65; // Adjust based on header
-        sv.top = 50; // Offset from center/header
-        sv.thickness = 0;
-        sv.barSize = 20;
-        sv.barColor = "#00FFFF";
-        mainContainer.addControl(sv);
+        const container = new GUI.Rectangle();
+        container.width = 1;
+        container.height = 1;
+        container.cornerRadius = 40;
+        container.color = "#3b82f6"; // Blue border
+        container.thickness = 4;
+        container.background = "rgba(10, 10, 20, 0.95)"; // Opaque dark background
+        if (this.texture) {
+            this.texture.addControl(container);
+        }
 
-        const stackPanel = new GUI.StackPanel();
-        stackPanel.width = "100%";
-        sv.addControl(stackPanel);
+        const contentStack = new GUI.StackPanel();
+        contentStack.width = 0.9;
+        contentStack.top = "20px";
+        container.addControl(contentStack);
 
-        // Filter keys
-        const entries = Object.entries(data)
-            .filter(([k]) => !['x', 'y', 'z', 'fx', 'fy', 'fz', '__index', 'geometryId', 'vx', 'vy', 'vz', 'id', 'label', 'type'].includes(k));
+        // Header
+        const header = new GUI.TextBlock();
+        header.text = type === 'node' ? "DÉTAILS NOEUD" : "DÉTAILS LIEN";
+        header.color = "#60a5fa";
+        header.fontSize = 60;
+        header.height = "80px";
+        header.fontWeight = "bold";
+        contentStack.addControl(header);
 
-        entries.forEach(([key, value]) => {
-            // Attribute Row
-            const row = new GUI.StackPanel(); // Use stack for vertical flow if value long? Or grid.
-            row.height = "60px";
-            row.isVertical = false;
+        // ID
+        const idText = new GUI.TextBlock();
+        idText.text = `ID: ${data.id}`;
+        idText.color = "white";
+        idText.fontSize = 40;
+        idText.height = "60px";
+        idText.textWrapping = true;
+        contentStack.addControl(idText);
+
+        // Properties Scroll Viewer
+        const scrollViewer = new GUI.ScrollViewer();
+        scrollViewer.width = 0.9;
+        scrollViewer.height = 0.6;
+        scrollViewer.thickness = 0;
+        scrollViewer.barColor = "#60a5fa";
+        scrollViewer.barSize = 20;
+        contentStack.addControl(scrollViewer);
+
+        const propsStack = new GUI.StackPanel();
+        scrollViewer.addControl(propsStack);
+
+        // Add Properties
+        Object.entries(data).forEach(([key, value]) => {
+            if (['id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'index'].includes(key)) return;
+
+            const pPanel = new GUI.StackPanel();
+            pPanel.height = "100px";
+            pPanel.isVertical = true;
 
             const kText = new GUI.TextBlock();
-            kText.text = `${key}: `;
-            kText.color = "rgba(150, 180, 255, 0.9)";
-            kText.fontSize = 32;
-            kText.width = 0.4;
-            kText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-            kText.paddingRight = "15px";
-            row.addControl(kText);
+            kText.text = key.toUpperCase();
+            kText.color = "#94a3b8"; // Slate 400
+            kText.fontSize = 28;
+            kText.height = "40px";
+            kText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            pPanel.addControl(kText);
 
             const vText = new GUI.TextBlock();
             vText.text = String(value);
             vText.color = "white";
-            vText.fontSize = 32;
-            vText.width = 0.6;
+            vText.fontSize = 34; // Readable size
+            vText.height = "60px";
             vText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-            row.addControl(vText);
+            vText.textWrapping = true;
+            pPanel.addControl(vText);
 
-            stackPanel.addControl(row);
+            propsStack.addControl(pPanel);
         });
 
         // Close Button
         const closeBtn = GUI.Button.CreateSimpleButton("closeBtn", "FERMER");
-        closeBtn.width = "250px";
+        closeBtn.width = "200px";
         closeBtn.height = "80px";
         closeBtn.color = "white";
-        closeBtn.background = "#ef4444";
         closeBtn.cornerRadius = 20;
-        closeBtn.fontSize = 36;
+        closeBtn.background = "#ef4444";
         closeBtn.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
         closeBtn.paddingBottom = "20px";
-        closeBtn.onPointerClickObservable.add(() => {
+        closeBtn.fontSize = 30;
+        closeBtn.onPointerUpObservable.add(() => {
             this.dispose();
         });
-        mainContainer.addControl(closeBtn);
+        container.addControl(closeBtn);
     }
 
     public dispose() {

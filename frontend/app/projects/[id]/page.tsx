@@ -152,7 +152,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     isVRMode ? (
                         <GraphSceneXR
                             ref={graphSceneRef}
-                            key={`xr-${project.updated_at || 'initial'}`}
+                            key="xr-scene"
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}
