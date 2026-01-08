@@ -1,8 +1,8 @@
 'use client';
 
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { XR, XROrigin } from '@react-three/xr';
-import { Suspense, ReactNode, Component, ErrorInfo, useRef, createContext, useContext } from 'react';
+import { XR, XROrigin, useXRInputSourceState, useXR } from '@react-three/xr';
+import { Suspense, ReactNode, Component, ErrorInfo, useRef, createContext, useContext, useState } from 'react';
 import { xrStore } from './store';
 import { VRButton } from '@react-three/xr';
 import * as THREE from 'three';
@@ -51,11 +51,50 @@ class XRErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> 
     }
 }
 
+// Debug component to log XR controller state
+function XRDebugger() {
+    const xr = useXR();
+    const leftController = useXRInputSourceState('controller', 'left');
+    const rightController = useXRInputSourceState('controller', 'right');
+    const [logged, setLogged] = useState(false);
+
+    useFrame(() => {
+        if (xr.session && !logged) {
+            console.log('[XR Debug] Session active:', xr.session);
+            console.log('[XR Debug] Origin:', xr.origin);
+            console.log('[XR Debug] Session.inputSources:', xr.session.inputSources?.length);
+            console.log('[XR Debug] Left controller:', leftController);
+            console.log('[XR Debug] Right controller:', rightController);
+            setLogged(true);
+        }
+
+        // Log controller input for debugging movement issues
+        if (xr.session && leftController?.gamepad) {
+            const gamepad = leftController.gamepad as any;
+            const axes = gamepad.axes;
+            if (axes) {
+                const hasInput = Math.abs(axes[0] || 0) > 0.1 || Math.abs(axes[1] || 0) > 0.1 ||
+                    Math.abs(axes[2] || 0) > 0.1 || Math.abs(axes[3] || 0) > 0.1;
+                if (hasInput) {
+                    console.log('[XR Debug] Left axes:', axes);
+                }
+            }
+        }
+    });
+
+    return null;
+}
+
 // Inner component that provides origin ref via context
 function XRSceneContent({ children, originRef }: { children: ReactNode, originRef: React.RefObject<THREE.Group | null> }) {
     return (
         <XROriginContext.Provider value={originRef}>
             <XROrigin ref={originRef} position={[0, 0, 0]} />
+
+            {/* Debug XR state */}
+            <XRDebugger />
+
+            {/* Note: In @react-three/xr v6, controllers are managed automatically by the store */}
 
             {/* Immersive Lighting */}
             <ambientLight intensity={0.6} />
@@ -92,8 +131,8 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
                 store={xrStore}
                 {...({
                     sessionInit: {
-                        // Minimal features for polyfill compatibility
-                        optionalFeatures: ['local']
+                        // Quest 3 compatible features
+                        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
                     }
                 } as any)}
                 style={{

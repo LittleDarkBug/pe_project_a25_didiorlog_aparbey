@@ -110,7 +110,7 @@ export default function LayoutSelector({ projectId, onLayoutUpdate, onLayoutRequ
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                     </svg>
                 )}
-                <span className="hidden sm:inline">Vues</span>
+                <span className="hidden sm:inline">Layout</span>
                 {currentLayout && (
                     <span className="hidden md:inline text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
                         {currentLayout.label}

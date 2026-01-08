@@ -367,3 +367,114 @@ async def delete_project(
         
     await project.delete()
     return None
+
+
+# ===== Export Project =====
+@router.get("/{project_id}/export")
+async def export_project(
+    project_id: str,
+    format: str = "json",
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Exporte un projet en format JSON ou CSV human-readable.
+    
+    Args:
+        format: 'json' ou 'csv'
+    """
+    from fastapi.responses import Response
+    import csv
+    import io
+    
+    try:
+        project = await Project.get(PydanticObjectId(project_id))
+    except:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if project.owner.ref.id != current_user.id:
+        raise HTTPException(status_code=403, detail="Acces non autorise")
+    
+    if not project.graph_data:
+        raise HTTPException(status_code=400, detail="Aucune donnee de graphe disponible")
+    
+    nodes = project.graph_data.get("nodes", [])
+    edges = project.graph_data.get("edges", [])
+    
+    if format == "json":
+        # Export JSON human-readable
+        export_data = {
+            "project_name": project.name,
+            "metadata": project.metadata or {},
+            "nodes": [
+                {
+                    "id": n.get("id"),
+                    "label": n.get("label", n.get("id")),
+                    **{k: v for k, v in n.items() if k not in ["id", "label", "x", "y", "z", "vx", "vy", "vz", "index"]}
+                }
+                for n in nodes
+            ],
+            "edges": [
+                {
+                    "source": e.get("source"),
+                    "target": e.get("target"),
+                    "weight": e.get("weight", 1)
+                }
+                for e in edges
+            ]
+        }
+        
+        content = json.dumps(export_data, indent=2, ensure_ascii=False)
+        filename = f"{project.name.replace(' ', '_')}_export.json"
+        
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    
+    elif format == "csv":
+        # Export CSV - deux fichiers concatenes: nodes puis edges
+        output = io.StringIO()
+        
+        # Section Nodes
+        output.write("# NODES\n")
+        if nodes:
+            # Determiner les colonnes des noeuds
+            node_keys = set()
+            for n in nodes:
+                node_keys.update(k for k in n.keys() if k not in ["x", "y", "z", "vx", "vy", "vz", "index"])
+            node_keys = sorted(list(node_keys))
+            
+            writer = csv.DictWriter(output, fieldnames=node_keys, extrasaction='ignore')
+            writer.writeheader()
+            for n in nodes:
+                clean_node = {k: v for k, v in n.items() if k not in ["x", "y", "z", "vx", "vy", "vz", "index"]}
+                writer.writerow(clean_node)
+        
+        output.write("\n# EDGES\n")
+        if edges:
+            edge_keys = ["source", "target", "weight"]
+            writer = csv.DictWriter(output, fieldnames=edge_keys, extrasaction='ignore')
+            writer.writeheader()
+            for e in edges:
+                writer.writerow({
+                    "source": e.get("source"),
+                    "target": e.get("target"),
+                    "weight": e.get("weight", 1)
+                })
+        
+        content = output.getvalue()
+        filename = f"{project.name.replace(' ', '_')}_export.csv"
+        
+        return Response(
+            content=content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    
+    else:
+        raise HTTPException(status_code=400, detail="Format non supporte. Utilisez 'json' ou 'csv'")
+

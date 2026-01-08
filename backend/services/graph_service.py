@@ -265,7 +265,7 @@ async def process_graph_file(
 
 
 def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str = "auto") -> Dict[str, Any]:
-    """Traite un fichier CSV pour créer un graphe."""
+    """Traite un fichier CSV pour creer un graphe avec attributs de noeuds."""
     df = _read_csv_safe(file_path)
     
     src_col = mapping.get('source')
@@ -275,7 +275,14 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str 
     if not src_col or not tgt_col:
         raise ValueError("Les colonnes source et target sont requises")
     
+    # Colonnes d'attributs = toutes colonnes sauf source/target/weight
+    reserved_cols = {src_col, tgt_col}
+    if weight_col:
+        reserved_cols.add(weight_col)
+    attr_cols = [c for c in df.columns if c not in reserved_cols]
+    
     G = nx.Graph()
+    node_attrs: Dict[str, Dict[str, Any]] = {}  # Agregation des attributs par noeud
     
     for row in df.iter_rows(named=True):
         source = row[src_col]
@@ -291,16 +298,42 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str 
                     weight = 1.0
         
         # Ignorer les lignes avec des valeurs manquantes ou vides
-        if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-            G.add_edge(source, target, weight=weight)
+        if source is None or target is None or str(source).strip() == "" or str(target).strip() == "":
+            continue
+        
+        source_str = str(source)
+        target_str = str(target)
+        
+        # Extraire les attributs des colonnes supplementaires
+        for attr_col in attr_cols:
+            val = row.get(attr_col)
+            if val is not None and str(val).strip():
+                # Premiere occurrence gagne pour chaque attribut
+                if source_str not in node_attrs:
+                    node_attrs[source_str] = {}
+                if attr_col not in node_attrs[source_str]:
+                    node_attrs[source_str][attr_col] = val
+                    
+                if target_str not in node_attrs:
+                    node_attrs[target_str] = {}
+                if attr_col not in node_attrs[target_str]:
+                    node_attrs[target_str][attr_col] = val
+        
+        G.add_edge(source_str, target_str, weight=weight)
+    
+    # Appliquer les attributs aux noeuds
+    for node_id, attrs in node_attrs.items():
+        for k, v in attrs.items():
+            G.nodes[node_id][k] = v
     
     metadata = {
         "node_count": G.number_of_nodes(),
         "edge_count": G.number_of_edges(),
         "density": nx.density(G),
-        "is_connected": nx.is_connected(G),
+        "is_connected": nx.is_connected(G) if G.number_of_nodes() > 0 else False,
         "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
-        "columns": df.columns
+        "columns": df.columns,
+        "attribute_columns": attr_cols
     }
     
     # Calcul du layout 3D

@@ -322,12 +322,56 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                             </svg>
                                         </div>
                                         <h3 className="text-2xl font-bold text-surface-50 mb-2">
-                                            {isDragActive ? "Déposez le fichier ici" : "Glissez-déposez votre fichier"}
+                                            {isDragActive ? "Deposez le fichier ici" : "Glissez-deposez votre fichier"}
                                         </h3>
                                         <p className="text-surface-400 text-center max-w-md">
                                             Supporte les fichiers CSV, JSON et GEXF.
                                             <br />Taille max: 50MB
                                         </p>
+                                    </div>
+
+                                    {/* Documentation Formats - Pour filtres */}
+                                    <div className="w-full max-w-2xl bg-surface-800/50 rounded-2xl p-5 border border-surface-700">
+                                        <h4 className="text-sm font-bold text-surface-200 mb-4 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Structure pour activer les filtres
+                                        </h4>
+                                        <div className="space-y-4 text-xs">
+                                            {/* CSV Example */}
+                                            <div className="space-y-2">
+                                                <span className="font-medium text-blue-400">CSV</span>
+                                                <pre className="bg-surface-900 rounded-lg p-3 overflow-x-auto text-surface-300">
+                                                    {`source,target,weight,type,department
+Alice,Bob,1,collaboration,Engineering
+Bob,Charlie,2,mentoring,Engineering
+Alice,Diana,1,collaboration,Marketing`}
+                                                </pre>
+                                                <p className="text-surface-500">Les colonnes type et department deviennent des filtres.</p>
+                                            </div>
+
+                                            {/* JSON Example */}
+                                            <div className="space-y-2">
+                                                <span className="font-medium text-green-400">JSON (node-link)</span>
+                                                <pre className="bg-surface-900 rounded-lg p-3 overflow-x-auto text-surface-300">
+                                                    {`{
+  "nodes": [
+    {"id": "Alice", "role": "Manager", "dept": "Eng"},
+    {"id": "Bob", "role": "Developer", "dept": "Eng"}
+  ],
+  "edges": [{"source": "Alice", "target": "Bob"}]
+}`}
+                                                </pre>
+                                                <p className="text-surface-500">Les attributs role et dept deviennent des filtres.</p>
+                                            </div>
+
+                                            {/* GEXF Note */}
+                                            <div className="space-y-1">
+                                                <span className="font-medium text-green-400">GEXF</span>
+                                                <p className="text-surface-500">Les attributs definis dans les balises attvalues sont automatiquement extraits comme filtres.</p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {isAnalyzing && (

@@ -12,6 +12,7 @@ import { DetailsPanel, OverlayControls } from '@/app/components/R3F/UI';
 import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
+import ExportButton from '@/app/components/project/ExportButton';
 import ShareModal from '@/app/components/project/ShareModal';
 import { useToastStore } from '@/app/store/useToastStore';
 import { ProjectSkeleton } from '@/app/components/ui/ProjectSkeleton';
@@ -297,6 +298,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             currentAlgorithm={currentAlgorithm}
                             onAlgorithmChange={setCurrentAlgorithm}
                         />
+
+                        {/* Export Button */}
+                        <ExportButton projectId={id} projectName={project.name} />
 
                         {/* Filter Toggle Button */}
                         <button
