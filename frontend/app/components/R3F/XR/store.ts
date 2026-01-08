@@ -20,4 +20,9 @@ export const xrStore = createXRStore({
     // Ensure controllers are prioritized for debugging
     controller: true,
     hand: false, // Temporarily disable hands to isolate controller detection issues
+
+    // Explicitly disable layers to avoid "Unsupported feature requested: layers"
+    layers: false,
+    // Disable other potentially problematic features
+    hitTest: false,
 });

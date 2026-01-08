@@ -5,6 +5,7 @@ import { XR, XROrigin, useXRInputSourceState, useXR } from '@react-three/xr';
 import { Suspense, ReactNode, Component, ErrorInfo, useRef, createContext, useContext, useState } from 'react';
 import { xrStore } from './store';
 import { VRButton } from '@react-three/xr';
+import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface XRCanvasProps {
@@ -96,16 +97,21 @@ function XRSceneContent({ children, originRef }: { children: ReactNode, originRe
 
             {/* Note: In @react-three/xr v6, controllers are managed automatically by the store */}
 
-            {/* Immersive Lighting */}
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[10, 20, 10]} intensity={1.5} color="#ffffff" />
-            <pointLight position={[-10, 5, -10]} intensity={1} color="#4080ff" />
-            <pointLight position={[10, 5, 10]} intensity={1} color="#ff8040" />
+            {/* NOTE: Quest 3 performance optimization - simplified lighting compared to Web */}
+            {/* Lighting - Matching BabylonJS exactly */}
+            <ambientLight intensity={0.4} color="#e6e6ff" />
+            <directionalLight position={[0, 10, 0]} intensity={0.4} color="#ffffff" />
+            <directionalLight position={[-1, -2, -1]} intensity={0.2} color="#ccccE6" />
 
             <Suspense fallback={null}>
-                {/* Vast Black Environment */}
-                <color attach="background" args={['#000000']} />
-                <gridHelper args={[50, 50, 0x222222, 0x050505]} position={[0, -2, 0]} />
+                {/* Space Background matching BabylonJS clearColor/spaceMat */}
+                <color attach="background" args={['#030308']} />
+
+                {/* Stars removed for VR performance stability */}
+                {/* <Stars radius={300} depth={100} count={3000} factor={4} saturation={0} fade speed={1} /> */}
+
+                {/* Subtle Grid for orientation, matching the dark aesthetic */}
+                <gridHelper args={[50, 50, 0x1a1a2e, 0x050510]} position={[0, -2, 0]} />
 
                 {children}
             </Suspense>
@@ -115,6 +121,7 @@ function XRSceneContent({ children, originRef }: { children: ReactNode, originRe
 
 export default function XRCanvas({ children, className }: XRCanvasProps) {
     const originRef = useRef<THREE.Group | null>(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
 
     const xrFallback = (
         <div className="h-full w-full flex items-center justify-center bg-black text-white">
@@ -128,7 +135,26 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
     return (
         <div className={className || "h-full w-full relative"}>
             <button
-                onClick={() => xrStore.enterVR()}
+                disabled={isTransitioning}
+                onClick={async () => {
+                    console.log('[XRCanvas] Enter VR clicked');
+                    if (isTransitioning) return;
+
+                    try {
+                        setIsTransitioning(true);
+                        console.log('[XRCanvas] Requesting VR session...');
+                        const session = await xrStore.enterVR();
+                        console.log('[XRCanvas] VR Session started:', session);
+                    } catch (error) {
+                        console.error('[XRCanvas] Failed to enter VR:', error);
+                        // Force reset state if it fails
+                        setIsTransitioning(false);
+                    }
+                    // Do not auto-reset isTransitioning to false on success immediately
+                    // because we want to prevent double-clicks while the immersive view loads.
+                    // The button will naturally essentially "disappear" or become irrelevant 
+                    // once the user is in VR (as they won't see the DOM overlay usually).
+                }}
                 style={{
                     position: 'absolute',
                     bottom: '24px',
@@ -138,13 +164,15 @@ export default function XRCanvas({ children, className }: XRCanvasProps) {
                     padding: '12px 24px',
                     border: '1px solid white',
                     borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.8)',
+                    background: isTransitioning ? 'rgba(88, 28, 135, 0.8)' : 'rgba(0, 0, 0, 0.8)', // Violet tint when loading
                     color: 'white',
                     font: 'bold 16px sans-serif',
-                    cursor: 'pointer'
+                    cursor: isTransitioning ? 'wait' : 'pointer',
+                    opacity: isTransitioning ? 0.8 : 1,
+                    transition: 'all 0.2s'
                 }}
             >
-                Enter VR
+                {isTransitioning ? 'Chargement VR...' : 'Entrer en VR'}
             </button>
 
             <XRErrorBoundary fallback={xrFallback}>

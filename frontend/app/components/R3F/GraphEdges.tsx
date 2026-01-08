@@ -35,7 +35,7 @@ interface GraphEdgesProps {
 export default function GraphEdges({
     edges,
     nodes,
-    edgeColor = '#64748b',
+    edgeColor = '#88ccff',
     edgeOpacity = 0.6,
     onEdgeClick,
     isVR = false
@@ -92,27 +92,12 @@ export default function GraphEdges({
         meshRef.current.instanceMatrix.needsUpdate = true;
     }, [validEdges, nodePositions, tempObject]);
 
-    // Handle Hover Colors
-    useFrame(() => {
+    // Optimization: Update colors only when hover/data changes
+    useLayoutEffect(() => {
         if (!meshRef.current) return;
-
-        // This is a bit costly if we do it every frame for all edges, 
-        // but InstancedMesh needs it if we want dynamic coloring.
-        // Optimization: only update if hovered state changes? 
-        // For now, simple loop is fine unless edges > 100k.
-
-        // Actually, we can just update the color of the hovered instance and reset others?
-        // But re-setting all is safer for state consistency.
 
         const defaultColor = new THREE.Color(edgeColor);
         const activeColor = new THREE.Color('#a855f7'); // Hover color
-
-        // If nothing hovered, we could skip? But we need to reset previous hover.
-        // Let's just iterate.
-
-        // Optimization: If performance is issue, we track "previousHovered" and only update 2 instances.
-        // For < 5000 edges, full loop is generally barely noticeable on GPU, but CPU overhead exists.
-        // We will assume standard graph size < 2000 edges.
 
         for (let i = 0; i < validEdges.length; i++) {
             // We can allow individual edge styling here if edge.color exists
@@ -123,7 +108,7 @@ export default function GraphEdges({
         if (meshRef.current.instanceColor) {
             meshRef.current.instanceColor.needsUpdate = true;
         }
-    });
+    }, [validEdges, hoveredInstanceId, edgeColor]); // Only re-run on hover/data change
 
     const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
@@ -162,10 +147,10 @@ export default function GraphEdges({
             <cylinderGeometry args={[0.15, 0.15, 1, 8]} />
             <meshStandardMaterial
                 transparent
-                opacity={0.8}
+                opacity={edgeOpacity}
                 color={edgeColor}
-                emissive="#ffffff"
-                emissiveIntensity={0.2}
+                emissive="#a855f7" // Violet emissive
+                emissiveIntensity={0.8} // Increased intensity for better neon effect
                 depthWrite={false} // Helps with transparency
             />
         </instancedMesh>

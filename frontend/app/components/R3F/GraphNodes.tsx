@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { Html, Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
@@ -48,9 +48,12 @@ export default function GraphNodes({
         return map;
     }, [nodes]);
 
-    // Update instance matrices on each frame
-    useFrame(() => {
+    // Optimization: Update instances only when data or selection changes, NOT every frame
+    useLayoutEffect(() => {
         if (!meshRef.current) return;
+
+        const tempObject = new THREE.Object3D();
+        const tempColor = new THREE.Color();
 
         nodes.forEach((node, i) => {
             tempObject.position.set(node.x || 0, node.y || 0, node.z || 0);
@@ -78,7 +81,7 @@ export default function GraphNodes({
         if (meshRef.current.instanceColor) {
             meshRef.current.instanceColor.needsUpdate = true;
         }
-    });
+    }, [nodes, selectedNodeId, hoveredId]); // Only re-run when these change
 
     const handleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
@@ -115,10 +118,11 @@ export default function GraphNodes({
             >
                 <sphereGeometry args={[nodeSize, 32, 32]} />
                 <meshStandardMaterial
-                    metalness={0.5}
-                    roughness={0.2}
-                    emissive="#2563eb"
-                    emissiveIntensity={0.4}
+                    metalness={0.8}
+                    roughness={0.1}
+                    emissive="#4080ff"
+                    emissiveIntensity={0.8}
+                    toneMapped={false} // Important for bloom to work well
                 />
             </instancedMesh>
 

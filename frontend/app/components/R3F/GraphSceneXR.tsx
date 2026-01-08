@@ -1,4 +1,4 @@
-import { useState, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
+import { useState, useCallback, forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useXRInputSourceState } from '@react-three/xr';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -131,7 +131,7 @@ const GraphSceneXR = forwardRef<GraphSceneXRRef, GraphSceneXRProps>(({
 }, ref) => {
     const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
     const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null);
-    const [showLabels, setShowLabels] = useState(true);
+    const [showLabels, setShowLabels] = useState(false); // Default false in VR to prevent performance crash
     const [showControlPanel, setShowControlPanel] = useState(false);
     const [panelPose, setPanelPose] = useState<{ position: [number, number, number], rotation: [number, number, number] }>({
         position: [0, 1.2, -0.5],
@@ -147,17 +147,21 @@ const GraphSceneXR = forwardRef<GraphSceneXRRef, GraphSceneXRProps>(({
 
     // ... existing filter logic ...
 
-    // Filter visible nodes
-    const visibleNodes = visibleNodeIds
-        ? data.nodes.filter(n => visibleNodeIds.has(n.id))
-        : data.nodes;
+    // Filter visible nodes - Memoized to prevent frequent re-renders
+    const visibleNodes = useMemo(() =>
+        visibleNodeIds
+            ? data.nodes.filter(n => visibleNodeIds.has(n.id))
+            : data.nodes
+        , [data.nodes, visibleNodeIds]);
 
-    // Filter edges to only show connections between visible nodes
-    const visibleEdges = visibleNodeIds
-        ? data.edges.filter(e =>
-            visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)
-        )
-        : data.edges;
+    // Filter edges to only show connections between visible nodes - Memoized
+    const visibleEdges = useMemo(() =>
+        visibleNodeIds
+            ? data.edges.filter(e =>
+                visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)
+            )
+            : data.edges
+        , [data.edges, visibleNodeIds]);
 
     const handleNodeClick = useCallback((node: NodeData) => {
         setSelectedNode(prev => prev?.id === node.id ? null : node);

@@ -20,7 +20,7 @@ export default function OverlayControls({
     children
 }: OverlayControlsProps) {
     return (
-        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl items-center">
+        <div className="absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/80 p-2 backdrop-blur-2xl shadow-2xl items-center">
             <button
                 onClick={onResetCamera}
                 className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-blue-500/20 hover:text-white hover:scale-105 cursor-pointer"
@@ -32,7 +32,7 @@ export default function OverlayControls({
                 <span className="hidden sm:inline">Reset</span>
             </button>
 
-            <div className="w-px h-6 bg-white/10"></div>
+            <div className="w-px h-6 bg-white/10 mx-1"></div>
 
             {/* Labels Toggle */}
             {onToggleLabels && (
@@ -40,8 +40,8 @@ export default function OverlayControls({
                     <button
                         onClick={onToggleLabels}
                         className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${showLabels
-                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
-                                : 'bg-white/5 text-gray-300 hover:bg-cyan-500/20 hover:text-white'
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
+                            : 'bg-white/5 text-gray-300 hover:bg-cyan-500/20 hover:text-white'
                             }`}
                         title="Afficher les labels"
                     >
@@ -50,13 +50,14 @@ export default function OverlayControls({
                         </svg>
                         <span className="hidden sm:inline">Labels</span>
                     </button>
-                    <div className="w-px h-6 bg-white/10"></div>
+                    <div className="w-px h-6 bg-white/10 mx-1"></div>
                 </>
             )}
 
+            {/* Children (Layouts, Export, Filters) */}
             {children}
 
-            {children && <div className="w-px h-6 bg-white/10"></div>}
+            {children && <div className="w-px h-6 bg-white/10 mx-1"></div>}
 
             <button
                 onClick={onToggleVR}
@@ -72,7 +73,7 @@ export default function OverlayControls({
 
             {onEdit && (
                 <>
-                    <div className="w-px bg-white/10"></div>
+                    <div className="w-px h-6 bg-white/10 mx-1"></div>
                     <button
                         onClick={onEdit}
                         className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-orange-500/20 hover:text-white hover:scale-105 cursor-pointer"
@@ -88,7 +89,7 @@ export default function OverlayControls({
 
             {onShare && (
                 <>
-                    <div className="w-px bg-white/10"></div>
+                    <div className="w-px h-6 bg-white/10 mx-1"></div>
                     <button
                         onClick={onShare}
                         className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-green-500/20 hover:text-white hover:scale-105 cursor-pointer"
