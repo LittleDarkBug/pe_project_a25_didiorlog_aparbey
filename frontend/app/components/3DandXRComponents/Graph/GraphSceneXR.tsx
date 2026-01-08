@@ -198,7 +198,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     testMat.emissiveColor = new Color3(1, 0, 0); // BRIGHT RED
                     testMat.disableLighting = true;
                     testSphere.material = testMat;
-                    console.log("🔴 DEBUG: Created red test sphere at (0, 1.5, -2)");
+                    console.log("DEBUG: Created red test sphere at (0, 1.5, -2)");
 
                     // Notify parent that we're now in XR
                     if (vrUtilsRef.current.onXRStateChange) {
@@ -225,7 +225,7 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
 
                 // Debug: Check if controller meshes are loaded
                 if (controller.grip) {
-                    console.log("📦 Grip mesh children:", controller.grip.getChildMeshes().length);
+                    console.log("Grip mesh children:", controller.grip.getChildMeshes().length);
 
                     // Create custom controller visual since external models don't load
                     const controllerVisual = MeshBuilder.CreateBox(
@@ -254,16 +254,16 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                             controllerVisual.rotationQuaternion = controller.grip.rotationQuaternion?.clone() ?? null;
 
                             if (!posLogged) {
-                                console.log("📍 Controller visual position:", controller.inputSource.handedness, controllerVisual.position.toString());
+                                console.log("Controller visual position:", controller.inputSource.handedness, controllerVisual.position.toString());
                                 posLogged = true;
                             }
                         }
                     });
 
-                    console.log("✅ Created custom controller visual for:", controller.inputSource.handedness);
+                    console.log("Created custom controller visual for:", controller.inputSource.handedness);
                 }
                 if (controller.pointer) {
-                    console.log("📦 Pointer mesh children:", controller.pointer.getChildMeshes().length);
+                    console.log("Pointer mesh children:", controller.pointer.getChildMeshes().length);
                 }
 
                 // Create visible laser beam mesh for this controller
