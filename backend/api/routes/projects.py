@@ -134,7 +134,8 @@ async def create_project(
             metadata=None,
             mapping=parsed_mapping,
             source_file_path=str(file_path),
-            is_public=is_public
+            is_public=is_public,
+            algorithm=algorithm # Persist initial algorithm choice
         )
         await project.insert()
 

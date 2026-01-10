@@ -206,13 +206,15 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
         }
     };
 
+    const [activeTab, setActiveTab] = useState<'csv' | 'json' | 'gexf'>('csv');
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-4xl overflow-hidden rounded-3xl bg-surface-900 shadow-2xl border border-surface-700 flex flex-col max-h-[90vh]"
+                className="w-full max-w-5xl overflow-hidden rounded-3xl bg-surface-900 shadow-2xl border border-surface-700 flex flex-col max-h-[90vh]"
             >
                 {/* Loader asynchrone */}
                 {(isSubmitting || pollingLoading) && jobId && (
@@ -248,13 +250,13 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                     </div>
 
                     {/* Stepper */}
-                    <div className="mt-8 flex items-center justify-between px-4">
+                    <div className="mt-8 flex items-center justify-between px-4 max-w-3xl mx-auto">
                         {steps.map((step, index) => {
                             const isActive = step.id === currentStep;
                             const isCompleted = steps.findIndex(s => s.id === currentStep) > index;
 
                             return (
-                                <div key={step.id} className="flex flex-col items-center relative z-10">
+                                <div key={step.id} className="flex flex-col items-center relative z-10 w-full text-center">
                                     <div
                                         className={`
                                             flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300
@@ -270,13 +272,13 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                             </svg>
                                         ) : step.icon}
                                     </div>
-                                    <span className={`mt-2 text-xs font-medium transition-colors duration-300 ${isActive ? 'text-blue-400' : 'text-surface-500'}`}>
+                                    <span className={`mt-2 text-xs font-medium transition-colors duration-300 absolute -bottom-6 w-24 ${isActive ? 'text-blue-400' : 'text-surface-500'}`}>
                                         {step.label}
                                     </span>
 
                                     {/* Connector Line */}
                                     {index < steps.length - 1 && (
-                                        <div className="absolute left-1/2 top-5 -z-10 h-[2px] w-[calc(100vw/4-2rem)] max-w-[180px] -translate-y-1/2 bg-surface-700">
+                                        <div className="absolute left-[50%] top-5 -z-10 h-[2px] w-full -translate-y-1/2 bg-surface-700">
                                             <div
                                                 className="h-full bg-blue-500 transition-all duration-500"
                                                 style={{ width: isCompleted ? '100%' : '0%' }}
@@ -290,7 +292,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-8">
+                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={currentStep}
@@ -301,37 +303,113 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                             className="h-full"
                         >
                             {currentStep === 'upload' && (
-                                <div className="flex h-full flex-col items-center justify-center space-y-6">
-                                    <div
-                                        {...getRootProps()}
-                                        className={`
-                                            group relative flex w-full max-w-2xl flex-col items-center justify-center rounded-3xl border-2 border-dashed p-16 transition-all duration-300 cursor-pointer
-                                            ${isDragActive
-                                                ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
-                                                : 'border-surface-700 bg-surface-800/30 hover:border-blue-400/50 hover:bg-surface-800/50'
-                                            }
-                                        `}
-                                    >
-                                        <input {...getInputProps()} />
-                                        <div className={`
-                                            mb-6 rounded-2xl p-6 transition-all duration-300 shadow-xl
-                                            ${isDragActive ? 'bg-blue-500 text-white scale-110' : 'bg-surface-800 text-surface-400 group-hover:bg-surface-700 group-hover:text-blue-400'}
-                                        `}>
-                                            <svg className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
+                                <div className="flex flex-col h-full gap-8">
+                                    {/* Dropzone Area */}
+                                    <section className="flex-shrink-0">
+                                        <div
+                                            {...getRootProps()}
+                                            className={`
+                                                group relative flex w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed p-10 transition-all duration-300 cursor-pointer bg-surface-800/20
+                                                ${isDragActive
+                                                    ? 'border-blue-500 bg-blue-500/10'
+                                                    : 'border-surface-600 hover:border-blue-400/50 hover:bg-surface-800/40'
+                                                }
+                                            `}
+                                        >
+                                            <input {...getInputProps()} />
+                                            <div className="flex items-center gap-6">
+                                                <div className={`
+                                                    rounded-2xl p-4 transition-all duration-300 shadow-xl
+                                                    ${isDragActive ? 'bg-blue-500 text-white scale-110' : 'bg-surface-800 text-surface-400 group-hover:bg-surface-700 group-hover:text-blue-400'}
+                                                `}>
+                                                    <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                    </svg>
+                                                </div>
+                                                <div className="text-left">
+                                                    <h3 className="text-xl font-bold text-surface-50 mb-1">
+                                                        {isDragActive ? "Déposez le fichier ici" : "Glissez-déposez votre fichier"}
+                                                    </h3>
+                                                    <p className="text-surface-400 text-sm">
+                                                        CSV, JSON ou GEXF (Max 50MB)
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <h3 className="text-2xl font-bold text-surface-50 mb-2">
-                                            {isDragActive ? "Déposez le fichier ici" : "Glissez-déposez votre fichier"}
-                                        </h3>
-                                        <p className="text-surface-400 text-center max-w-md">
-                                            Supporte les fichiers CSV, JSON et GEXF.
-                                            <br />Taille max: 50MB
-                                        </p>
-                                    </div>
+                                    </section>
+
+                                    {/* Guidance Tabs */}
+                                    <section className="flex-1 min-h-0 flex flex-col bg-surface-800/10 rounded-2xl border border-surface-700/50 overflow-hidden">
+                                        <div className="flex border-b border-surface-700/50 bg-surface-800/30">
+                                            <button onClick={() => setActiveTab('csv')} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'csv' ? 'text-blue-400 border-b-2 border-blue-400 bg-blue-500/5' : 'text-surface-400 hover:text-surface-200'}`}>CSV</button>
+                                            <button onClick={() => setActiveTab('json')} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'json' ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/5' : 'text-surface-400 hover:text-surface-200'}`}>JSON</button>
+                                            <button onClick={() => setActiveTab('gexf')} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'gexf' ? 'text-green-400 border-b-2 border-green-400 bg-green-500/5' : 'text-surface-400 hover:text-surface-200'}`}>GEXF</button>
+                                        </div>
+
+                                        <div className="p-6 overflow-y-auto">
+                                            {activeTab === 'csv' && (
+                                                <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="mt-1 p-1 rounded bg-blue-500/10"><svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                                                        <div>
+                                                            <h4 className="font-bold text-surface-200 text-sm">Format Tabulaire (Liens)</h4>
+                                                            <p className="text-xs text-surface-400 mt-1">Idéal pour les listes d'arêtes simples.</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-surface-950/50 p-4 rounded-lg border border-surface-700/50 text-xs font-mono text-surface-300">
+                                                        source,target,weight,type<br />
+                                                        NodeA,NodeB,1.0,friend<br />
+                                                        NodeB,NodeC,2.5,flirt
+                                                    </div>
+                                                    <ul className="text-sm text-surface-400 space-y-2 list-disc pl-5 marker:text-blue-500">
+                                                        <li>Colonnes requises : <strong>source</strong>, <strong>target</strong>.</li>
+                                                        <li>Colonnes optionnelles : <strong>weight</strong> (poids), et tout autre attribut pour le filtrage.</li>
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'json' && (
+                                                <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="mt-1 p-1 rounded bg-purple-500/10"><svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                                                        <div>
+                                                            <h4 className="font-bold text-surface-200 text-sm">Format Node-Link</h4>
+                                                            <p className="text-xs text-surface-400 mt-1">Structure complète déclarée.</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-surface-950/50 p-4 rounded-lg border border-surface-700/50 text-xs font-mono text-surface-300 whitespace-pre">
+                                                        {`{
+  "nodes": [
+    { "id": "1", "group": "A", "label": "Chef" },
+    ...
+  ],
+  "links": [
+    { "source": "1", "target": "2", "value": 5 }
+  ]
+}`}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'gexf' && (
+                                                <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="mt-1 p-1 rounded bg-green-500/10"><svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                                                        <div>
+                                                            <h4 className="font-bold text-surface-200 text-sm">Format Graph Exchange XML</h4>
+                                                            <p className="text-xs text-surface-400 mt-1">Le standard le plus riche pour les graphes complexes.</p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-sm text-surface-400">
+                                                        Gephi exporte nativement en GEXF. Les attributs, couleurs, et positions sont préservés.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </section>
 
                                     {isAnalyzing && (
-                                        <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-3 rounded-full">
+                                        <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-3 rounded-full mx-auto">
                                             <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                             <span className="font-medium">Analyse du fichier en cours...</span>
                                         </div>
@@ -340,7 +418,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                             )}
 
                             {currentStep === 'mapping' && analysis && (
-                                <div className="space-y-8">
+                                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                                     <div className="text-center mb-8">
                                         <h3 className="text-xl font-bold text-surface-50">Configuration du Mapping</h3>
                                         <p className="text-surface-400">Associez les colonnes de votre CSV aux propriétés du graphe</p>
@@ -420,7 +498,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                             )}
 
                             {currentStep === 'details' && (
-                                <div className="max-w-2xl mx-auto space-y-6">
+                                <div className="max-w-2xl mx-auto space-y-6 animate-in slide-in-from-right-4 duration-300">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-surface-300">Nom du projet</label>
                                         <input
@@ -459,7 +537,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                             )}
 
                             {currentStep === 'review' && (
-                                <div className="max-w-2xl mx-auto space-y-8">
+                                <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
                                     <div className="bg-surface-800/30 rounded-2xl p-6 border border-surface-700 space-y-4">
                                         <h3 className="text-lg font-bold text-surface-50 mb-4">Récapitulatif</h3>
 

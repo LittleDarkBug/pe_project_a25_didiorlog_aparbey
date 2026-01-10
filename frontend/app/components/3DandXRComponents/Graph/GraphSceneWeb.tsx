@@ -35,6 +35,7 @@ interface GraphSceneProps {
     data: GraphData;
     onSelect?: (data: any, type: 'node' | 'edge' | null) => void;
     visibleNodeIds?: Set<string> | null;
+    visibleEdgeIds?: Set<string> | null;
     showLabels?: boolean;
 }
 
@@ -42,7 +43,7 @@ export interface GraphSceneRef {
     resetCamera: () => void;
 }
 
-const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, showLabels }, ref) => {
+const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, visibleEdgeIds, showLabels }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
@@ -65,9 +66,9 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
     // Handle visibility updates
     useEffect(() => {
         if (scene && nodeMeshesRef.current.size > 0) {
-            graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
+            graphRenderer.current.updateVisibility(visibleNodeIds ?? null, visibleEdgeIds ?? null, nodeMeshesRef.current);
         }
-    }, [visibleNodeIds, scene]);
+    }, [visibleNodeIds, visibleEdgeIds, scene]);
 
     // Handle Label Visibility
     useEffect(() => {
@@ -136,7 +137,7 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
         );
 
         // Force visibility update after creation
-        graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
+        graphRenderer.current.updateVisibility(visibleNodeIds ?? null, visibleEdgeIds ?? null, nodeMeshesRef.current);
         // Force label update
         graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene);
 

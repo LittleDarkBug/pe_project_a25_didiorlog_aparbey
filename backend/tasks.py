@@ -92,14 +92,15 @@ def _process_csv_graph_sync(file_path: Path, mapping: dict, algorithm: str = "au
         "columns": df.columns
     }
     
-    apply_layout(G, algorithm=algorithm)
-    graph_data = nx.node_link_data(G)
+    resolved_algorithm = apply_layout(G, algorithm=algorithm)
+    graph_data = nx.node_link_data(G, edges="links")
     
     return {
         "metadata": metadata,
         "nodes": graph_data["nodes"],
         "edges": graph_data["links"],
-        "format": "csv_processed"
+        "format": "csv_processed",
+        "algorithm_used": resolved_algorithm
     }
 
 
@@ -109,34 +110,46 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
     with open(file_path, 'rb') as f:
         content = orjson.loads(f.read())
     
-    if isinstance(content, dict) and 'nodes' in content and 'edges' in content:
+    if isinstance(content, dict) and 'nodes' in content:
         nodes = content['nodes']
-        edges = content['edges']
+        # Support both 'edges' (generic) and 'links' (D3/NetworkX convention)
+        edges = content.get('edges', content.get('links'))
         
-        G = nx.Graph()
-        
-        for node in nodes:
-            node_id = node.get('id')
-            if node_id:
-                G.add_node(node_id, **{k: v for k, v in node.items() if k != 'id'})
-        
-        src_col = mapping.get('source', 'source')
-        tgt_col = mapping.get('target', 'target')
-        weight_col = mapping.get('weight', 'weight')
-        
-        for edge in edges:
-            source = edge.get(src_col)
-            target = edge.get(tgt_col)
-            weight = edge.get(weight_col, 1.0)
-            
-            if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-                try:
-                    w = float(weight) if weight else 1.0
-                except (ValueError, TypeError):
-                    w = 1.0
-                G.add_edge(source, target, weight=w)
-        
-        edge_keys = list(edges[0].keys()) if edges else []
+        if edges is None:
+             # Fallback to list check if no edges/links found, or raise logic later
+             # But for now, if 'nodes' is present but no edges, it might be a node-only graph?
+             # existing code flow expects edges.
+             pass
+
+        if edges is not None:
+             G = nx.Graph()
+             
+             for node in nodes:
+                 node_id = node.get('id')
+                 if node_id:
+                     G.add_node(node_id, **{k: v for k, v in node.items() if k != 'id'})
+             
+             src_col = mapping.get('source') or 'source'
+             tgt_col = mapping.get('target') or 'target'
+             weight_col = mapping.get('weight') or 'weight'
+             
+             # Fallback: if user didn't specify mapping and 'weight' not found, try 'value' (common in D3)
+             if not mapping.get('weight') and edges and 'value' in edges[0]:
+                 weight_col = 'value'
+             
+             for edge in edges:
+                 source = edge.get(src_col)
+                 target = edge.get(tgt_col)
+                 weight = edge.get(weight_col, 1.0)
+                 
+                 if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
+                     try:
+                         w = float(weight) if weight else 1.0
+                     except (ValueError, TypeError):
+                         w = 1.0
+                     G.add_edge(source, target, weight=w)
+             
+             edge_keys = list(edges[0].keys()) if edges else []
 
         # Check connectivity based on graph type
         is_connected = False
@@ -152,23 +165,34 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
             "columns": edge_keys
         }
         
-        apply_layout(G, algorithm=algorithm)
-        graph_data = nx.node_link_data(G)
+        resolved_algorithm = apply_layout(G, algorithm=algorithm)
+        graph_data = nx.node_link_data(G, edges="links")
+        
+        used_mapping = {
+            "source": src_col,
+            "target": tgt_col,
+            "weight": weight_col
+        }
         
         return {
             "metadata": metadata,
             "nodes": graph_data["nodes"],
             "edges": graph_data["links"],
-            "format": "json_node_link"
+            "format": "json_node_link",
+            "algorithm_used": resolved_algorithm,
+            "mapping": used_mapping
         }
     
     elif isinstance(content, list):
         # Traiter comme une liste d'edges
-        src_col = mapping.get('source')
-        tgt_col = mapping.get('target')
-        weight_col = mapping.get('weight')
+        src_col = mapping.get('source') or 'source'
+        tgt_col = mapping.get('target') or 'target'
+        weight_col = mapping.get('weight') or 'weight'
         
+        # If still failing validation because defaults didn't match data, we will raise error later 
+        # but here we ensure at least we try defaults.
         if not src_col or not tgt_col:
+             # Should practically never happen with defaults set above
             raise ValueError("Les colonnes source et target sont requises")
         
         G = nx.Graph()
@@ -202,14 +226,21 @@ def _process_json_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
         }
         
         resolved_algorithm = apply_layout(G, algorithm=algorithm)
-        graph_data = nx.node_link_data(G)
+        graph_data = nx.node_link_data(G, edges="links")
+        
+        used_mapping = {
+            "source": src_col,
+            "target": tgt_col,
+            "weight": weight_col
+        }
         
         return {
             "metadata": metadata,
             "nodes": graph_data["nodes"],
             "edges": graph_data["links"],
             "format": "json_list",
-            "algorithm_used": resolved_algorithm
+            "algorithm_used": resolved_algorithm,
+            "mapping": used_mapping
         }
     
     else:
@@ -290,12 +321,9 @@ def _process_gexf_graph_sync(file_path: Path, mapping: dict, algorithm: str = "a
         "columns": []
     }
     
-    apply_layout(G, algorithm=algorithm)
-    resolved_algorithm = apply_layout(G, algorithm=algorithm) # Note: apply_layout modifies G in place, but we need return value. 
-    # Actually, apply_layout is idempotent-ish but running it twice is wasteful. 
-    # Just one call capturing the return value.
+    resolved_algorithm = apply_layout(G, algorithm=algorithm)
     
-    graph_data = nx.node_link_data(G)
+    graph_data = nx.node_link_data(G, edges="links")
     
     return {
         "metadata": metadata,
@@ -354,8 +382,13 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
                     project.updated_at = datetime.now(timezone.utc)
                     # Utiliser l'algorithme résolu (après "auto") au lieu de l'argument original
                     project.algorithm = result.get("algorithm_used", algorithm)
+                    
                     # Si c'était un nouveau projet sans mapping explicite, sauver le mapping utilisé
-                    if not project.mapping and mapping: 
+                    # On priorise le mapping retourné par la fonction de traitement (qui contient les valeurs par défaut utilisées)
+                    result_mapping = result.get("mapping")
+                    if result_mapping:
+                        project.mapping = result_mapping
+                    elif not project.mapping and mapping: 
                         project.mapping = mapping
                     
                     await project.save()

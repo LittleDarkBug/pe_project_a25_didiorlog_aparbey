@@ -113,7 +113,11 @@ async def analyze_file_structure(file_path: Path) -> Dict[str, Any]:
                             "type": "json_node_link",
                             "columns": edge_keys,
                             "preview": edges[:5],
-                            "suggestions": _suggest_mapping(edge_keys),
+                            "suggestions": _suggest_mapping(edge_keys) or {
+                                "source": "source",
+                                "target": "target",
+                                "format": "json_node_link_default"
+                            },
                             "stats": None,
                             "node_count": len(nodes),
                             "edge_count": len(edges)
@@ -163,7 +167,11 @@ async def analyze_file_structure(file_path: Path) -> Dict[str, Any]:
                     "type": "gexf",
                     "columns": [],
                     "preview": [],
-                    "suggestions": {},
+                    "suggestions": {
+                        "source": "id",
+                        "target": "target",
+                        "format": "gexf_standard"
+                    },
                     "stats": {
                         "node_count": G.number_of_nodes(),
                         "edge_count": G.number_of_edges(),
@@ -292,7 +300,9 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str 
         
         # Ignorer les lignes avec des valeurs manquantes ou vides
         if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-            G.add_edge(source, target, weight=weight)
+            # Capture extra attributes for valid edge
+            edge_attrs = {k: v for k, v in row.items() if k not in [src_col, tgt_col, weight_col]}
+            G.add_edge(source, target, weight=weight, **edge_attrs)
     
     metadata = {
         "node_count": G.number_of_nodes(),
@@ -306,7 +316,8 @@ def _process_csv_graph(file_path: Path, mapping: Dict[str, str], algorithm: str 
     # Calcul du layout 3D
     resolved_algorithm = apply_layout(G, algorithm=algorithm)
     
-    graph_data = nx.node_link_data(G)
+    # Explicitly use 'links' to preserve compatibility with existing frontend logic
+    graph_data = nx.node_link_data(G, edges="links")
     
     return {
         "metadata": metadata,
@@ -322,29 +333,41 @@ def _process_json_graph(file_path: Path, mapping: Dict[str, str], algorithm: str
     with open(file_path, 'rb') as f:
         content = orjson.loads(f.read())
     
-    if isinstance(content, dict) and 'nodes' in content and 'edges' in content:
+    if isinstance(content, dict) and 'nodes' in content:
         nodes = content['nodes']
-        edges = content['edges']
+        # Support both 'edges' (generic) and 'links' (D3/NetworkX convention)
+        edges = content.get('edges', content.get('links'))
         
-        G = nx.Graph()
-        
-        for node in nodes:
-            node_id = node.get('id')
-            if node_id:
-                G.add_node(node_id, **{k: v for k, v in node.items() if k != 'id'})
-        
-        src_col = mapping.get('source', 'source')
-        tgt_col = mapping.get('target', 'target')
-        weight_col = mapping.get('weight', 'weight')
-        
-        for edge in edges:
-            source = edge.get(src_col)
-            target = edge.get(tgt_col)
-            weight = edge.get(weight_col, 1.0)
-            
-            # Ignorer les lignes avec des valeurs manquantes ou vides
-            if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-                G.add_edge(source, target, weight=float(weight) if weight else 1.0)
+        if edges is not None:
+             G = nx.Graph()
+             
+             for node in nodes:
+                 node_id = node.get('id')
+                 if node_id:
+                     G.add_node(node_id, **{k: v for k, v in node.items() if k != 'id'})
+             
+             src_col = mapping.get('source') or 'source'
+             tgt_col = mapping.get('target') or 'target'
+             weight_col = mapping.get('weight') or 'weight'
+             
+             # Fallback: if user didn't specify mapping (ImportWizard defaults) and 'weight' not found, try 'value' (Common in D3)
+             if not mapping.get('weight') and edges and 'value' in edges[0]:
+                 weight_col = 'value'
+             
+             for edge in edges:
+                 source = edge.get(src_col)
+                 target = edge.get(tgt_col)
+                 weight = edge.get(weight_col, 1.0)
+                 
+                 # Ignorer les lignes avec des valeurs manquantes ou vides
+                 if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
+                     try:
+                        w = float(weight) if weight else 1.0
+                     except (ValueError, TypeError):
+                        w = 1.0
+                     # Capture extra attributes for valid edge
+                     edge_attrs = {k: v for k, v in edge.items() if k not in [src_col, tgt_col, weight_col]}
+                     G.add_edge(source, target, weight=w, **edge_attrs)
         
         edge_keys = list(edges[0].keys()) if edges and len(edges) > 0 else []
 
@@ -360,13 +383,14 @@ def _process_json_graph(file_path: Path, mapping: Dict[str, str], algorithm: str
         # Calcul du layout 3D
         resolved_algorithm = apply_layout(G, algorithm=algorithm)
         
-        graph_data = nx.node_link_data(G)
+        graph_data = nx.node_link_data(G, edges="links")
         
         return {
             "metadata": metadata,
             "nodes": graph_data["nodes"],
             "edges": graph_data["links"],
-            "format": "json_node_link"
+            "format": "json_node_link",
+            "algorithm_used": resolved_algorithm
         }
     
     elif isinstance(content, list):
@@ -394,7 +418,8 @@ def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str], algo
         
         # Ignorer les lignes avec des valeurs manquantes ou vides
         if source is not None and target is not None and str(source).strip() != "" and str(target).strip() != "":
-            G.add_edge(source, target, weight=float(weight) if weight else 1.0)
+            edge_attrs = {k: v for k, v in row.items() if k not in [src_col, tgt_col, weight_col]}
+            G.add_edge(source, target, weight=float(weight) if weight else 1.0, **edge_attrs)
     
     edge_keys = list(data[0].keys()) if data and len(data) > 0 else []
 
@@ -408,7 +433,7 @@ def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str], algo
     }
     
     # Calcul du layout 3D
-    apply_layout(G, algorithm=algorithm)
+    resolved_algorithm = apply_layout(G, algorithm=algorithm)
     
     graph_data = nx.node_link_data(G)
     
@@ -416,7 +441,8 @@ def _process_csv_graph_from_list(data: List[Dict], mapping: Dict[str, str], algo
         "metadata": metadata,
         "nodes": graph_data["nodes"],
         "edges": graph_data["links"],
-        "format": "json_list"
+        "format": "json_list",
+        "algorithm_used": resolved_algorithm
     }
 
 
@@ -459,15 +485,16 @@ def _process_gexf_graph(file_path: Path, mapping: Dict[str, str], algorithm: str
     }
     
     # Calcul du layout 3D
-    apply_layout(G, algorithm=algorithm)
+    resolved_algorithm = apply_layout(G, algorithm=algorithm)
     
-    graph_data = nx.node_link_data(G)
+    graph_data = nx.node_link_data(G, edges="links")
     
     return {
         "metadata": metadata,
         "nodes": graph_data["nodes"],
         "edges": graph_data["links"],
-        "format": "gexf"
+        "format": "gexf",
+        "algorithm_used": resolved_algorithm
     }
 
 def apply_layout(G: nx.Graph, algorithm: str = "auto", scale: float = 50.0):
@@ -483,8 +510,21 @@ def apply_layout(G: nx.Graph, algorithm: str = "auto", scale: float = 50.0):
     node_keys = list(G.nodes())
     node_map = {k: i for i, k in enumerate(node_keys)}
     
+    # Ensure weights are floats for layout algorithms
+    cleaned_edges = []
+    weights = []
+    for u, v, d in G.edges(data=True):
+        w = d.get('weight', 1.0)
+        try:
+            w = float(w)
+        except (ValueError, TypeError):
+            w = 1.0
+        cleaned_edges.append((node_map[u], node_map[v]))
+        weights.append(w)
+
     ig_graph = ig.Graph(len(node_keys))
-    ig_graph.add_edges([(node_map[u], node_map[v]) for u, v in G.edges()])
+    ig_graph.add_edges(cleaned_edges)
+    ig_graph.es['weight'] = weights
     
     # Auto-sélection de l'algorithme basée sur plusieurs critères
     if algorithm == "auto":

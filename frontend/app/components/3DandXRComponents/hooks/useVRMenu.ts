@@ -17,14 +17,15 @@ export const useVRMenu = () => {
 
         // Create a slate/panel for buttons following the user
         const panel = new GUI.StackPanel3D();
-        panel.margin = 0.05;
+        panel.margin = 0.02; // Smaller gap
+        panel.scaling = new BABYLON.Vector3(0.2, 0.2, 0.2); // Scale down 5x (Buttons are 1m by default)
         manager.addControl(panel);
 
         // Position panel in front of camera
         // We use a TransformNode to anchor it
         const anchor = new BABYLON.TransformNode("anchor", scene);
         anchor.parent = xr.baseExperience.camera;
-        anchor.position = new BABYLON.Vector3(0, 0, 1.5); // 1.5m in front
+        anchor.position = new BABYLON.Vector3(0, -0.3, 2); // 2m in front, slightly lower
         panel.linkToTransformNode(anchor);
 
         // Helper to create buttons

@@ -112,7 +112,7 @@ export default function LayoutSelector({ projectId, onLayoutUpdate, onLayoutRequ
                 )}
                 <span className="hidden sm:inline">Layout</span>
                 {currentLayout && (
-                    <span className="hidden md:inline text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                    <span className="hidden md:inline text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 truncate max-w-[100px]">
                         {currentLayout.label}
                     </span>
                 )}

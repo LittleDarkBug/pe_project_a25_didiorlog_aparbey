@@ -14,6 +14,7 @@ import FilterPanel from '@/app/components/project/FilterPanel';
 import ShareModal from '@/app/components/project/ShareModal';
 import { useToastStore } from '@/app/store/useToastStore';
 import { ProjectSkeleton } from '@/app/components/ui/ProjectSkeleton';
+import { generateProjectReport, downloadReport } from '@/app/utils/exportUtils';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -26,6 +27,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
+    const [visibleEdgeIds, setVisibleEdgeIds] = useState<Set<string> | null>(null);
     const [isVRMode, setIsVRMode] = useState(false);
     const [isInXR, setIsInXR] = useState(false); // Track actual XR session state
     const [showLabels, setShowLabels] = useState(false); // Toggle labels
@@ -98,8 +100,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
     const handleResetFilters = useCallback(() => {
         setVisibleNodeIds(null);
+        setVisibleEdgeIds(null);
         setIsFilterOpen(false);
     }, []);
+
+    const handleFilterChange = useCallback((filters: { nodes: Set<string> | null, edges: Set<string> | null }) => {
+        setVisibleNodeIds(filters.nodes);
+        setVisibleEdgeIds(filters.edges);
+    }, []);
+
+    const handleExport = useCallback(() => {
+        if (!project) return;
+        const report = generateProjectReport(project);
+        downloadReport(report, `rapport_${project.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.md`);
+        addToast("Rapport généré et téléchargé", "success");
+    }, [project, addToast]);
 
     if (isLoading) {
         return <ProjectSkeleton />;
@@ -156,6 +171,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}
+                            visibleEdgeIds={visibleEdgeIds}
                             projectId={id}
                             onLayoutUpdate={handleLayoutUpdate}
                             onXRStateChange={handleXRStateChange}
@@ -170,6 +186,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             data={project.graph_data}
                             onSelect={handleSelect}
                             visibleNodeIds={visibleNodeIds}
+                            visibleEdgeIds={visibleEdgeIds}
                             showLabels={showLabels}
                         />
                     )
@@ -215,7 +232,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <FilterPanel
                     nodes={project.graph_data.nodes}
                     edges={project.graph_data.edges}
-                    onFilterChange={setVisibleNodeIds}
+                    onFilterChange={handleFilterChange}
                     onClose={() => setIsFilterOpen(false)}
                 />
             )}
@@ -287,6 +304,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         onToggleVR={() => setIsVRMode(!isVRMode)}
                         onShare={() => setIsShareModalOpen(true)}
                         onEdit={() => setIsEditModalOpen(true)}
+                        onExport={handleExport}
                     >
                         <LayoutSelector
                             projectId={id}

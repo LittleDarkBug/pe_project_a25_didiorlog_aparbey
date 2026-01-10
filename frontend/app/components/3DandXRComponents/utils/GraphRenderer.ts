@@ -21,7 +21,7 @@ interface GraphData {
 
 export class GraphRenderer {
     // Store edge references for filtering
-    private edgeInstances: Array<{ mesh: InstancedMesh, source: string, target: string }> = [];
+    private edgeInstances: Array<{ mesh: InstancedMesh, source: string, target: string, id: string }> = [];
     private graphRoot: TransformNode | null = null; // Root for all content
     private labelsMap: Map<string, GUI.TextBlock> = new Map();
     private labelsTexture: GUI.AdvancedDynamicTexture | null = null;
@@ -31,6 +31,8 @@ export class GraphRenderer {
     public getGraphRoot(): TransformNode | null {
         return this.graphRoot;
     }
+
+
 
     createNodes(
         data: GraphData,
@@ -215,8 +217,8 @@ export class GraphRenderer {
         masterEdge.instancedBuffers.color = new Color4(0.8, 0.4, 0.8, 0.6);
 
         data.edges.forEach(edge => {
-            const sourceMesh = nodeMeshes.get(edge.source);
-            const targetMesh = nodeMeshes.get(edge.target);
+            const sourceMesh = nodeMeshes.get(String(edge.source));
+            const targetMesh = nodeMeshes.get(String(edge.target));
 
             if (sourceMesh && targetMesh) {
                 const instance = masterEdge.createInstance(`edge_${edge.source}_${edge.target}`);
@@ -250,7 +252,9 @@ export class GraphRenderer {
                 // TODO: Add edge update logic if node dragging is critical.
 
                 // Store reference for filtering
-                this.edgeInstances.push({ mesh: instance, source: edge.source, target: edge.target });
+                // Use constructed ID matching FilterPanel logic: edge.id || `${source}-${target}`
+                const edgeId = edge.id || `${edge.source}-${edge.target}`;
+                this.edgeInstances.push({ mesh: instance, source: edge.source, target: edge.target, id: edgeId });
 
                 // Ensure visibility
                 instance.isVisible = true;
@@ -307,10 +311,15 @@ export class GraphRenderer {
 
     /**
      * Updates the visibility of nodes and edges based on a set of visible node IDs.
-     * @param visibleNodeIds Set of node IDs that should be visible. If null, all are visible.
+     * @param visibleNodeIds Set of node IDs that should be visible. If null, all nodes are visible.
+     * @param visibleEdgeIds Set of edge IDs that should be visible. If null, all edges (filtered by nodes) are visible.
      * @param nodeMeshes Map of node meshes
      */
-    updateVisibility(visibleNodeIds: Set<string> | null, nodeMeshes: Map<string, Mesh | InstancedMesh>) {
+    updateVisibility(
+        visibleNodeIds: Set<string> | null,
+        visibleEdgeIds: Set<string> | null,
+        nodeMeshes: Map<string, Mesh | InstancedMesh>
+    ) {
         // 1. Update Nodes
         nodeMeshes.forEach((mesh, id) => {
             const isVisible = visibleNodeIds === null || visibleNodeIds.has(id);
@@ -320,12 +329,19 @@ export class GraphRenderer {
         });
 
         // 2. Update Edges
-        // An edge is visible only if BOTH its source and target are visible
+        // An edge is visible only if:
+        // A) BOTH its source and target nodes are visible
+        // B) AND it is in the visibleEdgeIds set (if that set is not null)
         this.edgeInstances.forEach(edge => {
             const isSourceVisible = visibleNodeIds === null || visibleNodeIds.has(edge.source);
             const isTargetVisible = visibleNodeIds === null || visibleNodeIds.has(edge.target);
 
-            const isVisible = isSourceVisible && isTargetVisible;
+            let isEdgeExplicitlyVisible = true;
+            if (visibleEdgeIds !== null) {
+                isEdgeExplicitlyVisible = visibleEdgeIds.has(edge.id);
+            }
+
+            const isVisible = isSourceVisible && isTargetVisible && isEdgeExplicitlyVisible;
 
             edge.mesh.isVisible = isVisible;
             edge.mesh.isPickable = isVisible;

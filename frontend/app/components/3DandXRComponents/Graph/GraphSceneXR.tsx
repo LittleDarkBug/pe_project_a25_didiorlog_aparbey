@@ -50,6 +50,7 @@ interface GraphSceneProps {
     data: GraphData;
     onSelect?: (data: any, type: 'node' | 'edge' | null) => void;
     visibleNodeIds?: Set<string> | null;
+    visibleEdgeIds?: Set<string> | null;
     projectId?: string;
     onLayoutUpdate?: (newData: any) => void;
     onXRStateChange?: (isInXR: boolean) => void;
@@ -62,7 +63,7 @@ export interface GraphSceneRef {
     resetCamera: () => void;
 }
 
-const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, projectId, onLayoutUpdate, onXRStateChange, showLabels, onResetFilters, onToggleLabels }, ref) => {
+const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, visibleEdgeIds, projectId, onLayoutUpdate, onXRStateChange, showLabels, onResetFilters, onToggleLabels }, ref) => {
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const xrHelperRef = useRef<any>(null);
@@ -131,9 +132,9 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     // Handle visibility updates
     useEffect(() => {
         if (scene && nodeMeshesRef.current.size > 0) {
-            graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
+            graphRenderer.current.updateVisibility(visibleNodeIds ?? null, visibleEdgeIds ?? null, nodeMeshesRef.current);
         }
-    }, [visibleNodeIds, scene]);
+    }, [visibleNodeIds, visibleEdgeIds, scene]);
 
     // Handle Label Visibility
     useEffect(() => {
@@ -392,10 +393,10 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             xrHelperRef
         );
 
-        graphRenderer.current.updateVisibility(visibleNodeIds ?? null, nodeMeshesRef.current);
+        graphRenderer.current.updateVisibility(visibleNodeIds ?? null, visibleEdgeIds ?? null, nodeMeshesRef.current);
         // Pass isXR=true for label handling in VR (needs update in GraphRenderer)
         graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene, true);
-    }, [scene, data, onSelect, showLabels]);
+    }, [scene, data, onSelect, showLabels]); // visibleNodeIds handled by separate effect
 
     return (
         <div className="h-full w-full overflow-hidden rounded-xl bg-black/20 relative" style={{ touchAction: 'none' }}>
