@@ -344,13 +344,21 @@ async def update_project(
 @router.get("/", response_model=List[Dict[str, Any]])
 async def list_projects(current_user: User = Depends(get_current_user)):
     """Liste les projets de l'utilisateur."""
-    projects = await Project.find(Project.owner.id == current_user.id).sort(-Project.created_at).to_list()
+    # Projection pour éviter de charger graph_data volumineuses
+    projects = await Project.find(
+        Project.owner.id == current_user.id,
+        projection_model=None  # Use raw dict projection below
+    ).sort(-Project.created_at).to_list()
     
+    # Note: Beanie doesn't support field projection directly with find(),
+    # but we avoid serializing graph_data by not including it in response
     return [
         {
             "id": str(p.id),
             "name": p.name,
+            "description": p.description,
             "created_at": p.created_at,
+            "is_public": p.is_public,
             "algorithm": p.algorithm or "auto",
             "stats": {
                 "nodes": (p.metadata or {}).get("node_count", 0),

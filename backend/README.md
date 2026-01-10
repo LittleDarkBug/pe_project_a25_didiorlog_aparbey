@@ -5,7 +5,7 @@ API REST pour la gestion des graphes, utilisateurs et projets avec traitement as
 ## Stack Technique
 - **FastAPI** - Framework API async
 - **Beanie** - ODM MongoDB async
-- **Celery** - Tâches asynchrones
+- **Celery + Beat** - Tâches asynchrones et périodiques
 - **Redis** - Cache + Broker Celery
 - **NetworkX + igraph** - Traitement de graphes
 - **JWT (PyJWT)** - Authentification
@@ -80,6 +80,11 @@ Traite un fichier de graphe de manière asynchrone:
 - `algorithm`: Algorithme layout (auto par défaut)
 - `project_id`: ID projet à mettre à jour
 - `is_new_project`: Supprimer si échec (true pour nouveau)
+
+### `cleanup_expired_free_projects`
+Tâche périodique (Celery Beat) exécutée toutes les 5 minutes:
+- Supprime les projets Free > 6 heures
+- Nettoie les fichiers associés
 
 ## Algorithmes de Layout
 

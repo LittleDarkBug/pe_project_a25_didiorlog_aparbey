@@ -439,5 +439,64 @@ def async_process_graph_file(self, file_path: str, mapping: dict, algorithm: str
         else:
              print(f"Echec du traitement pour le projet {project_id} (Non supprimé car existant). Erreur: {e}")
         
+
         return {"status": "FAILURE", "error": str(e)}
+
+
+@celery_app.task(name="tasks.cleanup_expired_free_projects")
+def cleanup_expired_free_projects():
+    """
+    Tâche périodique (Celery Beat) pour supprimer les projets des utilisateurs Free
+    qui sont plus vieux que 6 heures.
+    """
+    try:
+        mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+        db_name = os.getenv("MONGODB_DB", "pe_def_db")
+        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_uri)
+        db = client[db_name]
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        async def run_cleanup():
+            from models.user import User  # Import local pour éviter cycle
+            await init_beanie(database=db, document_models=[Project, User])
+            
+            # Date limite de 6h
+            from datetime import timedelta
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+            
+            # 1. Trouver projets vieux > 6h
+            expired_candidates = await Project.find(
+                Project.created_at < cutoff
+            ).to_list()
+            
+            deleted_count = 0
+            
+            for project in expired_candidates:
+                # 2. Vérifier si le owner est Free
+                owner = await project.owner.fetch()
+                if owner and not owner.is_elite and not owner.is_superuser:
+                    # Supprimer fichiers associés si nécessaire
+                    if project.source_file_path:
+                        try:
+                            Path(project.source_file_path).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                            
+                    await project.delete()
+                    deleted_count += 1
+            
+            if deleted_count > 0:
+                print(f"[Cleanup] Supprimé {deleted_count} projets expirés (Free Plan > 6h)")
+
+        try:
+            loop.run_until_complete(run_cleanup())
+        finally:
+            loop.close()
+            client.close()
+            
+    except Exception as e:
+        print(f"Erreur lors du cleanup périodique: {e}")
+
 

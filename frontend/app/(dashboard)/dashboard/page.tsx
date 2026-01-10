@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, LayoutGrid, List } from 'lucide-react';
 import ImportWizard from '@/app/components/dashboard/ImportWizard';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { projectsService } from '@/app/services/projectsService';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 
@@ -20,9 +21,14 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; projectId: string | null; projectName: string }>({
+        isOpen: false,
+        projectId: null,
+        projectName: ''
+    });
     const router = useRouter();
 
-    const filteredProjects = projects.filter(project => 
+    const filteredProjects = projects.filter(project =>
         project.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -62,16 +68,25 @@ export default function DashboardPage() {
         }
     };
 
-    const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
-        e.stopPropagation(); // Empêcher la navigation
-        if (confirm('Êtes-vous sûr de vouloir supprimer ce projet ?')) {
-            try {
-                await projectsService.delete(id);
-                fetchProjects();
-            } catch (error) {
-                console.error("Erreur suppression", error);
-                alert("Erreur lors de la suppression");
-            }
+    const openDeleteModal = (e: React.MouseEvent, project: any) => {
+        e.stopPropagation();
+        setOpenMenuId(null);
+        setDeleteModal({
+            isOpen: true,
+            projectId: project.id,
+            projectName: project.name
+        });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteModal.projectId) return;
+        try {
+            await projectsService.delete(deleteModal.projectId);
+            setDeleteModal({ isOpen: false, projectId: null, projectName: '' });
+            fetchProjects();
+        } catch (error) {
+            console.error("Erreur suppression", error);
+            alert("Erreur lors de la suppression");
         }
     };
 
@@ -191,7 +206,7 @@ export default function DashboardPage() {
                                                         Ouvrir
                                                     </button>
                                                     <button
-                                                        onClick={(e) => handleDeleteProject(e, project.id)}
+                                                        onClick={(e) => openDeleteModal(e, project)}
                                                         className="block w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
                                                     >
                                                         Supprimer
@@ -312,7 +327,7 @@ export default function DashboardPage() {
                                                     Ouvrir
                                                 </button>
                                                 <button
-                                                    onClick={(e) => handleDeleteProject(e, project.id)}
+                                                    onClick={(e) => openDeleteModal(e, project)}
                                                     className="block w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
                                                 >
                                                     Supprimer
@@ -322,7 +337,7 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             ))}
-                            
+
                             {/* Add Project Row */}
                             <button
                                 onClick={() => setIsWizardOpen(true)}
@@ -347,6 +362,18 @@ export default function DashboardPage() {
                     onSuccess={handleProjectCreated}
                 />
             )}
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={deleteModal.isOpen}
+                title="Supprimer le projet"
+                message={`Êtes-vous sûr de vouloir supprimer "${deleteModal.projectName}" ? Cette action est irréversible.`}
+                confirmLabel="Supprimer"
+                cancelLabel="Annuler"
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteModal({ isOpen: false, projectId: null, projectName: '' })}
+                danger
+            />
         </div>
     );
 }

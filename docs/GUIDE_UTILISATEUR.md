@@ -60,12 +60,22 @@ La page d'accueil presente les fonctionnalites principales de GraphXR:
 6. Acceptez la politique de confidentialite
 7. Cliquez sur **S'inscrire**
 
-### Types de Comptes
+### Types de Comptes et Conservation
 
-| Plan      | Projets               | Partage           | Galerie |
-| --------- | --------------------- | ----------------- | ------- |
-| **Free**  | Temporaires (session) | Durant la session | Non     |
-| **Elite** | Permanents            | Liens durables    | Oui     |
+| Fonctionnalite   | **Plan Gratuit** (Defaut) | **Plan Elite** (Sur demande) |
+| :--------------- | :------------------------ | :--------------------------- |
+| **Duree de vie** | **Temporaire (6 heures)** | **Illimitee**                |
+| Suppression      | Auto (6h ou Logout)       | Manuelle uniquement          |
+| Projets prives   | Non                       | Oui                          |
+| Galerie          | Consultation              | Publication                  |
+
+> [!WARNING]
+> **Politique de Suppression (Plan Gratuit)**
+> 1. **TTL de 6 Heures**: Les projets sont supprimes automatiquement 6h apres creation.
+> 2. **Fin de Session**: La deconnexion supprime tous vos projets immediatement.
+> 3. **Alertes**: Un avertissement apparait 30min avant l'expiration.
+>
+> Pensez a **demander l'acces Elite** pour conserver vos travaux.
 
 ---
 

@@ -3,6 +3,7 @@ Configuration Celery pour les tâches asynchrones.
 """
 
 from celery import Celery
+from celery.schedules import crontab
 import os
 
 # Configuration du broker Redis (modifiable via variable d'env)
@@ -24,4 +25,12 @@ celery_app.conf.update(
     task_track_started=True,
     result_expires=3600,  # 1h
     broker_connection_retry_on_startup=True,
+    # Celery Beat schedule for periodic tasks
+    beat_schedule={
+        'cleanup-expired-free-projects': {
+            'task': 'tasks.cleanup_expired_free_projects',
+            'schedule': 300.0,  # Every 5 minutes
+        },
+    },
 )
+

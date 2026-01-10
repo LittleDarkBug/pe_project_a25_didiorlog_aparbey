@@ -165,18 +165,18 @@ PE_Def_Project/
 
 ## Plans Utilisateurs
 
-| Fonctionnalité            | Free     | Elite |
-| ------------------------- | -------- | ----- |
-| Import fichiers (max 5Go) | Oui      | Oui   |
-| Visualisation 3D/VR       | Oui      | Oui   |
-| Filtres & layouts         | Oui      | Oui   |
-| Projets temporaires       | Oui      | -     |
-| Projets persistants       | -        | Oui   |
-| Publier en galerie        | -        | Oui   |
-| Projets privés            | -        | Oui   |
-| Partage par lien          | Session* | Oui   |
+| Fonctionnalité            | Free         | Elite |
+| ------------------------- | ------------ | ----- |
+| Import fichiers (max 5Go) | Oui          | Oui   |
+| Visualisation 3D/VR       | Oui          | Oui   |
+| Filtres & layouts         | Oui          | Oui   |
+| Projets temporaires       | Oui (max 6h) | -     |
+| Projets persistants       | -            | Oui   |
+| Publier en galerie        | -            | Oui   |
+| Projets privés            | -            | Oui   |
+| Partage par lien          | Session*     | Oui   |
 
-*Liens de partage Free expirent a la deconnexion.
+*Liens et projets Free expirent après 6h ou à la déconnexion.
 
 ---
 
