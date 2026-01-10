@@ -19,6 +19,9 @@ Les données sont converties en un objet graphe NetworkX en Python.
 
 C'est ici que les positions 3D sont calculées. Le système utilise la bibliothèque igraph pour des calculs performants.
 
+> **Note importante pour les fichiers GEXF** :
+> Par défaut, le système **recalcule** les positions de tous les nœuds lors de l'import, même si le fichier GEXF contient déjà des coordonnées (`viz:position`). Cela garantit que le graphe est correctement normalisé et adapté à la visualisation 3D de l'application.
+
 **Algorithme par défaut** :
 À l'import, aucun choix d'algorithme n'est proposé à l'utilisateur. Le système applique toujours la logique "auto" qui sélectionne intelligemment l'algorithme optimal selon trois critères :
 

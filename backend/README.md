@@ -212,8 +212,16 @@ backend/
 
 - `GET /users/me` - Profil utilisateur courant
 - `PATCH /users/me` - Mise à jour profil
-- `GET /admin/users` - Liste utilisateurs (Admin only)
-- `DELETE /admin/users/{id}` - Supprimer utilisateur (Admin only)
+
+### Administration
+
+- `GET /admin/stats` - Statistiques globales (Users, Projets)
+- `GET /admin/users` - Liste paginée des utilisateurs
+- `POST /admin/users` - Créer un utilisateur (Admin)
+- `PATCH /admin/users/{id}` - Modifier rôle/statut utilisateur
+- `DELETE /admin/users/{id}` - Supprimer utilisateur
+- `GET /admin/projects` - Liste paginée de tous les projets
+- `DELETE /admin/projects/{id}` - Supprimer tout projet (Modération)
 
 ### Projets
 
@@ -244,15 +252,15 @@ Le système utilise `services/graph_service.py` avec sélection automatique inte
 
 ### Algorithmes disponibles
 
-| Algorithme | Taille graphe | Complexité | Usage |
-|------------|---------------|------------|-------|
-| **Fruchterman-Reingold 3D** | < 2000 nœuds | O(V² + E) | Force-directed équilibré |
-| **Kamada-Kawai 3D** | Graphes denses | O(V²) | Préserve topologie, esthétique |
-| **DrL** | > 2000 nœuds | O(V log V + E) | Scalable, fait ressortir clusters |
-| **Force Atlas** | Modularité > 0.4 | O(V² + E) | Détection communautés, extension 3D |
-| **Sphérique** | Navigation VR | O(V) | Distribution uniforme sur sphère |
-| **Grille** | Comparaison | O(V) | Organisation géométrique |
-| **Aléatoire** | Tests | O(V) | Baseline |
+| Algorithme                  | Taille graphe    | Complexité     | Usage                               |
+| --------------------------- | ---------------- | -------------- | ----------------------------------- |
+| **Fruchterman-Reingold 3D** | < 2000 nœuds     | O(V² + E)      | Force-directed équilibré            |
+| **Kamada-Kawai 3D**         | Graphes denses   | O(V²)          | Préserve topologie, esthétique      |
+| **DrL**                     | > 2000 nœuds     | O(V log V + E) | Scalable, fait ressortir clusters   |
+| **Force Atlas**             | Modularité > 0.4 | O(V² + E)      | Détection communautés, extension 3D |
+| **Sphérique**               | Navigation VR    | O(V)           | Distribution uniforme sur sphère    |
+| **Grille**                  | Comparaison      | O(V)           | Organisation géométrique            |
+| **Aléatoire**               | Tests            | O(V)           | Baseline                            |
 
 ### Sélection automatique intelligente
 
@@ -300,6 +308,34 @@ A,C,7.0
 
 Colonnes requises: `source`, `target`
 Colonnes optionnelles: `weight` (défaut: 1.0)
+
+### Formats JSON supportés
+
+Le backend supporte deux structures JSON principales via `orjson`.
+
+**1. Format Node-Link (Standard D3.js / NetworkX)** :
+```json
+{
+  "nodes": [
+    {"id": "A", "group": 1},
+    {"id": "B", "group": 2}
+  ],
+  "links": [  // ou "edges"
+    {"source": "A", "target": "B", "value": 5.0} // "value" ou "weight"
+  ]
+}
+```
+- **Clés supportées** : `links` est accepté comme alias de `edges`.
+- **Poids** : Si `weight` est absent, le système cherche automatiquement `value` (standard D3).
+
+**2. Liste d'arêtes (Simple)** :
+```json
+[
+  {"source": "A", "target": "B", "weight": 1},
+  {"source": "B", "target": "C", "weight": 2}
+]
+``` 
+- Mapping automatique des colonnes `source`/`target`.
 
 ### Force Atlas - Détails d'implémentation 3D
 

@@ -7,9 +7,11 @@ Plateforme web complète pour la visualisation 3D et VR de graphes complexes ave
 - **Visualisation 3D/WebGL** : Rendu haute performance avec Babylon.js
 - **Mode VR immersif** : Navigation WebXR pour casques VR
 - **Spatialisation intelligente** : Sélection automatique de l'algorithme optimal selon les caractéristiques du graphe
+- **Analyse Topologique** : Outils intégrés pour l'analyse de voisinage et recherche de chemin
 - **Force Atlas** : Détection avancée de clusters et communautés
-- **Import flexible** : Support CSV, JSON, GEXF
+- **Import flexible** : Support CSV, JSON (Node-Link & List), GEXF
 - **Partage collaboratif** : Liens publics pour visualisation en lecture seule
+- **Administration** : Gestion complète des utilisateurs et projets pour les administrateurs
 - **Authentification sécurisée** : JWT + Argon2id
 - **Processing asynchrone** : Celery pour traitement de graphes massifs (>100k nœuds)
 
@@ -89,15 +91,15 @@ Le système sélectionne automatiquement l'algorithme optimal selon **3 critère
 
 ### Algorithmes Disponibles
 
-| Algorithme | Cas d'usage | Complexité |
-|------------|-------------|------------|
-| **Fruchterman-Reingold** | Graphes moyens, équilibré | O(V² + E) |
-| **Kamada-Kawai** | Graphes denses, esthétique | O(V²) |
-| **DrL** | Grands graphes (> 5000 nœuds) | O(V log V + E) |
-| **Force Atlas** | Clusters et communautés | O(V² + E) |
-| **Sphérique** | Navigation immersive VR | O(V) |
-| **Grille** | Comparaison structurelle | O(V) |
-| **Aléatoire** | Tests et comparaisons | O(V) |
+| Algorithme               | Cas d'usage                   | Complexité     |
+| ------------------------ | ----------------------------- | -------------- |
+| **Fruchterman-Reingold** | Graphes moyens, équilibré     | O(V² + E)      |
+| **Kamada-Kawai**         | Graphes denses, esthétique    | O(V²)          |
+| **DrL**                  | Grands graphes (> 5000 nœuds) | O(V log V + E) |
+| **Force Atlas**          | Clusters et communautés       | O(V² + E)      |
+| **Sphérique**            | Navigation immersive VR       | O(V)           |
+| **Grille**               | Comparaison structurelle      | O(V)           |
+| **Aléatoire**            | Tests et comparaisons         | O(V)           |
 
 Voir [SPATIALISATION.md](./SPATIALISATION.md) pour plus de détails.
 
@@ -219,7 +221,7 @@ B,C,3.0
 4. **Sélection** : Pointer + gâchette
 5. **Menu VR** : Layouts, recentrage, quitter
 
-Voir [instructions-pro3.md](./instructions-pro3.md) pour le guide complet XR.
+voir le [Guide WebXR dans la documentation Frontend](./frontend/README.md#guide-webxr--réalité-virtuelle).
 
 ## Docker Compose
 
@@ -279,9 +281,8 @@ npm test
 ## Documentation
 
 - [SPATIALISATION.md](./SPATIALISATION.md) - Logique de spatialisation détaillée
-- [instructions-pro3.md](./instructions-pro3.md) - Guide WebXR/VR
-- [backend/README.md](./backend/README.md) - Documentation API
-- [frontend/README.md](./frontend/README.md) - Documentation Frontend
+- [SPATIALISATION.md](./SPATIALISATION.md) - Logique de spatialisation détaillée
+- [frontend/README.md](./frontend/README.md) - Documentation Frontend et Guide WebXR
 - API Docs : http://localhost:8000/docs (Swagger)
 - ReDoc : http://localhost:8000/redoc
 

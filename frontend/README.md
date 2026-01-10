@@ -130,7 +130,46 @@ app/
 - **Partage** : Liens publics pour partager vos graphes en lecture seule.
 - **Layouts Dynamiques** : 7 algorithmes de spatialisation (Fruchterman-Reingold, Kamada-Kawai, DrL, **Force Atlas**, Sphérique, Grille, Aléatoire).
 - **Sélection Automatique Intelligente** : Choix optimal selon taille, densité et modularité du graphe.
-- **Filtrage** : Filtres "Frontend-Only" rapides.
+- **Filtrage Avancé** : 
+  - **Attributs** : Filtres dynamiques sur les propriétés des nœuds et arêtes.
+  - **Topologie** : Analyse de voisinage (BFS) et chemin le plus court (Shortest Path) avec UI intuitive.
+- **Assistant d'Import** : Interface par onglets pour CSV, JSON et GEXF avec prévisualisation et mapping intelligent.
+- **Administration** : Dashboard complet pour gérer les utilisateurs et modérer les projets (Accessibles aux rôles 'admin').
+
+## Guide WebXR / Réalité Virtuelle
+
+L'application supporte nativement les casques VR compatibles WebXR (Meta Quest 2/3/Pro, Vision Pro, HTC Vive, etc.).
+
+### Comment lancer la VR ?
+1. Ouvrez l'application dans le navigateur du casque (ex: Oculus Browser).
+2. Entrez dans un projet.
+3. Cliquez sur le bouton "Lunettes" en bas à droite de la visualisation 3D.
+
+### Contrôles
+
+| Action               | Contrôleur   | Input                    | Description                                                              |
+| -------------------- | ------------ | ------------------------ | ------------------------------------------------------------------------ |
+| **Voler (Free Fly)** | Gauche/Droit | Joysticks                | Déplacez-vous librement dans l'espace 3D.                                |
+| **Saisir le monde**  | Gauche/Droit | Grip (Gâchette latérale) | Maintenez pour "attraper" le graphe et le déplacer/tourner manuellement. |
+| **Sélectionner**     | Droit        | Trigger (Gâchette index) | Pointez un nœud et appuyez pour afficher ses détails.                    |
+| **Menu VR**          | Gauche/Droit | Bouton A ou X            | Affiche/Masque le menu flottant (Filtres, Layouts, Labels).              |
+
+> **Note**: Si les contrôleurs n'apparaissent pas, assurez-vous que votre navigateur supporte WebXR et que vous êtes en mode "Immersif".
+
+### Comparatif des Fonctionnalités Web vs VR
+
+| Fonctionnalité        | Web (Desktop)       | VR (Immersive)         | Notes                            |
+| --------------------- | ------------------- | ---------------------- | -------------------------------- |
+| **Visualisation 3D**  | ✅ Complète          | ✅ Complète             | Rendu identique (Babylon.js)     |
+| **Navigation**        | Souris / Clavier    | Vol Libre (Joysticks)  | Adapté au support                |
+| **Sélection Nœud**    | Clic                | Rayon Laser + Trigger  | Affiche le panneau détails       |
+| **Panneau Détails**   | ✅ Propriétés riches | ✅ Propriétés de base   | Support JSON imbriqué sur Web    |
+| **Manipulation**      | ❌ (Caméra seule)    | ✅ Saisir Graphe (Grip) | Interaction physique en VR       |
+| **Changement Layout** | ✅ 7 Algorithmes     | ✅ 5 Algorithmes        | Via Menu VR (Bouton A/X)         |
+| **Filtres Attributs** | ✅ Complets          | ❌ Non disponible       | "Reset Filtres" disponible en VR |
+| **Analyse Topologie** | ✅ Voisins / Chemins | ❌ Non disponible       | Exclusive au Web pour l'instant  |
+| **Labels**            | ✅ Toggle            | ✅ Toggle               | Visibilité synchronisée          |
+| **Import / Export**   | ✅ Wizard Complet    | ❌ Consultation seule   | Créez sur Web, explorez en VR    |
 
 ### Que pouvez-vous modifier ?
 
@@ -306,13 +345,13 @@ function FormulaireCreationUtilisateur() {
 
 ### Différence entre Zustand et React Query
 
-| Critère | Zustand | React Query |
-|---------|---------|-------------|
-| **Usage** | État UI local | Données serveur |
-| **Exemple** | Theme, sidebar ouverte, config 3D | Liste d'utilisateurs, produits, commandes |
-| **Cache** | Manuel (localStorage avec persist) | Automatique (en mémoire) |
-| **Quand mettre à jour** | Vous décidez (`setState()`) | Automatique (refetch, invalidation) |
-| **Persistance** | Peut persister dans localStorage | Non (rechargé depuis API) |
+| Critère                 | Zustand                            | React Query                               |
+| ----------------------- | ---------------------------------- | ----------------------------------------- |
+| **Usage**               | État UI local                      | Données serveur                           |
+| **Exemple**             | Theme, sidebar ouverte, config 3D  | Liste d'utilisateurs, produits, commandes |
+| **Cache**               | Manuel (localStorage avec persist) | Automatique (en mémoire)                  |
+| **Quand mettre à jour** | Vous décidez (`setState()`)        | Automatique (refetch, invalidation)       |
+| **Persistance**         | Peut persister dans localStorage   | Non (rechargé depuis API)                 |
 
 **Règle simple :** 
 - Les données viennent d'une API ? → React Query
@@ -644,12 +683,12 @@ export default function Ma3DPage() {
 
 ### Props du `SceneComponent`
 
-| Prop | Type | Description | Requis |
-|------|------|-------------|--------|
-| `onSceneReady` | `(scene: Scene) => void` | Fonction appelée quand la scène est prête. Créez vos objets 3D ici. | Oui |
-| `onRender` | `(scene: Scene) => void` | Fonction appelée à chaque frame. Pour les animations. | Non |
-| `antialias` | `boolean` | Active l'antialiasing (lissage des bords). Recommandé. | Non |
-| `adaptToDeviceRatio` | `boolean` | S'adapte à la résolution de l'écran. Recommandé pour les écrans Retina. | Non |
+| Prop                 | Type                     | Description                                                             | Requis |
+| -------------------- | ------------------------ | ----------------------------------------------------------------------- | ------ |
+| `onSceneReady`       | `(scene: Scene) => void` | Fonction appelée quand la scène est prête. Créez vos objets 3D ici.     | Oui    |
+| `onRender`           | `(scene: Scene) => void` | Fonction appelée à chaque frame. Pour les animations.                   | Non    |
+| `antialias`          | `boolean`                | Active l'antialiasing (lissage des bords). Recommandé.                  | Non    |
+| `adaptToDeviceRatio` | `boolean`                | S'adapte à la résolution de l'écran. Recommandé pour les écrans Retina. | Non    |
 
 ### Types de caméras disponibles
 
@@ -931,15 +970,15 @@ const xr = await scene.createDefaultXRExperienceAsync({
 
 ### Interactions VR Complètes
 
-| Action | Input | Description |
-|--------|-------|-------------|
-| Déplacement | Joystick gauche | Flying 6DoF (haut/bas/avant/arrière/gauche/droite) |
-| Rotation | Joystick droit | Rotation libre de la caméra |
-| Sélection nœud | Pointer + Trigger | Ouvre VRDetailsPanel |
-| Grab nœud | Trigger (près du nœud) | Déplace le nœud dans l'espace |
-| Grab graphe | Grip/Menu (espace vide) | Déplace tout le graphe |
-| Menu VR | Bouton A/X | Ouvre menu radial |
-| Recentrer | Menu VR → Bouton | Reset position caméra |
+| Action         | Input                   | Description                                        |
+| -------------- | ----------------------- | -------------------------------------------------- |
+| Déplacement    | Joystick gauche         | Flying 6DoF (haut/bas/avant/arrière/gauche/droite) |
+| Rotation       | Joystick droit          | Rotation libre de la caméra                        |
+| Sélection nœud | Pointer + Trigger       | Ouvre VRDetailsPanel                               |
+| Grab nœud      | Trigger (près du nœud)  | Déplace le nœud dans l'espace                      |
+| Grab graphe    | Grip/Menu (espace vide) | Déplace tout le graphe                             |
+| Menu VR        | Bouton A/X              | Ouvre menu radial                                  |
+| Recentrer      | Menu VR → Bouton        | Reset position caméra                              |
 
 Voir [instructions-pro3.md](../instructions-pro3.md) pour guide complet XR.
 
@@ -1100,17 +1139,17 @@ import { useAppStore } from '../../../store';
 
 ### Conventions de nommage
 
-| Type | Convention | Exemples |
-|------|------------|----------|
-| **Fichiers composants** | PascalCase | `Button.tsx`, `ProductCard.tsx`, `UserProfile.tsx` |
-| **Fichiers utilitaires** | camelCase | `apiClient.ts`, `utils.ts`, `formatDate.ts` |
-| **Fichiers de config** | camelCase | `api.ts`, `theme.ts` |
-| **Variables et fonctions** | camelCase | `const userName = ...`, `function fetchData() { ... }` |
-| **Constantes** | UPPER_SNAKE_CASE | `const API_URL = ...`, `const MAX_RETRIES = 3` |
-| **Types et Interfaces** | PascalCase | `interface User { ... }`, `type ApiResponse = ...` |
-| **Composants** | PascalCase | `function Button() { ... }`, `export default Card` |
-| **Hooks personnalisés** | camelCase avec `use` | `useLocalStorage`, `useFetch`, `useDebounce` |
-| **Dossiers** | camelCase | `components/`, `services/`, `webComponents/` |
+| Type                       | Convention           | Exemples                                               |
+| -------------------------- | -------------------- | ------------------------------------------------------ |
+| **Fichiers composants**    | PascalCase           | `Button.tsx`, `ProductCard.tsx`, `UserProfile.tsx`     |
+| **Fichiers utilitaires**   | camelCase            | `apiClient.ts`, `utils.ts`, `formatDate.ts`            |
+| **Fichiers de config**     | camelCase            | `api.ts`, `theme.ts`                                   |
+| **Variables et fonctions** | camelCase            | `const userName = ...`, `function fetchData() { ... }` |
+| **Constantes**             | UPPER_SNAKE_CASE     | `const API_URL = ...`, `const MAX_RETRIES = 3`         |
+| **Types et Interfaces**    | PascalCase           | `interface User { ... }`, `type ApiResponse = ...`     |
+| **Composants**             | PascalCase           | `function Button() { ... }`, `export default Card`     |
+| **Hooks personnalisés**    | camelCase avec `use` | `useLocalStorage`, `useFetch`, `useDebounce`           |
+| **Dossiers**               | camelCase            | `components/`, `services/`, `webComponents/`           |
 
 **Noms descriptifs :**
 
