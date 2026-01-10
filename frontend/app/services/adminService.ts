@@ -14,6 +14,9 @@ export interface UserAdminView {
     is_active: boolean;
     is_superuser: boolean;
     role: string;
+    is_elite?: boolean;
+    elite_request_status?: string;
+    elite_request_date?: string;
     created_at: string;
     project_count: number;
 }
@@ -34,6 +37,8 @@ export interface ProjectAdminView {
 export interface UserUpdateData {
     is_active?: boolean;
     role?: string;
+    is_elite?: boolean;
+    elite_request_status?: string;
 }
 
 export interface UserCreateData {
@@ -74,13 +79,25 @@ export const adminService = {
         await apiClient.delete(`/admin/users/${userId}`);
     },
 
-    getProjects: async (skip = 0, limit = 100, search = ''): Promise<ProjectAdminView[]> => {
+    getProjects: async (skip = 0, limit = 50, search = '', sortBy = 'created_at', sortOrder = 'desc', isPublic: boolean | undefined = undefined): Promise<ProjectAdminView[]> => {
         const params = new URLSearchParams({
             skip: skip.toString(),
             limit: limit.toString(),
+            sort_by: sortBy,
+            sort_order: sortOrder,
             ...(search && { search })
         });
+
+        if (isPublic !== undefined) {
+            params.append('is_public', isPublic.toString());
+        }
+
         const response = await apiClient.get<ProjectAdminView[]>(`/admin/projects?${params}`);
+        return response;
+    },
+
+    updateProject: async (projectId: string, data: { name?: string; description?: string; is_public?: boolean; }): Promise<ProjectAdminView> => {
+        const response = await apiClient.patch<ProjectAdminView>(`/admin/projects/${projectId}`, data);
         return response;
     },
 

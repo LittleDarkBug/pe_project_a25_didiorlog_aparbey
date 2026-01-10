@@ -6,6 +6,8 @@ import { useDropzone } from 'react-dropzone';
 import { filesService, AnalysisResult } from '@/app/services/filesService';
 import { projectsService, Project } from '@/app/services/projectsService';
 
+import { useAuth } from '@/app/hooks/useAuth';
+
 interface EditProjectModalProps {
     project: Project;
     onClose: () => void;
@@ -13,9 +15,15 @@ interface EditProjectModalProps {
 }
 
 export default function EditProjectModal({ project, onClose, onSuccess }: EditProjectModalProps) {
-    const [activeTab, setActiveTab] = useState<'data' | 'mapping'>('mapping');
+    const { user } = useAuth();
+    const isElite = user?.is_elite || false;
+
+    const [activeTab, setActiveTab] = useState<'data' | 'mapping' | 'settings'>('mapping');
     const [file, setFile] = useState<File | null>(null);
     const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+    const [isPublic, setIsPublic] = useState(project.is_public ?? true);
+    const [isFeatured, setIsFeatured] = useState(project.is_featured ?? false);
+
     const [mapping, setMapping] = useState<Record<string, string>>({
         source: '',
         target: '',
@@ -45,7 +53,7 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
 
         try {
             const data = await filesService.analyze(uploadedFile);
-            
+
             if (data.type === 'json_object') {
                 setError(data.message || 'Format JSON non compatible.');
                 setIsLoading(false);
@@ -82,7 +90,7 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
         setIsLoading(true);
         setError(null);
         try {
-            const updateData: any = { mapping };
+            const updateData: any = { mapping, is_public: isPublic, is_featured: isFeatured };
             if (analysis?.temp_file_id) {
                 updateData.temp_file_id = analysis.temp_file_id;
             }
@@ -124,7 +132,7 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
                     <div className="flex items-center gap-3 text-blue-400 bg-blue-500/10 px-6 py-4 rounded-full mb-4">
                         <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         <span className="font-medium">
-                            Mise à jour du projet en cours...<br/>
+                            Mise à jour du projet en cours...<br />
                             (Cette opération peut prendre plusieurs minutes selon la taille du graphe)
                         </span>
                     </div>
@@ -137,11 +145,10 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
             <div className="flex border-b border-surface-50/10 mb-6">
                 <button
                     onClick={() => setActiveTab('data')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                        activeTab === 'data' 
-                            ? 'text-blue-400' 
-                            : 'text-gray-400 hover:text-white'
-                    }`}
+                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'data'
+                        ? 'text-blue-400'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
                 >
                     Données
                     {activeTab === 'data' && (
@@ -150,14 +157,25 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
                 </button>
                 <button
                     onClick={() => setActiveTab('mapping')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                        activeTab === 'mapping' 
-                            ? 'text-blue-400' 
-                            : 'text-gray-400 hover:text-white'
-                    }`}
+                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'mapping'
+                        ? 'text-blue-400'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
                 >
                     Mapping
                     {activeTab === 'mapping' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"></div>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('settings')}
+                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'settings'
+                        ? 'text-blue-400'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    Paramètres
+                    {activeTab === 'settings' && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"></div>
                     )}
                 </button>
@@ -177,8 +195,8 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
                             {...getRootProps()}
                             className={`
                                 group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 transition-all duration-300 cursor-pointer
-                                ${isDragActive 
-                                    ? 'border-blue-500 bg-blue-500/10 scale-[1.01]' 
+                                ${isDragActive
+                                    ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
                                     : 'border-surface-700 bg-surface-800/30 hover:border-blue-400/50 hover:bg-surface-800/50'
                                 }
                             `}
@@ -213,7 +231,7 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
                                         <p className="text-xs text-surface-400">{(file.size / 1024).toFixed(1)} KB</p>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={(e) => { e.stopPropagation(); setFile(null); setAnalysis(null); }}
                                     className="p-2 rounded-lg hover:bg-red-500/10 text-surface-400 hover:text-red-400 transition-colors"
                                 >
@@ -237,7 +255,7 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
                                 </div>
                                 <p className="text-lg font-medium text-surface-300">Aucune colonne détectée</p>
                                 <p className="text-sm mt-2 text-surface-500 max-w-xs mx-auto">Veuillez importer un fichier dans l'onglet "Données" pour configurer le mapping.</p>
-                                <button 
+                                <button
                                     onClick={() => setActiveTab('data')}
                                     className="mt-6 px-6 py-2 rounded-lg bg-surface-800 text-blue-400 hover:bg-surface-700 hover:text-blue-300 transition-colors font-medium"
                                 >
@@ -312,36 +330,142 @@ export default function EditProjectModal({ project, onClose, onSuccess }: EditPr
                         )}
                     </div>
                 )}
-            </div>
+                {activeTab === 'settings' && (
+                    <div className="space-y-6">
+                        {isElite ? (
+                            <>
+                                {/* Privacy Section (Elite) */}
+                                <div className="rounded-xl bg-surface-800/30 p-6 border border-surface-700">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flexItems-center gap-3">
+                                            <div className={`p-2 rounded-lg ${isPublic ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                {isPublic ? (
+                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-white">
+                                                    {isPublic ? "Visible par l'administrateur" : "Projet Privé"}
+                                                </h3>
+                                                <p className="text-sm text-surface-400">
+                                                    {isPublic
+                                                        ? "L'administrateur peut voir et accéder à ce projet."
+                                                        : "Seul vous pouvez accéder à ce projet. L'administrateur a une vue restreinte."}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
 
-            {/* Footer */}
-            <div className="mt-6 flex justify-end gap-3 border-t border-surface-50/10 pt-6">
-                <button
-                    onClick={onClose}
-                    className="rounded-lg px-4 py-2 text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"
-                >
-                    Annuler
-                </button>
-                <button
-                    onClick={handleUpdate}
-                    disabled={isLoading || (activeTab === 'mapping' && (!mapping.source || !mapping.target))}
-                    className={`
-                        flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-medium text-white transition-all
-                        ${isLoading || (activeTab === 'mapping' && (!mapping.source || !mapping.target))
-                            ? 'cursor-not-allowed bg-surface-700 opacity-50'
-                            : 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20'
-                        }
-                    `}
-                >
-                    {isLoading ? (
-                        <>
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-                            Traitement...
-                        </>
-                    ) : (
-                        'Mettre à jour'
-                    )}
-                </button>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={isPublic}
+                                            onChange={(e) => {
+                                                setIsPublic(e.target.checked);
+                                                if (!e.target.checked) setIsFeatured(false);
+                                            }}
+                                        />
+                                        <div className={`w-14 h-7 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all ${isPublic ? 'peer-checked:bg-green-600' : 'peer-checked:bg-red-600'}`}></div>
+                                    </label>
+                                </div>
+
+                                {/* Gallery Section (Elite) */}
+                                <div className="rounded-xl bg-surface-800/30 p-6 border border-surface-700">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${isFeatured ? 'bg-purple-500/20 text-purple-400' : 'bg-surface-700/50 text-surface-400'}`}>
+                                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-white">Galerie Publique</h3>
+                                                <p className="text-sm text-surface-400">
+                                                    {isFeatured
+                                                        ? "Ce projet est publié dans la galerie."
+                                                        : "Publier ce projet pour la communauté."}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={isFeatured}
+                                                onChange={(e) => {
+                                                    setIsFeatured(e.target.checked);
+                                                }}
+                                                disabled={!isPublic}
+                                            />
+                                            <div className={`w-14 h-7 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all ${isFeatured ? 'peer-checked:bg-purple-600' : 'peer-checked:bg-surface-600'}`}></div>
+                                        </label>
+                                    </div>
+                                    {!isPublic && (
+                                        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center gap-3">
+                                            <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <p className="text-sm text-blue-200">
+                                                Le projet doit être visible par l'administrateur pour être publié.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="rounded-xl bg-surface-800/30 p-8 border border-surface-700 text-center">
+                                <div className="inline-flex p-4 rounded-full bg-surface-700 mb-4 text-surface-400">
+                                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Paramètres Avancés</h3>
+                                <p className="text-sm text-surface-400 max-w-sm mx-auto">
+                                    Les options de confidentialité et de galerie sont réservées aux membres Élite. Les comptes gratuits sont conçus pour une utilisation temporaire.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="mt-6 flex justify-end gap-3 border-t border-surface-50/10 pt-6">
+                            <button
+                                onClick={onClose}
+                                className="rounded-lg px-4 py-2 text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={handleUpdate}
+                                disabled={isLoading}
+                                className={`
+                                    flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-medium text-white transition-all
+                                    ${isLoading
+                                        ? 'cursor-not-allowed bg-surface-700 opacity-50'
+                                        : 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20'
+                                    }
+                                `}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                                        Traitement...
+                                    </>
+                                ) : (
+                                    'Mettre à jour'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

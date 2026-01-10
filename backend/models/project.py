@@ -21,6 +21,7 @@ class Project(Document):
     description: Optional[str] = None
     owner: Link[User]
     is_public: bool = True
+    is_featured: bool = False # Published to Gallery (Elite Only)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
     graph_data: Optional[dict] = None
@@ -34,6 +35,7 @@ class Project(Document):
         indexes = [
             "owner",
             "is_public",
+            "is_featured",
             "created_at"
         ]
     

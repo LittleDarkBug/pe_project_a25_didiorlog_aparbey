@@ -5,6 +5,7 @@ export interface CreateProjectPayload {
     name: string;
     description?: string;
     isPublic?: boolean;
+    isFeatured?: boolean;
     mapping?: Record<string, string>;
     algorithm?: string;
 }
@@ -19,6 +20,9 @@ export interface Project {
     graph_data?: any;
     mapping?: Record<string, string>;
     algorithm?: string;
+    is_public?: boolean;
+    is_featured?: boolean;
+    description?: string;
 }
 
 export interface JobResponse {
@@ -43,6 +47,7 @@ export const projectsService = {
         }
 
         formData.append('is_public', payload.isPublic ? 'true' : 'false');
+        formData.append('is_featured', payload.isFeatured ? 'true' : 'false');
 
         if (payload.mapping && Object.keys(payload.mapping).length > 0) {
             formData.append('mapping', JSON.stringify(payload.mapping));
@@ -55,6 +60,10 @@ export const projectsService = {
 
     list: async (): Promise<Project[]> => {
         return apiClient.get<Project[]>('/projects/');
+    },
+
+    getPublicProjects: async (): Promise<Project[]> => {
+        return apiClient.get<Project[]>('/projects/public');
     },
 
     getById: async (id: string): Promise<Project> => {
@@ -70,10 +79,19 @@ export const projectsService = {
     },
 
     getByToken: async (token: string): Promise<Project> => {
-        return apiClient.get<Project>(`/projects/share/${token}`);
+        return apiClient.get<Project>(`/share/${token}`);
     },
 
     delete: async (id: string): Promise<void> => {
         return apiClient.delete(`/projects/${id}`);
+    },
+
+    getShortestPath: async (projectId: string, source: string, target: string): Promise<string[]> => {
+        // Returns list of node IDs
+        return apiClient.get<string[]>(`/projects/${projectId}/path?source=${source}&target=${target}`);
+    },
+
+    updateSharedLayout: async (token: string, algorithm: string): Promise<JobResponse> => {
+        return apiClient.post<JobResponse>(`/share/${token}/layout`, { algorithm });
     }
 };

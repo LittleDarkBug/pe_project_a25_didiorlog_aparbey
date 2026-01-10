@@ -12,7 +12,12 @@ export class VRDetailsPanel {
         scene: Scene,
         data: any,
         type: string,
-        xrHelper?: any
+        xrHelper?: any,
+        callbacks?: {
+            onShowNeighbors?: (id: string) => void,
+            onSetPathStart?: (id: string) => void,
+            onSetPathEnd?: (id: string) => void
+        }
     ) {
         // Clean up previous panel
         this.dispose();
@@ -173,6 +178,39 @@ export class VRDetailsPanel {
 
             propsStack.addControl(pPanel);
         });
+
+        // 4. Action Buttons (Topology Analysis)
+        if (type === 'node' && callbacks) {
+            const actionPanel = new GUI.StackPanel();
+            actionPanel.height = "100px";
+            actionPanel.isVertical = false; // Horizontal layout
+            actionPanel.paddingTop = "10px";
+            container.addControl(actionPanel);
+
+            const createActionBtn = (label: string, color: string, onClick: () => void) => {
+                const btn = GUI.Button.CreateSimpleButton("btn_" + label, label);
+                btn.width = "180px";
+                btn.height = "60px";
+                btn.color = "white";
+                btn.cornerRadius = 15;
+                btn.background = color;
+                btn.fontSize = 24;
+                btn.paddingLeft = "10px";
+                btn.paddingRight = "10px";
+                btn.onPointerUpObservable.add(onClick);
+                actionPanel.addControl(btn);
+            };
+
+            if (callbacks.onShowNeighbors) {
+                createActionBtn("VOISINS", "#8b5cf6", () => callbacks.onShowNeighbors!(data.id));
+            }
+            if (callbacks.onSetPathStart) {
+                createActionBtn("DÉPART", "#10b981", () => callbacks.onSetPathStart!(data.id));
+            }
+            if (callbacks.onSetPathEnd) {
+                createActionBtn("ARRIVÉE", "#f59e0b", () => callbacks.onSetPathEnd!(data.id));
+            }
+        }
 
         // Close Button
         const closeBtn = GUI.Button.CreateSimpleButton("closeBtn", "FERMER");

@@ -27,6 +27,7 @@ import { GraphRenderer } from '../utils/GraphRenderer';
 import { setupCommonScene } from '../utils/SceneSetup';
 import { useJobPolling } from '@/app/hooks/useJobPolling';
 import { apiClient } from '@/app/lib/apiClient';
+import { projectsService } from '@/app/services/projectsService';
 
 interface GraphData {
     nodes: Array<{
@@ -59,11 +60,19 @@ interface GraphSceneProps {
     onToggleLabels?: () => void;
 }
 
+// Match GraphSceneWeb interface
 export interface GraphSceneRef {
     resetCamera: () => void;
+    getCameraState: () => any;
 }
 
 const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, visibleEdgeIds, projectId, onLayoutUpdate, onXRStateChange, showLabels, onResetFilters, onToggleLabels }, ref) => {
+    // ... lines 68-114 ... (retained implicit context but need to be careful with replacer) - Wait, I should not replace the whole component definition if I can avoid it.
+    // I will target the interface definition and useImperativeHandle block.
+    // However, the component start line is in the middle of arguments.
+    // Let's target the lines specifically.
+    // Actually, I'll just replace the interface and useImperativeHandle.
+
     const [scene, setScene] = useState<Scene | null>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
     const xrHelperRef = useRef<any>(null);
@@ -71,6 +80,10 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     const nodeMeshesRef = useRef<Map<string, Mesh | InstancedMesh>>(new Map());
     const graphRenderer = useRef(new GraphRenderer());
     const vrMenuRef = useRef<{ dispose: () => void } | null>(null);
+
+    // --- Topology State ---
+    const [pathStart, setPathStart] = useState<string | null>(null);
+    const [pathEnd, setPathEnd] = useState<string | null>(null);
 
     // --- Async Layout Handling ---
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -120,6 +133,17 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
                     camera.radius = 100;
                 }
             }
+        },
+        getCameraState: () => {
+            if (xrHelperRef.current && xrHelperRef.current.baseExperience) {
+                const cam = xrHelperRef.current.baseExperience.camera;
+                return {
+                    position: { x: cam.position.x, y: cam.position.y, z: cam.position.z },
+                    rotation: { x: cam.rotation.x, y: cam.rotation.y, z: cam.rotation.z },
+                    mode: 'VR'
+                };
+            }
+            return { mode: 'VR_Preview' };
         }
     }));
 
@@ -133,8 +157,11 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
     useEffect(() => {
         if (scene && nodeMeshesRef.current.size > 0) {
             graphRenderer.current.updateVisibility(visibleNodeIds ?? null, visibleEdgeIds ?? null, nodeMeshesRef.current);
+            // Sync labels with visibility
+            // Pass isXR=true
+            graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene, true);
         }
-    }, [visibleNodeIds, visibleEdgeIds, scene]);
+    }, [visibleNodeIds, visibleEdgeIds, scene, showLabels]);
 
     // Handle Label Visibility
     useEffect(() => {
@@ -142,6 +169,30 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
             graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene);
         }
     }, [showLabels, scene]);
+
+    // Handle Path Calculation
+    useEffect(() => {
+        const calculatePath = async () => {
+            if (pathStart && pathEnd && projectId) {
+                console.log(`VR: Calculating path from ${pathStart} to ${pathEnd}`);
+                try {
+                    const pathNodes = await projectsService.getShortestPath(projectId, pathStart, pathEnd);
+                    console.log("VR: Path found", pathNodes);
+                    if (pathNodes && pathNodes.length > 0) {
+                        const pathSet = new Set(pathNodes);
+                        // Show only path nodes
+                        graphRenderer.current.updateVisibility(pathSet, null, nodeMeshesRef.current);
+                    }
+                } catch (e) {
+                    console.error("VR: Path calculation failed", e);
+                }
+                // Reset state to allow new path
+                setPathStart(null);
+                setPathEnd(null);
+            }
+        };
+        calculatePath();
+    }, [pathStart, pathEnd, projectId]);
 
     const onSceneReady = useCallback(async (sceneInstance: Scene) => {
         setScene(sceneInstance);
@@ -366,11 +417,46 @@ const GraphSceneXR = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelec
         // Clean up old graph
         graphRenderer.current.disposeGraph(nodeMeshesRef.current, scene);
 
+        // --- Topology Handlers ---
+        const handleShowNeighbors = (nodeId: string) => {
+            console.log("VR: Show Neighbors for", nodeId);
+            if (!data) return;
+            const neighbors = new Set<string>();
+            neighbors.add(nodeId);
+            data.edges.forEach(e => {
+                if (String(e.source) === nodeId) neighbors.add(String(e.target));
+                if (String(e.target) === nodeId) neighbors.add(String(e.source));
+            });
+            // Update visibility locally
+            graphRenderer.current.updateVisibility(neighbors, null, nodeMeshesRef.current);
+        };
+
+        const handleSetPathStart = (nodeId: string) => {
+            console.log("VR: Path Start set to", nodeId);
+            setPathStart(nodeId);
+            // Visual feedback?
+        };
+
+        const handleSetPathEnd = (nodeId: string) => {
+            console.log("VR: Path End set to", nodeId);
+            setPathEnd(nodeId);
+        };
+
         // Define VR Selection Callback
         const handleVRSelect = (itemData: any, type: string) => {
             console.log("VR Selection Triggered:", itemData);
             if (detailsPanelRef.current) {
-                detailsPanelRef.current.create(scene, itemData, type, xrHelperRef.current);
+                detailsPanelRef.current.create(
+                    scene,
+                    itemData,
+                    type,
+                    xrHelperRef.current,
+                    {
+                        onShowNeighbors: handleShowNeighbors,
+                        onSetPathStart: handleSetPathStart,
+                        onSetPathEnd: handleSetPathEnd
+                    }
+                );
             }
         };
 

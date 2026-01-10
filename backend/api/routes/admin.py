@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 from api.dependencies import get_current_admin_user
 from models.user import User
 from models.project import Project
@@ -8,6 +9,11 @@ from beanie import PydanticObjectId
 from core.security import hash_password
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+class ProjectUpdateAdmin(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_public: Optional[bool] = None
 
 @router.get("/stats", response_model=AdminStats)
 async def get_admin_stats(admin: User = Depends(get_current_admin_user)):
@@ -48,6 +54,9 @@ async def get_users(
             is_active=user.is_active,
             is_superuser=user.is_superuser,
             role=user.role,
+            is_elite=user.is_elite,
+            elite_request_status=user.elite_request_status,
+            elite_request_date=user.elite_request_date,
             created_at=user.created_at
         ) for user in users
     ]
@@ -82,6 +91,9 @@ async def create_user(
         is_active=user.is_active,
         is_superuser=user.is_superuser,
         role=user.role,
+        is_elite=user.is_elite,
+        elite_request_status=user.elite_request_status,
+        elite_request_date=user.elite_request_date,
         created_at=user.created_at
     )
 
@@ -97,6 +109,13 @@ async def update_user(
     
     if update_data.is_active is not None:
         user.is_active = update_data.is_active
+    
+    if update_data.is_elite is not None:
+        user.is_elite = update_data.is_elite
+        
+    if update_data.elite_request_status is not None:
+        user.elite_request_status = update_data.elite_request_status
+        
     if update_data.role is not None:
         user.role = update_data.role
         if user.role == "admin":
@@ -113,6 +132,9 @@ async def update_user(
         is_active=user.is_active,
         is_superuser=user.is_superuser,
         role=user.role,
+        is_elite=user.is_elite,
+        elite_request_status=user.elite_request_status,
+        elite_request_date=user.elite_request_date,
         created_at=user.created_at
     )
 
@@ -137,29 +159,45 @@ async def get_projects(
     skip: int = 0,
     limit: int = 50,
     search: str = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+    is_public: Optional[bool] = None,
+    owner_email: Optional[str] = None,
     admin: User = Depends(get_current_admin_user)
 ):
     query = Project.find_all()
+    
     if search:
         query = Project.find({"name": {"$regex": search, "$options": "i"}})
         
-    projects = await query.skip(skip).limit(limit).sort("-created_at").to_list()
+    if is_public is not None:
+        query = query.find(Project.is_public == is_public)
+
+    if owner_email:
+        user = await User.find_one(User.email == owner_email)
+        if user:
+            query = query.find(Project.owner.id == user.id)
+        else:
+            return []
+
+    # Sorting
+    sort_field = f"-{sort_by}" if sort_order == "desc" else sort_by
+    if sort_by not in ["created_at", "name", "node_count", "edge_count"]:
+        sort_field = "-created_at"
+        
+    projects = await query.skip(skip).limit(limit).sort(sort_field).to_list()
     
     results = []
     for p in projects:
-        # Fetch owner email if possible
-        owner_email = "Unknown"
+        owner_email_str = "Unknown"
         if p.owner:
-            # Assuming owner is a Link, we might need to fetch it if not populated
-            # Beanie fetch_link
             try:
                 if isinstance(p.owner, User):
-                    owner_email = p.owner.email
+                    owner_email_str = p.owner.email
                 else:
-                    # It's a Link/DBRef, fetch it
                     owner = await p.owner.fetch()
                     if owner:
-                        owner_email = owner.email
+                        owner_email_str = owner.email
             except:
                 pass
         
@@ -172,7 +210,7 @@ async def get_projects(
         results.append(ProjectAdminView(
             id=str(p.id),
             name=p.name,
-            owner_email=owner_email,
+            owner_email=owner_email_str,
             is_public=p.is_public,
             created_at=p.created_at,
             node_count=node_count,
@@ -180,6 +218,55 @@ async def get_projects(
         ))
         
     return results
+
+@router.patch("/projects/{project_id}", response_model=ProjectAdminView)
+async def update_project(
+    project_id: PydanticObjectId,
+    update_data: ProjectUpdateAdmin,
+    admin: User = Depends(get_current_admin_user)
+):
+    project = await Project.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Strict Privacy: Admin cannot control private projects (unless they are owner)
+    if not project.is_public and project.owner.ref.id != admin.id:
+        raise HTTPException(status_code=403, detail="Projet privé : Modification administrative intérdite.")
+
+    if update_data.name is not None:
+        project.name = update_data.name
+    if update_data.description is not None:
+        project.description = update_data.description
+    if update_data.is_public is not None:
+        project.is_public = update_data.is_public
+        
+    await project.save()
+
+    # Construct response
+    owner_email_str = "Unknown"
+    if project.owner:
+        try:
+            if isinstance(project.owner, User):
+                owner_email_str = project.owner.email
+            else:
+                owner = await project.owner.fetch()
+                if owner:
+                    owner_email_str = owner.email
+        except:
+            pass
+
+    node_count = project.metadata.get("node_count", 0) if project.metadata else 0
+    edge_count = project.metadata.get("edge_count", 0) if project.metadata else 0
+
+    return ProjectAdminView(
+        id=str(project.id),
+        name=project.name,
+        owner_email=owner_email_str,
+        is_public=project.is_public,
+        created_at=project.created_at,
+        node_count=node_count,
+        edge_count=edge_count
+    )
 
 @router.delete("/projects/{project_id}")
 async def delete_project(

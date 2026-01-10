@@ -1,307 +1,237 @@
-# Graph 3D/XR - Visualisation Immersive de Graphes
+# PE_Def_Project - Visualisation de Graphes 3D/VR
 
-Plateforme web complète pour la visualisation 3D et VR de graphes complexes avec spatialisation intelligente.
-
-## Fonctionnalités
-
-- **Visualisation 3D/WebGL** : Rendu haute performance avec Babylon.js
-- **Mode VR immersif** : Navigation WebXR pour casques VR
-- **Spatialisation intelligente** : Sélection automatique de l'algorithme optimal selon les caractéristiques du graphe
-- **Analyse Topologique** : Outils intégrés pour l'analyse de voisinage et recherche de chemin
-- **Force Atlas** : Détection avancée de clusters et communautés
-- **Import flexible** : Support CSV, JSON (Node-Link & List), GEXF
-- **Partage collaboratif** : Liens publics pour visualisation en lecture seule
-- **Administration** : Gestion complète des utilisateurs et projets pour les administrateurs
-- **Authentification sécurisée** : JWT + Argon2id
-- **Processing asynchrone** : Celery pour traitement de graphes massifs (>100k nœuds)
-
-## Architecture
-
-### Stack Technique
-
-**Frontend :**
-- Next.js 15 + TypeScript
-- Babylon.js (moteur 3D)
-- WebXR (support VR)
-- Zustand (état UI) + TanStack Query (données serveur)
-- Tailwind CSS
-
-**Backend :**
-- FastAPI 0.121 +  Python 3.11
-- MongoDB + Beanie ODM
-- Redis (cache + sessions)
-- Celery + Flower (tâches async)
-
-**Spatialisation :**
-- NetworkX 3.5 (manipulation graphes)
-- igraph 0.11.8 (calculs performants C++)
-- fa2-modified (Force Atlas 2)
-- NumPy + SciPy
+Plateforme de visualisation immersive de graphes en 3D et réalité virtuelle (WebXR), permettant d'importer, analyser et explorer des réseaux de données complexes.
 
 ## Démarrage Rapide
 
 ### Prérequis
-
 - Docker & Docker Compose
+- Casque VR compatible WebXR (optionnel)
 
 ### Installation
 
 ```bash
-# Cloner le repository
-git clone <votre-repository>
+# Cloner le projet
+git clone <repository-url>
 cd PE_Def_Project
 
-# Créer le fichier d'environnement
+# Configurer les variables d'environnement
 cp .env.example .env
 
-# Démarrer tous les services
-docker-compose up -d
-
-# Vérifier le statut
-docker-compose ps
+# Lancer tous les services
+docker compose up
 ```
 
-**Services démarrés :**
-- Frontend : http://localhost:3000
-- Backend API : http://localhost:8000
-- API Docs : http://localhost:8000/docs
-- Flower (monitoring) : http://localhost:5555
-- MongoDB : localhost:27017 (interne)
-- Redis : localhost:6379 (interne)
+### URLs d'accès
+| Service         | URL                   | Description                        |
+| --------------- | --------------------- | ---------------------------------- |
+| Frontend (Dev)  | http://localhost:3000 | Mode développement avec hot reload |
+| Frontend (Prod) | http://localhost:3001 | Mode production optimisé           |
+| Backend API     | http://localhost:8000 | API FastAPI + Swagger UI           |
+| Flower          | http://localhost:5555 | Monitoring des tâches Celery       |
 
-Accédez à http://localhost:3000/register pour créer votre compte.
+---
 
-## 📊 Spatialisation Intelligente
-
-Le système sélectionne automatiquement l'algorithme optimal selon **3 critères** :
-
-### Critère 1 : Taille (prioritaire pour performance)
-- **> 5000 nœuds** : DrL obligatoire (seul algorithme scalable)
-- **2000-5000 nœuds** : DrL par défaut, sauf si très sparse (< 0.01 densité) → Sphérique
-
-### Critère 2 : Densité (graphes moyens < 2000 nœuds)
-- **Densité > 0.3** : Kamada-Kawai (préserve topologie)
-- **Densité < 0.05** : 
-  - Moins de 500 nœuds → Sphérique
-  - Plus de 500 nœuds → Fruchterman-Reingold
-
-### Critère 3 : Modularité (structure communautaire)
-- **Modularité > 0.4 + 3+ communautés** : **Force Atlas** (détection clusters)
-- **Sinon** : Fruchterman-Reingold (défaut équilibré)
-
-### Algorithmes Disponibles
-
-| Algorithme               | Cas d'usage                   | Complexité     |
-| ------------------------ | ----------------------------- | -------------- |
-| **Fruchterman-Reingold** | Graphes moyens, équilibré     | O(V² + E)      |
-| **Kamada-Kawai**         | Graphes denses, esthétique    | O(V²)          |
-| **DrL**                  | Grands graphes (> 5000 nœuds) | O(V log V + E) |
-| **Force Atlas**          | Clusters et communautés       | O(V² + E)      |
-| **Sphérique**            | Navigation immersive VR       | O(V)           |
-| **Grille**               | Comparaison structurelle      | O(V)           |
-| **Aléatoire**            | Tests et comparaisons         | O(V)           |
-
-Voir [SPATIALISATION.md](./SPATIALISATION.md) pour plus de détails.
-
-## Structure du Projet
+## Architecture
 
 ```
 PE_Def_Project/
-├── frontend/               # Application Next.js
-│   ├── app/
-│   │   ├── (auth)/         # Authentification
-│   │   ├── (dashboard)/    # Dashboard utilisateur
-│   │   ├── projects/[id]/ # Visualisation 3D
-│   │   ├── share/[token]/  # Partage public
-│   │   ├── components/     # Composants React
-│   │   │   ├── 3DandXRComponents/  # 3D & VR
-│   │   │   └── project/    # Gestion projets
-│   │   ├── services/       # Services API
-│   │   └── store/          # Stores Zustand
-│   └── package.json
-│
-├── backend/                # API FastAPI
-│   ├── api/routes/         # Endpoints
-│   ├── core/               # Config, sécurité, DB
-│   ├── models/             # Modèles MongoDB
-│   ├── services/           # Logique métier
-│   │   └── graph_service.py  # Spatialisation
-│   ├── tasks.py            # Tâches Celery
-│   └── requirements.txt
-│
-├── docker-compose.yml      # Orchestration services
-├── .env.example            # Template variables env
-├── SPATIALISATION.md       # Documentation spatialisation
-└── README.md              # Ce fichier
+├── backend/                 # API FastAPI + Celery
+│   ├── api/routes/          # Endpoints REST
+│   ├── models/              # Modèles MongoDB (Beanie)
+│   ├── services/            # Logique métier (layouts)
+│   └── tasks.py             # Tâches asynchrones Celery
+├── frontend/                # Next.js 16 + TypeScript
+│   └── app/
+│       ├── components/      # UI & 3D/XR Components
+│       ├── services/        # API clients
+│       ├── hooks/           # React hooks
+│       └── store/           # Zustand stores
+└── docker-compose.yml       # Orchestration des services
 ```
 
-## Développement
+### Services Docker
 
-### Workflow Docker
+| Service       | Image          | Port  | Description           |
+| ------------- | -------------- | ----- | --------------------- |
+| mongodb       | mongo:7        | 27017 | Base de données       |
+| redis         | redis:7-alpine | 6379  | Cache & Broker Celery |
+| backend       | ./backend      | 8000  | API FastAPI           |
+| frontend      | node:20        | 3000  | Next.js (dev)         |
+| frontend-prod | node:20        | 3001  | Next.js (prod)        |
+| celery-worker | ./backend      | -     | Worker async          |
+| flower        | ./backend      | 5555  | Monitoring Celery     |
 
-Le projet utilise des **volumes bind-mount** pour le développement :
+---
 
-```yaml
-# docker-compose.yml
-backend:
-  volumes:
-    - ./backend:/app  # Hot reload automatique
+## API Backend
 
-frontend:
-  volumes:
-    - ./frontend:/app  # Next.js fast refresh
-```
+### Authentification (`/auth`)
+| Méthode | Endpoint          | Description                         |
+| ------- | ----------------- | ----------------------------------- |
+| POST    | `/auth/register/` | Inscription (Free ou demande Elite) |
+| POST    | `/auth/login/`    | Connexion - JWT tokens              |
+| POST    | `/auth/refresh/`  | Rafraîchir access token             |
+| POST    | `/auth/logout/`   | Déconnexion (blacklist token)       |
 
-**Modifications → Reload automatique (pas de rebuild nécessaire)**
+### Projets (`/projects`)
+| Méthode | Endpoint                   | Description                   |
+| ------- | -------------------------- | ----------------------------- |
+| POST    | `/projects/`               | Créer projet (upload fichier) |
+| GET     | `/projects/`               | Lister mes projets            |
+| GET     | `/projects/public`         | Galerie publique              |
+| GET     | `/projects/{id}`           | Détails d'un projet           |
+| PUT     | `/projects/{id}`           | Modifier projet               |
+| DELETE  | `/projects/{id}`           | Supprimer projet              |
+| POST    | `/projects/{id}/layout`    | Recalculer layout             |
+| GET     | `/projects/tasks/{job_id}` | Polling tâche Celery          |
 
-### Logs
+### Partage (`/share`)
+| Méthode | Endpoint                | Description                      |
+| ------- | ----------------------- | -------------------------------- |
+| POST    | `/share/generate`       | Créer lien de partage            |
+| GET     | `/share/{token}`        | Accéder projet partagé           |
+| POST    | `/share/{token}/layout` | Preview layout (sans sauvegarde) |
+
+### Administration (`/admin`)
+| Méthode             | Endpoint          | Description           |
+| ------------------- | ----------------- | --------------------- |
+| GET                 | `/admin/stats`    | Statistiques globales |
+| GET/POST/PUT/DELETE | `/admin/users`    | Gestion utilisateurs  |
+| GET/PUT/DELETE      | `/admin/projects` | Gestion projets       |
+
+### Fichiers (`/files`)
+| Méthode | Endpoint              | Description                |
+| ------- | --------------------- | -------------------------- |
+| POST    | `/files/analyze`      | Analyser structure fichier |
+| GET     | `/files/preview/{id}` | Prévisualiser données      |
+
+---
+
+## Frontend
+
+### Pages
+| Route            | Description                    |
+| ---------------- | ------------------------------ |
+| `/`              | Landing page                   |
+| `/login`         | Connexion                      |
+| `/register`      | Inscription                    |
+| `/dashboard`     | Liste des projets              |
+| `/projects/[id]` | Visualisation 3D/VR            |
+| `/gallery`       | Galerie publique               |
+| `/share/[token]` | Projet partagé (lecture seule) |
+| `/admin`         | Panel administrateur           |
+
+### Composants 3D/XR
+- **GraphSceneWeb**: Rendu 3D navigateur (Babylon.js)
+- **GraphSceneXR**: Mode VR immersif (WebXR)
+- **OverlayControls**: Contrôles UI (reset, VR, export)
+- **FilterPanel**: Filtrage noeuds/liens
+- **LayoutSelector**: Choix algorithme layout
+- **DetailsPanel**: Infos noeud/lien sélectionné
+
+### Services Frontend
+| Service         | Description              |
+| --------------- | ------------------------ |
+| authService     | Connexion/inscription    |
+| projectsService | CRUD projets + layout    |
+| filesService    | Upload & analyse         |
+| shareService    | Génération liens partage |
+| adminService    | Admin API                |
+| userService     | Profil utilisateur       |
+
+---
+
+## Algorithmes de Layout
+
+| Algorithme               | Description                  | Cas d'usage           |
+| ------------------------ | ---------------------------- | --------------------- |
+| **auto**                 | Sélection intelligente       | Défaut recommandé     |
+| **fruchterman_reingold** | Force-directed classique     | < 1000 noeuds         |
+| **kamada_kawai**         | Préserve distances           | Petits graphes        |
+| **drl**                  | Distributed Recursive Layout | Grands graphes        |
+| **force_atlas**          | Clustering visuel            | Détection communautés |
+| **sphere**               | Distribution sphérique       | VR immersif           |
+| **grid**                 | Grille régulière             | Comparaison           |
+| **random**               | Aléatoire                    | Baseline              |
+
+**Sélection automatique** (basée sur densité et taille):
+- Dense (>0.1) + petit (<200): Kamada-Kawai  
+- Dense + grand: ForceAtlas  
+- Sparse + petit: Fruchterman-Reingold  
+- Sparse + grand: DrL  
+
+---
+
+## Plans Utilisateurs
+
+| Fonctionnalité            | Free     | Elite |
+| ------------------------- | -------- | ----- |
+| Import fichiers (max 5Go) | Oui      | Oui   |
+| Visualisation 3D/VR       | Oui      | Oui   |
+| Filtres & layouts         | Oui      | Oui   |
+| Projets temporaires       | Oui      | -     |
+| Projets persistants       | -        | Oui   |
+| Publier en galerie        | -        | Oui   |
+| Projets privés            | -        | Oui   |
+| Partage par lien          | Session* | Oui   |
+
+*Liens de partage Free expirent a la deconnexion.
+
+---
+
+## Formats Supportés
+
+| Format | Extension | Description                       |
+| ------ | --------- | --------------------------------- |
+| CSV    | `.csv`    | Colonnes source/target/weight     |
+| JSON   | `.json`   | Node-link format ou liste d'edges |
+| GEXF   | `.gexf`   | Standard Gephi                    |
+
+**Mapping automatique**: Détection intelligente des colonnes source/target.
+
+---
+
+## Configuration
+
+### Variables d'environnement (`.env`)
 
 ```bash
-# Tous les services
-docker-compose logs -f
-
-# Service spécifique
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f celery-worker
-```
-
-### Rebuild après changement de dépendances
-
-```bash
-# Après ajout dans requirements.txt ou package.json
-docker-compose up -d --build backend
-docker-compose up -d --build frontend
-```
-
-### Accéder à un container
-
-```bash
-# Backend (Python/bash)
-docker-compose exec backend bash
-
-# Frontend (Node/sh)
-docker-compose exec frontend sh
-
 # MongoDB
-docker-compose exec mongodb mongosh
+MONGO_ROOT_USER=admin
+MONGO_ROOT_PASSWORD=<password>
+MONGO_DATABASE=graphdb
 
-# Redis
-docker-compose exec redis redis-cli
+# Redis  
+REDIS_PASSWORD=<password>
+
+# JWT
+JWT_SECRET=<secret-key>
+JWT_ALGORITHM=HS256
+
+# Limites
+MAX_UPLOAD_SIZE_MB=5000  # 5 Go
 ```
 
-## Utilisation
-
-### Import de graphes
-
-1. **Dashboard** → Bouton "Nouveau Projet"
-2. **Upload** fichier CSV/JSON/GEXF
-3. **Mapping** colonnes (source, target, propriétés)
-4. **Traitement** automatique avec spatialisation intelligente
-
-Format CSV attendu :
-```csv
-source,target,weight
-A,B,5.0
-B,C,3.0
-```
-
-### Visualisation 3D
-
-- **Navigation** : Souris/touchpad (rotation, zoom, pan)
-- **Sélection** : Clic sur nœud → panneau détails
-- **Filtrage** : Panneau latéral pour filtres avancés
-- **Layouts** : Menu "Vues" pour changer l'algorithme
-
-### Mode VR
-
-1. **Connecter** casque VR compatible WebXR
-2. **Bouton VR** en bas à droite de la visualisation
-3. **Navigation** : Joysticks pour vol libre
-4. **Sélection** : Pointer + gâchette
-5. **Menu VR** : Layouts, recentrage, quitter
-
-voir le [Guide WebXR dans la documentation Frontend](./frontend/README.md#guide-webxr--réalité-virtuelle).
-
-## Docker Compose
-
-Services définis :
-
-- **mongodb** : Base de données
-- **redis** : Cache et sessions
-- **backend** : API FastAPI
-- **celery-worker** : Worker asynchrone
-- **flower** : Monitoring Celery
-- **frontend** : Next.js (mode dev)
-- **frontend-prod** : Next.js (build production)
-
-```bash
-# Démarrer tout
-docker-compose up -d
-
-# Voir les logs
-docker-compose logs -f backend
-
-# Rebuild un service
-docker-compose up -d --build frontend-prod
-
-# Arrêter tout
-docker-compose down
-```
-
-## Sécurité
-
-- **Passwords** : Argon2id (time_cost=3, memory_cost=64MB, parallelism=4)
-- **JWT** : HS256 avec access tokens (30min) + refresh tokens (30j)
-- **CORS** : Origins configurables
-- **Upload** : Limite configurable (défaut 50MB)
-- **Rate limiting** : À implémenter selon besoins
-
-## Performance
-
-- **Petits graphes (< 500 nœuds)** : < 1s
-- **Graphes moyens (500-2000)** : 1-5s
-- **Grands graphes (2000-10k)** : 5-30s
-- **Très grands (> 10k)** : Traitement async avec Celery, pas de timeout
-
-Le processing asynchrone garantit la réactivité de l'API sur tous les graphes.
+---
 
 ## Tests
 
 ```bash
 # Backend
-cd backend
-pytest
+cd backend && pytest
 
 # Frontend
-cd frontend
-npm test
+cd frontend && npm test
 ```
 
-## Documentation
+---
 
-- [SPATIALISATION.md](./SPATIALISATION.md) - Logique de spatialisation détaillée
-- [SPATIALISATION.md](./SPATIALISATION.md) - Logique de spatialisation détaillée
-- [frontend/README.md](./frontend/README.md) - Documentation Frontend et Guide WebXR
-- API Docs : http://localhost:8000/docs (Swagger)
-- ReDoc : http://localhost:8000/redoc
+## Documentation Complementaire
 
-## Contribution
+- [Backend README](./backend/README.md) - API, endpoints et structure backend
+- [Frontend README](./frontend/README.md) - Pages, composants et services frontend
+- [SPATIALISATION.md](./SPATIALISATION.md) - Details algorithmes de layout
+- [ROADMAP.md](./ROADMAP.md) - Feuille de route du projet
+- [docs/](./docs/) - Documentation technique additionnelle
 
-1. Fork le projet
-2. Créer une branche feature (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push (`git push origin feature/amazing-feature`)
-5. Ouvrir une Pull Request
-
-## License
-
-[À définir]
-
-## Équipe
-
-Projet réalisé dans le cadre de [contexte du projet].
-
-## Support
-
-Pour signaler un bug ou demander une fonctionnalité, ouvrir une issue sur GitHub.

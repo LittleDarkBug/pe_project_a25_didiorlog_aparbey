@@ -87,7 +87,7 @@ async def get_shared_project(token: str):
     if expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=410, detail="Lien de partage expiré")
         
-    project = await Project.get(share_link.project_id)
+    project = await Project.get(PydanticObjectId(share_link.project_id))
     
     if not project:
         raise HTTPException(status_code=404, detail="Projet introuvable")
@@ -123,7 +123,7 @@ async def preview_shared_project_layout(token: str, layout_update: LayoutUpdate)
     if expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=410, detail="Lien de partage expiré")
         
-    project = await Project.get(share_link.project_id)
+    project = await Project.get(PydanticObjectId(share_link.project_id))
     
     if not project:
         raise HTTPException(status_code=404, detail="Projet introuvable")

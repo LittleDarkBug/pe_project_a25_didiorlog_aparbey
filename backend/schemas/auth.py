@@ -15,6 +15,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=100)
     full_name: Optional[str] = Field(None, max_length=100)
+    request_elite: bool = False
     
     class Config:
         json_schema_extra = {

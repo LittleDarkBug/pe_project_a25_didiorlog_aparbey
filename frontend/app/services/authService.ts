@@ -17,6 +17,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   full_name: string;
+  request_elite?: boolean;
 }
 
 /**

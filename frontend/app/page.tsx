@@ -73,9 +73,9 @@ export default function LandingPage() {
                 Créer un compte gratuit
               </Button>
             </Link>
-            <Link href="#demo">
+            <Link href="/gallery">
               <Button variant="outline" size="lg" className="rounded-full px-8 backdrop-blur-sm">
-                Voir la démo
+                Explorer la Galerie
               </Button>
             </Link>
           </div>

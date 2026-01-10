@@ -9,6 +9,7 @@ export interface User {
   created_at: string;
   is_active: boolean;
   is_superuser: boolean;
+  is_elite?: boolean;
   role: string;
 }
 

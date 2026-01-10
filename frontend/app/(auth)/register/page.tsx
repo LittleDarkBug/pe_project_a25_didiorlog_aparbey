@@ -12,11 +12,12 @@ import { useToastStore } from '@/app/store/useToastStore';
 export default function RegisterPage() {
     const { register } = useAuth();
     const { addToast } = useToastStore();
-    
+
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [requestElite, setRequestElite] = useState(false);
     const [gdprConsent, setGdprConsent] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +33,7 @@ export default function RegisterPage() {
             return;
         }
 
-        register.mutate({ email, password, full_name: fullName });
+        register.mutate({ email, password, full_name: fullName, request_elite: requestElite });
     };
 
     return (
@@ -98,6 +99,25 @@ export default function RegisterPage() {
                         leftIcon={<Lock className="h-5 w-5" />}
                     />
 
+                    <div className="flex items-start p-4 rounded-lg bg-primary-500/5 border border-primary-500/20">
+                        <input
+                            id="elite"
+                            type="checkbox"
+                            checked={requestElite}
+                            onChange={(e) => setRequestElite(e.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-surface-600 bg-surface-950/50 text-primary-500 focus:ring-primary-500"
+                        />
+                        <div className="ml-3">
+                            <label htmlFor="elite" className="block text-sm font-medium text-surface-50">
+                                Demander un accès Élite (Sauvegarde permanente)
+                            </label>
+                            <p className="text-xs text-surface-400 mt-1">
+                                Les comptes standards sont temporaires et les projets sont supprimés à la déconnexion.
+                                Cochez cette case pour demander un compte permanent (validation administrateur requise).
+                            </p>
+                        </div>
+                    </div>
+
                     <div className="flex items-center">
                         <input
                             id="gdpr"
@@ -132,6 +152,6 @@ export default function RegisterPage() {
                     </Link>
                 </div>
             </Card>
-        </div>
+        </div >
     );
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { LoginRequest, RegisterRequest, authService } from '@/app/services/authService';
+import { User } from '@/app/services/userService';
 import { useToastStore } from '@/app/store/useToastStore';
 import { signIn, signOut, useSession } from 'next-auth/react';
 
@@ -12,23 +13,23 @@ export const useAuth = () => {
 
   const login = useMutation({
     mutationFn: async (credentials: LoginRequest) => {
-        const result = await signIn('credentials', {
-            redirect: false,
-            email: credentials.email,
-            password: credentials.password,
-        });
-        
-        if (result?.error) {
-            throw new Error("Email ou mot de passe incorrect");
-        }
-        return result;
+      const result = await signIn('credentials', {
+        redirect: false,
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      if (result?.error) {
+        throw new Error("Email ou mot de passe incorrect");
+      }
+      return result;
     },
     onSuccess: async () => {
       addToast('Connexion réussie', 'success');
-      
+
       // Force session refresh to get the latest user data including role
       const newSession = await update();
-      
+
       if ((newSession?.user as any)?.role === 'admin') {
         router.push('/admin');
       } else {
@@ -66,7 +67,7 @@ export const useAuth = () => {
   });
 
   return {
-    user: session?.user,
+    user: session?.user as unknown as User,
     isAuthenticated: status === 'authenticated',
     isLoading: status === 'loading',
     login,

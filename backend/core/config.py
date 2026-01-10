@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = ["*"]
     
     # Upload
-    MAX_UPLOAD_SIZE_MB: int = 100
+    MAX_UPLOAD_SIZE_MB: int = 5000
     
     # Argon2
     ARGON2_TIME_COST: int = 3

@@ -73,10 +73,67 @@ export default function AdminUsersPage() {
         setIsCreateModalOpen(false);
     };
 
+    const handleApproveElite = async (user: UserAdminView) => {
+        try {
+            const updated = await adminService.updateUser(user.id, {
+                is_elite: true,
+                elite_request_status: 'APPROVED'
+            });
+            setUsers(users.map(u => u.id === user.id ? updated : u));
+            addToast('Requête Élite approuvée', 'success');
+        } catch (error) {
+            addToast('Approbation échouée', 'error');
+        }
+    };
+
+    const handleRejectElite = async (user: UserAdminView) => {
+        try {
+            const updated = await adminService.updateUser(user.id, {
+                elite_request_status: 'REJECTED'
+            });
+            setUsers(users.map(u => u.id === user.id ? updated : u));
+            addToast('Requête Élite rejetée', 'info');
+        } catch (error) {
+            addToast('Rejet échoué', 'error');
+        }
+    };
+
+    const [viewMode, setViewMode] = useState<'all' | 'requests'>('all');
+    const filteredUsers = viewMode === 'requests'
+        ? users.filter(u => u.elite_request_status === 'PENDING')
+        : users;
+
     return (
         <div className="space-y-6 p-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-surface-50">Gestion des Utilisateurs</h2>
+                <div className="flex items-center gap-4">
+                    <h2 className="text-2xl font-bold text-surface-50">Gestion des Utilisateurs</h2>
+                    <div className="flex bg-surface-900/50 p-1 rounded-lg border border-surface-50/10">
+                        <button
+                            onClick={() => setViewMode('all')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'all'
+                                    ? 'bg-primary-500/20 text-primary-400'
+                                    : 'text-surface-400 hover:text-surface-200'
+                                }`}
+                        >
+                            Tous
+                        </button>
+                        <button
+                            onClick={() => setViewMode('requests')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${viewMode === 'requests'
+                                    ? 'bg-purple-500/20 text-purple-400'
+                                    : 'text-surface-400 hover:text-surface-200'
+                                }`}
+                        >
+                            Requêtes Élite
+                            {users.filter(u => u.elite_request_status === 'PENDING').length > 0 && (
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-[10px] text-white">
+                                    {users.filter(u => u.elite_request_status === 'PENDING').length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                </div>
                 <div className="flex gap-4">
                     <div className="w-64">
                         <Input
@@ -98,6 +155,7 @@ export default function AdminUsersPage() {
                         <tr>
                             <th className="px-6 py-3">Utilisateur</th>
                             <th className="px-6 py-3">Rôle</th>
+                            <th className="px-6 py-3">Plan</th>
                             <th className="px-6 py-3">Statut</th>
                             <th className="px-6 py-3">Date création</th>
                             <th className="px-6 py-3 text-right">Actions</th>
@@ -118,6 +176,7 @@ export default function AdminUsersPage() {
                                     </td>
                                     <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
                                     <td className="px-6 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                                    <td className="px-6 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
                                     <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2">
@@ -128,10 +187,10 @@ export default function AdminUsersPage() {
                                     </td>
                                 </tr>
                             ))
-                        ) : users.length === 0 ? (
-                            <tr><td colSpan={5} className="p-6 text-center">Aucun utilisateur trouvé</td></tr>
+                        ) : filteredUsers.length === 0 ? (
+                            <tr><td colSpan={6} className="p-6 text-center">Aucun utilisateur trouvé</td></tr>
                         ) : (
-                            users.map((user) => (
+                            filteredUsers.map((user) => (
                                 <tr key={user.id} className="hover:bg-surface-50/5">
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-surface-50">{user.full_name || 'Sans nom'}</div>
@@ -145,6 +204,21 @@ export default function AdminUsersPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
+                                        {user.elite_request_status === 'PENDING' ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                                En attente
+                                            </span>
+                                        ) : user.is_elite ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                                Élite
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-surface-700/50 text-surface-400">
+                                                Gratuit
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4">
                                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
 
                                             }`}>
@@ -156,6 +230,30 @@ export default function AdminUsersPage() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2">
+                                            {user.elite_request_status === 'PENDING' && (
+                                                <>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleApproveElite(user)}
+                                                        title="Approuver Élite"
+                                                        className="h-8 w-8 p-0 bg-green-500/10 hover:bg-green-500/20 text-green-400"
+                                                    >
+                                                        <CheckCircle className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleRejectElite(user)}
+                                                        title="Rejeter Élite"
+                                                        className="h-8 w-8 p-0 bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                                                    >
+                                                        <Ban className="h-4 w-4" />
+                                                    </Button>
+                                                    <div className="w-px h-6 bg-surface-500/20 mx-1" />
+                                                </>
+                                            )}
+
                                             <Button
                                                 variant="ghost"
                                                 size="sm"

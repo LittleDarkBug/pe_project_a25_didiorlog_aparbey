@@ -61,26 +61,38 @@ export function generateProjectReport(project: any): string {
     const edgeCount = edgesList.length;
 
     // --- Format Report ---
-    const report = `# Export de Données: ${name}
+    const report = `# Rapport de Projet: ${name}
 Date: ${new Date().toLocaleString()}
 
-## 1. Contexte du Projet
-- **ID**: ${project.id}
-- **Créé le**: ${date}
-- **Source**: ${project.source_file_path ? project.source_file_path.split(/[\\/]/).pop() : 'N/A'}
-- **Layout**: ${algorithm || 'Auto'}
+---
 
-## 2. Statistiques
-- **Nœuds**: ${nodeCount}
-- **Liens**: ${edgeCount}
-- **Densité**: ${metadata?.density ? Number(metadata.density).toFixed(4) : "N/A"}
+## 1. Métadonnées et Contexte
+| Propriété | Valeur |
+| :--- | :--- |
+| **ID** | \`${project.id}\` |
+| **Création** | ${date} |
+| **Fichier Source** | ${project.source_file_path ? project.source_file_path.split(/[\\/]/).pop() : 'N/A'} |
+| **Layout** | ${algorithm || 'Auto'} |
+| **Densité** | ${metadata?.density ? Number(metadata.density).toFixed(4) : "N/A"} |
 
-## 3. Liste des Nœuds
-Ci-dessous la liste complète des entités du graphe.
+---
+
+## 2. Statistiques du Graphe
+- **Nombre de Nœuds**: ${nodeCount}
+- **Nombre de Liens**: ${edgeCount}
+
+---
+
+## 3. Données des Nœuds
+*Liste complète des entités et leurs attributs.*
+
 ${generateMarkdownTable(nodesList, 'node')}
 
-## 4. Liste des Relations (Liens)
-Ci-dessous la liste complète des connexions.
+---
+
+## 4. Données des Relations
+*Liste des connexions entre les entités.*
+
 ${generateMarkdownTable(edgesList, 'edge')}
 
 ---
@@ -90,8 +102,61 @@ ${generateMarkdownTable(edgesList, 'edge')}
     return report;
 }
 
-export function downloadReport(content: string, filename: string) {
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+export function generateJSONExport(project: any): string {
+    const exportData = {
+        metadata: {
+            id: project.id,
+            name: project.name,
+            created_at: project.created_at,
+            updated_at: project.updated_at,
+            source_file: project.source_file_path,
+            algorithm: project.algorithm,
+            stats: project.metadata
+        },
+        settings: {
+            mapping: project.mapping,
+            filters: project.viewState?.filters,
+            layout: project.viewState?.layoutAlgorithm,
+            labels: project.viewState?.labelsVisible,
+            camera: project.viewState?.camera
+        },
+        graph: {
+            nodes: project.graph_data?.nodes || [],
+            edges: project.graph_data?.edges || project.graph_data?.links || []
+        }
+    };
+    return JSON.stringify(exportData, null, 2);
+}
+
+export function generateCSVExport(items: any[]): string {
+    if (!items || items.length === 0) return "";
+
+    // Get headers
+    const headers = Object.keys(items[0]).join(",");
+
+    // Get rows
+    const rows = items.map(item => {
+        return Object.values(item).map(val => {
+            if (val === null || val === undefined) return "";
+            const str = String(val);
+            // Escape quotes and wrap in quotes if contains comma
+            if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }).join(",");
+    });
+
+    return [headers, ...rows].join("\n");
+}
+
+export function downloadFile(content: string, filename: string, type: 'md' | 'json' | 'csv') {
+    let mimeType = 'text/plain;charset=utf-8';
+    if (type === 'json') mimeType = 'application/json';
+    if (type === 'csv') mimeType = 'text/csv;charset=utf-8';
+    if (type === 'md') mimeType = 'text/markdown;charset=utf-8';
+
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

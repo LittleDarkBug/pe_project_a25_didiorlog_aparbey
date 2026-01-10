@@ -8,6 +8,7 @@ import { filesService, AnalysisResult } from '@/app/services/filesService';
 import { useJobPolling } from '@/app/hooks/useJobPolling';
 import { useRouter } from 'next/navigation';
 import { useToastStore } from '@/app/store/useToastStore';
+import { useAuth } from '@/app/hooks/useAuth';
 
 interface ImportWizardProps {
     onClose: () => void;
@@ -19,6 +20,8 @@ type Step = 'upload' | 'mapping' | 'details' | 'review';
 export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) {
     const router = useRouter();
     const { addToast } = useToastStore();
+    const { user } = useAuth();
+    const isElite = user?.is_elite || false;
 
     const [currentStep, setCurrentStep] = useState<Step>('upload');
     const [file, setFile] = useState<File | null>(null);
@@ -39,7 +42,8 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
     const [details, setDetails] = useState({
         name: '',
         description: '',
-        isPublic: false
+        isPublic: true,
+        isFeatured: false
     });
 
     // Polling du job Celery
@@ -123,6 +127,7 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                 name: details.name,
                 description: details.description,
                 isPublic: details.isPublic,
+                isFeatured: details.isFeatured,
                 mapping: mapping,
                 algorithm: 'auto'
             });
@@ -521,18 +526,59 @@ export default function ImportWizard({ onClose, onSuccess }: ImportWizardProps) 
                                         />
                                     </div>
 
-                                    <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-800/50 border border-surface-700">
-                                        <input
-                                            type="checkbox"
-                                            id="isPublic"
-                                            checked={details.isPublic}
-                                            onChange={(e) => setDetails(prev => ({ ...prev, isPublic: e.target.checked }))}
-                                            className="h-5 w-5 rounded border-surface-600 bg-surface-900 text-blue-500 focus:ring-blue-500 focus:ring-offset-surface-900"
-                                        />
-                                        <label htmlFor="isPublic" className="text-sm font-medium text-surface-300 cursor-pointer select-none">
-                                            Rendre ce projet public (visible par tous les utilisateurs)
-                                        </label>
-                                    </div>
+                                    {isElite && (
+                                        <>
+                                            <div className="rounded-xl bg-surface-800/50 border border-surface-700 overflow-hidden">
+                                                <div className="p-4 flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="isPublic"
+                                                        checked={details.isPublic}
+                                                        onChange={(e) => {
+                                                            setDetails(prev => ({ ...prev, isPublic: e.target.checked }));
+                                                        }}
+                                                        className="h-5 w-5 rounded border-surface-600 bg-surface-900 text-blue-500 focus:ring-blue-500 focus:ring-offset-surface-900 cursor-pointer"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <label htmlFor="isPublic" className={`text-sm font-medium cursor-pointer select-none ${details.isPublic ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {details.isPublic ? "Visible par l'administrateur" : "Projet Privé (Admin Exclu)"}
+                                                        </label>
+                                                        <p className="text-xs text-surface-400 mt-0.5">
+                                                            {details.isPublic
+                                                                ? "L'administrateur peut accéder à ce projet pour le support."
+                                                                : "Confidentialité stricte. Même l'admin ne peut accéder au contenu."}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Gallery Toggle (Elite Only) */}
+                                            <div className="rounded-xl bg-surface-800/50 border border-surface-700 overflow-hidden">
+                                                <div className="p-4 flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="isFeatured"
+                                                        checked={details.isFeatured}
+                                                        onChange={(e) => {
+                                                            setDetails(prev => ({ ...prev, isFeatured: e.target.checked }));
+                                                        }}
+                                                        disabled={!details.isPublic}
+                                                        className={`h-5 w-5 rounded border-surface-600 bg-surface-900 text-purple-500 focus:ring-purple-500 focus:ring-offset-surface-900 ${!details.isPublic ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                    />
+                                                    <div className="flex-1">
+                                                        <label htmlFor="isFeatured" className={`text-sm font-medium cursor-pointer select-none ${details.isFeatured ? 'text-purple-400' : 'text-surface-400'}`}>
+                                                            Publier dans la Galerie
+                                                        </label>
+                                                        <p className="text-xs text-surface-400 mt-0.5">
+                                                            {details.isPublic
+                                                                ? "Votre projet sera visible par tous les visiteurs sur la page Galerie."
+                                                                : "Impossible de publier un projet privé."}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 

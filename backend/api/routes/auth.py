@@ -60,6 +60,11 @@ async def register(request: RegisterRequest):
         full_name=request.full_name
     )
     
+    if request.request_elite:
+        user.elite_request_status = "PENDING"
+        from datetime import datetime, timezone
+        user.elite_request_date = datetime.now(timezone.utc)
+    
     await user.insert()
     
     return UserResponse(
@@ -202,3 +207,8 @@ async def logout(
             ttl = int(exp - now)
             if ttl > 0:
                 await RedisClient.blacklist_token(token, ttl)
+
+    # Free Plan: Delete all projects on logout
+    if not current_user.is_elite and not current_user.is_superuser:
+        from models.project import Project
+        await Project.find(Project.owner.id == current_user.id).delete()

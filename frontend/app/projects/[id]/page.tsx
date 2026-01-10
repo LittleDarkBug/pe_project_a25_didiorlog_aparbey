@@ -12,12 +12,15 @@ import EditProjectModal from '@/app/components/dashboard/EditProjectModal';
 import LayoutSelector from '@/app/components/project/LayoutSelector';
 import FilterPanel from '@/app/components/project/FilterPanel';
 import ShareModal from '@/app/components/project/ShareModal';
+import ConfigImportModal from '@/app/components/project/ConfigImportModal';
 import { useToastStore } from '@/app/store/useToastStore';
 import { ProjectSkeleton } from '@/app/components/ui/ProjectSkeleton';
-import { generateProjectReport, downloadReport } from '@/app/utils/exportUtils';
+import { useAuth } from '@/app/hooks/useAuth';
+import { generateProjectReport, generateJSONExport, generateCSVExport, downloadFile } from '@/app/utils/exportUtils';
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const { user } = useAuth();
     const [project, setProject] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,6 +28,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const [selectionType, setSelectionType] = useState<'node' | 'edge' | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string> | null>(null);
     const [visibleEdgeIds, setVisibleEdgeIds] = useState<Set<string> | null>(null);
@@ -109,12 +113,95 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         setVisibleEdgeIds(filters.edges);
     }, []);
 
-    const handleExport = useCallback(() => {
-        if (!project) return;
-        const report = generateProjectReport(project);
-        downloadReport(report, `rapport_${project.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.md`);
-        addToast("Rapport généré et téléchargé", "success");
-    }, [project, addToast]);
+    // Inject ViewState into Project for Export
+    const getProjectWithViewState = useCallback(() => {
+        if (!project) return null;
+        return {
+            ...project,
+            viewState: {
+                filters: {
+                    nodes: visibleNodeIds ? Array.from(visibleNodeIds) : null,
+                    edges: visibleEdgeIds ? Array.from(visibleEdgeIds) : null
+                },
+                layoutAlgorithm: currentAlgorithm,
+                labelsVisible: showLabels,
+                camera: graphSceneRef.current?.getCameraState()
+            }
+        };
+    }, [project, visibleNodeIds, visibleEdgeIds, currentAlgorithm, showLabels]);
+
+    const handleExportReport = useCallback(() => {
+        const enrichedProject = getProjectWithViewState();
+        if (!enrichedProject) return;
+
+        const report = generateProjectReport(enrichedProject);
+        downloadFile(report, `rapport_${enrichedProject.name.replace(/\s+/g, '_')}.md`, 'md');
+        addToast("Rapport généré (Markdown)", "success");
+    }, [getProjectWithViewState, addToast]);
+
+    const handleExportJSON = useCallback(() => {
+        const enrichedProject = getProjectWithViewState();
+        if (!enrichedProject) return;
+
+        const json = generateJSONExport(enrichedProject);
+        downloadFile(json, `project_data_${enrichedProject.name.replace(/\s+/g, '_')}.json`, 'json');
+        addToast("Données exportées (JSON + Config)", "success");
+    }, [getProjectWithViewState, addToast]);
+
+    const handleExportCSVNodes = useCallback(() => {
+        if (!project?.graph_data?.nodes) return;
+        // Filter nodes if filters active
+        let nodes = project.graph_data.nodes;
+        if (visibleNodeIds) {
+            nodes = nodes.filter((n: any) => visibleNodeIds.has(n.id));
+        }
+
+        const csv = generateCSVExport(nodes);
+        downloadFile(csv, `nodes_${project.name.replace(/\s+/g, '_')}.csv`, 'csv');
+        addToast("Nœuds exportés (CSV)", "success");
+    }, [project, visibleNodeIds, addToast]);
+
+    const handleExportCSVEdges = useCallback(() => {
+        if (!project?.graph_data?.edges && !project?.graph_data?.links) return;
+        let edges = project.graph_data.edges || project.graph_data.links;
+
+        // Filter edges if filters active
+        if (visibleEdgeIds) {
+            edges = edges.filter((e: any) =>
+                visibleEdgeIds.has(e.id) ||
+                visibleEdgeIds.has(`${e.source}-${e.target}`)
+            );
+        }
+
+        const csv = generateCSVExport(edges);
+        downloadFile(csv, `edges_${project.name.replace(/\s+/g, '_')}.csv`, 'csv');
+        addToast("Liens exportés (CSV)", "success");
+    }, [project, visibleEdgeIds, addToast]);
+
+    const handleApplyConfig = useCallback((config: any) => {
+        try {
+            // Restore Filters
+            if (config.filters) {
+                if (config.filters.nodes) setVisibleNodeIds(new Set(config.filters.nodes));
+                if (config.filters.edges) setVisibleEdgeIds(new Set(config.filters.edges));
+            }
+
+            // Restore Layout
+            if (config.layout) {
+                setCurrentAlgorithm(config.layout);
+            }
+
+            // Restore Labels
+            if (typeof config.labels === 'boolean') {
+                setShowLabels(config.labels);
+            }
+
+            addToast("Configuration appliquée avec succès", "success");
+        } catch (error) {
+            console.error("Config apply error:", error);
+            addToast("Erreur lors de l'application de la configuration", "error");
+        }
+    }, [addToast]);
 
     if (isLoading) {
         return <ProjectSkeleton />;
@@ -271,6 +358,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     onClose={() => setIsShareModalOpen(false)}
                     projectId={project.id}
                     projectName={project.name}
+                    isElite={user?.is_elite || user?.is_superuser || false}
+                />
+            )}
+
+            {/* Config Import Modal */}
+            {isImportModalOpen && (
+                <ConfigImportModal
+                    onClose={() => setIsImportModalOpen(false)}
+                    onApply={handleApplyConfig}
                 />
             )}
 
@@ -304,7 +400,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         onToggleVR={() => setIsVRMode(!isVRMode)}
                         onShare={() => setIsShareModalOpen(true)}
                         onEdit={() => setIsEditModalOpen(true)}
-                        onExport={handleExport}
+                        onExportReport={handleExportReport}
+                        onExportJSON={handleExportJSON}
+                        onExportCSVNodes={handleExportCSVNodes}
+                        onExportCSVEdges={handleExportCSVEdges}
+                        onImportConfig={() => setIsImportModalOpen(true)}
                     >
                         <LayoutSelector
                             projectId={id}

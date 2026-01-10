@@ -109,10 +109,20 @@ Ces tâches seront traitées une fois les priorités immédiates stabilisées.
 - [ ] **Clustering Visuel** : Outline automatique des communautés détectées
 
 ### Performance
-- [ ] **WebAssembly** : Modules Wasm pour calculs physique côté client
-- [ ] **Streaming Progressif** : Affichage incrémental pour graphes >50k nœuds
-- [ ] **Compression Graphes** : Format binaire optimisé pour transfert réseau
-- [ ] **Worker Threads** : Calculs layouts côté client sans bloquer UI
+- [ ] **WebAssembly** : Modules Wasm pour calculs physique cote client
+- [ ] **Streaming Progressif** : Affichage incremental pour graphes >50k noeuds
+- [ ] **Compression Graphes** : Format binaire optimise pour transfert reseau
+- [ ] **Worker Threads** : Calculs layouts cote client sans bloquer UI
+
+### Commandes Vocales / NLP (Non Implemente)
+- [ ] **Speech-to-Command** : Commandes vocales pour navigation et filtrage
+  - [ ] Integration Web Speech API (reconnaissance vocale)
+  - [ ] Commandes: "Montre les voisins de X", "Filtre par type Y", "Change layout Z"
+  - [ ] Feedback vocal (confirmation actions)
+- [ ] **Filtrage NLP** : Requetes en langage naturel
+  - [ ] Parsing intent (ex: "affiche tous les serveurs connectes a DB1")
+  - [ ] Mapping vers filtres topologiques existants
+  - [ ] Suggestions intelligentes basees sur attributs du graphe
 
 ---
 

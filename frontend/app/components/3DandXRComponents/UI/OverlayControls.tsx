@@ -1,11 +1,16 @@
-'use client';
+import { useState, useRef, useEffect } from 'react';
+import { Download, FileJson, FileText, Table, Upload } from 'lucide-react';
 
 interface OverlayControlsProps {
     onResetCamera: () => void;
     onToggleVR: () => void;
     onShare?: () => void;
     onEdit?: () => void;
-    onExport?: () => void;
+    onExportReport?: () => void;
+    onExportJSON?: () => void;
+    onExportCSVNodes?: () => void;
+    onExportCSVEdges?: () => void;
+    onImportConfig?: () => void;
     children?: React.ReactNode;
     hideEdit?: boolean;
     hideShare?: boolean;
@@ -16,11 +21,23 @@ export default function OverlayControls({
     onToggleVR,
     onShare,
     onEdit,
-    onExport,
+    onExportReport,
+    onExportJSON,
+    onExportCSVNodes,
+    onExportCSVEdges,
+    onImportConfig,
     children,
     hideEdit = false,
     hideShare = false
 }: OverlayControlsProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false);
+    const exportRef = useRef<HTMLDivElement>(null);
+    const handleImportClick = () => {
+        if (onImportConfig) {
+            onImportConfig();
+        }
+    };
+
     return (
         <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 transform gap-2 rounded-2xl border border-white/10 bg-black/40 p-2 backdrop-blur-2xl shadow-2xl items-center">
             <button
@@ -64,22 +81,87 @@ export default function OverlayControls({
                         </svg>
                         <span className="hidden sm:inline">Éditer</span>
                     </button>
+
+                    {onImportConfig && (
+                        <>
+                            <button
+                                onClick={handleImportClick}
+                                className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-yellow-500/20 hover:text-white hover:scale-105 cursor-pointer"
+                                title="Importer Configuration (JSON)"
+                            >
+                                <Upload className="h-4 w-4" />
+                                <span className="hidden sm:inline">Import</span>
+                            </button>
+                        </>
+                    )}
                 </>
             )}
 
-            {onExport && (
+            {(onExportReport || onExportJSON || onExportCSVNodes) && (
                 <>
                     <div className="w-px bg-white/10"></div>
-                    <button
-                        onClick={onExport}
-                        className="group relative flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-gray-300 transition-all hover:bg-cyan-500/20 hover:text-white hover:scale-105 cursor-pointer"
-                        title="Exporter le rapport"
-                    >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span className="hidden sm:inline">Export</span>
-                    </button>
+                    <div className="relative" ref={exportRef}>
+                        <button
+                            onClick={() => setIsExportOpen(!isExportOpen)}
+                            className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all hover:scale-105 cursor-pointer ${isExportOpen
+                                ? 'bg-cyan-500/20 text-white'
+                                : 'bg-white/5 text-gray-300 hover:bg-cyan-500/20 hover:text-white'
+                                }`}
+                            title="Options d'export"
+                        >
+                            <Download className="h-5 w-5" />
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
+
+                        {isExportOpen && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-xl border border-white/10 bg-surface-900/95 p-1 backdrop-blur-xl shadow-2xl animate-in slide-in-from-bottom-2 fade-in duration-200">
+                                <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-surface-400">
+                                    Exporter Données
+                                </div>
+                                {onExportReport && (
+                                    <button
+                                        onClick={() => { onExportReport(); setIsExportOpen(false); }}
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                    >
+                                        <FileText className="h-4 w-4 text-blue-400" />
+                                        Rapport (Markdown)
+                                    </button>
+                                )}
+                                {onExportJSON && (
+                                    <button
+                                        onClick={() => { onExportJSON(); setIsExportOpen(false); }}
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                    >
+                                        <FileJson className="h-4 w-4 text-yellow-400" />
+                                        Complet (JSON + Config)
+                                    </button>
+                                )}
+                                {(onExportCSVNodes || onExportCSVEdges) && (
+                                    <>
+                                        <div className="my-1 h-px bg-white/10" />
+                                        {onExportCSVNodes && (
+                                            <button
+                                                onClick={() => { onExportCSVNodes(); setIsExportOpen(false); }}
+                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Table className="h-4 w-4 text-green-400" />
+                                                Nœuds (CSV)
+                                            </button>
+                                        )}
+                                        {onExportCSVEdges && (
+                                            <button
+                                                onClick={() => { onExportCSVEdges(); setIsExportOpen(false); }}
+                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Table className="h-4 w-4 text-purple-400" />
+                                                Liens (CSV)
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </>
             )}
 

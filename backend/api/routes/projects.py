@@ -49,6 +49,8 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     temp_file_id: Optional[str] = None
     mapping: Optional[Dict[str, str]] = None
+    is_public: Optional[bool] = None # Allow visibility toggle
+    is_featured: Optional[bool] = None # Allow gallery toggle
 
 
 class LayoutUpdate(BaseModel):
@@ -89,6 +91,7 @@ async def create_project(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     is_public: bool = Form(False),
+    is_featured: bool = Form(False),
     mapping: Optional[str] = Form(None),
     algorithm: str = Form("auto"),
     current_user: User = Depends(get_current_user)
@@ -97,6 +100,17 @@ async def create_project(
     Crée un nouveau projet à partir d'un fichier uploadé et d'un mapping.
     Lance une tâche Celery pour traiter le graphe de façon asynchrone.
     """
+    # Enforce Elite Status for Private Projects
+    if not is_public and not current_user.is_elite:
+        is_public = True
+
+    # Enforce Elite Status for Gallery
+    if is_featured:
+        if not current_user.is_elite:
+            is_featured = False # Silently disable if not elite
+        elif not is_public:
+            is_featured = False # Must be public to be featured
+
     upload_dir = Path("uploads")
     upload_dir.mkdir(exist_ok=True)
     
@@ -135,6 +149,7 @@ async def create_project(
             mapping=parsed_mapping,
             source_file_path=str(file_path),
             is_public=is_public,
+            is_featured=is_featured,
             algorithm=algorithm # Persist initial algorithm choice
         )
         await project.insert()
@@ -182,7 +197,7 @@ async def update_project_layout(
     if not project:
         raise HTTPException(status_code=404, detail="Projet introuvable")
         
-    if project.owner.ref.id != current_user.id:
+    if project.owner.ref.id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Accès non autorisé")
 
     if not project.source_file_path:
@@ -233,10 +248,41 @@ async def update_project(
     if not project:
         raise HTTPException(status_code=404, detail="Projet introuvable")
         
+    # Strict Privacy Check for Update
     if project.owner.ref.id != current_user.id:
-        raise HTTPException(status_code=403, detail="Accès non autorisé")
+        if not project.is_public:
+             raise HTTPException(status_code=403, detail="Projet privé : Modification interdite.")
+        if not current_user.is_superuser:
+             raise HTTPException(status_code=403, detail="Accès non autorisé")
 
     # Update name
+    if project_update.name:
+        project.name = project_update.name
+
+    # Handle Visibility Update
+    if project_update.is_public is not None:
+        if project_update.is_public is False and not current_user.is_elite:
+            # Non-elite trying to hide project -> Forbidden or Force True?
+            # Let's forbid this explicit action with a clear error.
+            raise HTTPException(status_code=403, detail="La confidentialité privée est réservée aux membres Élite.")
+        project.is_public = project_update.is_public
+
+    # Handle Gallery Toggle
+    if project_update.is_featured is not None:
+        if project_update.is_featured and not current_user.is_elite:
+            raise HTTPException(status_code=403, detail="La publication en galerie est réservée aux membres Élite.")
+        
+        # If enabling gallery, ensure it is public
+        if project_update.is_featured and not project.is_public:
+             # If strictly private, cannot be in gallery
+             raise HTTPException(status_code=400, detail="Un projet doit être visible par l'administrateur pour être publié dans la galerie.")
+             
+        project.is_featured = project_update.is_featured
+
+    # Handle file/mapping update (asynchrone via Celery)
+    # ... (skipping context match, just updating security block at start of function... wait, start of function logic is earlier)
+    # Let's target the permission check block around line 236.
+
     if project_update.name:
         project.name = project_update.name
 
@@ -315,6 +361,29 @@ async def list_projects(current_user: User = Depends(get_current_user)):
     ]
 
 
+# ===== List Public Projects (Gallery) =====
+@router.get("/public", response_model=List[Dict[str, Any]])
+async def list_public_projects():
+    """Liste tous les projets publics pour la galerie."""
+    # Fetch featured projects (Gallery)
+    projects = await Project.find(Project.is_featured == True).sort(-Project.created_at).to_list()
+    
+    return [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "created_at": p.created_at,
+            "description": p.description,
+            "algorithm": p.algorithm or "auto",
+            "stats": {
+                "nodes": (p.metadata or {}).get("node_count", 0),
+                "edges": (p.metadata or {}).get("edge_count", 0)
+            }
+        }
+        for p in projects
+    ]
+
+
 # ===== Get Project by ID =====
 @router.get("/{project_id}", response_model=Dict[str, Any])
 async def get_project(
@@ -331,7 +400,13 @@ async def get_project(
         raise HTTPException(status_code=404, detail="Projet introuvable")
         
     if project.owner.ref.id != current_user.id:
-        raise HTTPException(status_code=403, detail="Accès non autorisé")
+        # Strict Privacy: Private projects are owner-only
+        if not project.is_public:
+             raise HTTPException(status_code=403, detail="Projet privé : Accès interdit.")
+        
+        # If public, we allow access (Gallery Mode)
+        # Previous restriction for non-superusers is removed to support the Gallery.
+
         
     try:
         response_data = {
@@ -366,7 +441,7 @@ async def delete_project(
     if not project:
         raise HTTPException(status_code=404, detail="Projet introuvable")
         
-    if project.owner.ref.id != current_user.id:
+    if project.owner.ref.id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Accès non autorisé")
         
     await project.delete()

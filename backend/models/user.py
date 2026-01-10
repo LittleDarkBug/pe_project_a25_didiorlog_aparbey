@@ -23,6 +23,12 @@ class User(Document):
     is_active: bool = True
     is_superuser: bool = False
     role: str = "user"  # "admin" or "user"
+    
+    # Elite Plan Fields
+    is_elite: bool = False
+    elite_request_status: str = "NONE" # NONE, PENDING, APPROVED, REJECTED
+    elite_request_date: Optional[datetime] = None
+    
     preferences: dict = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None

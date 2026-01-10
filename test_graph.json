@@ -1,0 +1,82 @@
+{
+    "nodes": [
+        {
+            "id": "Alice",
+            "label": "Alice",
+            "group": "Team A"
+        },
+        {
+            "id": "Bob",
+            "label": "Bob",
+            "group": "Team A"
+        },
+        {
+            "id": "Charlie",
+            "label": "Charlie",
+            "group": "Team B"
+        },
+        {
+            "id": "Diana",
+            "label": "Diana",
+            "group": "Team B"
+        },
+        {
+            "id": "Eve",
+            "label": "Eve",
+            "group": "Team C"
+        },
+        {
+            "id": "Frank",
+            "label": "Frank",
+            "group": "Team C"
+        },
+        {
+            "id": "Grace",
+            "label": "Grace",
+            "group": "Team A"
+        },
+        {
+            "id": "Henry",
+            "label": "Henry",
+            "group": "Team B"
+        }
+    ],
+    "edges": [
+        {
+            "source": "Alice",
+            "target": "Bob"
+        },
+        {
+            "source": "Alice",
+            "target": "Charlie"
+        },
+        {
+            "source": "Bob",
+            "target": "Diana"
+        },
+        {
+            "source": "Charlie",
+            "target": "Eve"
+        },
+        {
+            "source": "Diana",
+            "target": "Frank"
+        },
+        {
+            "source": "Eve",
+            "target": "Grace"
+        },
+        {
+            "source": "Frank",
+            "target": "Henry"
+        },
+        {
+            "source": "Grace",
+            "target": "Alice"
+        },
+        {
+            "source": "Henry",
+            "target": "Bob"
+        }
+    ]
+}

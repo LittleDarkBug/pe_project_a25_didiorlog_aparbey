@@ -55,12 +55,14 @@ export const useVRMenu = () => {
         headerBtn.content = headerTxt;
 
         // 1. Layout Options
-        // List from Backend: forceatlas2, circular, grid, random, dagre
+        // Full list matching backend capabilities
         const layouts = [
-            { id: 'forceatlas2', label: 'Force Atlas 2' },
+            { id: 'fruchterman_reingold', label: 'Fruchterman-Reingold' },
+            { id: 'kamada_kawai', label: 'Kamada-Kawai' },
+            { id: 'drl', label: 'DrL' },
+            { id: 'force_atlas', label: 'Force Atlas 2' },
+            { id: 'sphere', label: 'Sphérique' },
             { id: 'grid', label: 'Grille' },
-            { id: 'circular', label: 'Circulaire' },
-            { id: 'dagre', label: 'Hiérarchique' },
             { id: 'random', label: 'Aléatoire' }
         ];
 

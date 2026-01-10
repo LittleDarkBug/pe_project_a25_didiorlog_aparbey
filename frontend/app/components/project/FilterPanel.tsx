@@ -33,15 +33,27 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
         return adj;
     }, [edges]);
 
-    // Extract categories helper
+    // Extract categories helper - supports nested 'attributes' object
     const extractCategories = (items: any[], ignoreKeys: string[]) => {
         const cats: Record<string, Set<string>> = {};
+
+        const processValue = (key: string, value: any) => {
+            if (ignoreKeys.includes(key)) return;
+            if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                if (!cats[key]) cats[key] = new Set();
+                cats[key].add(String(value));
+            }
+        };
+
         items.forEach(item => {
             Object.entries(item).forEach(([key, value]) => {
-                if (ignoreKeys.includes(key)) return;
-                if (typeof value === 'string' || typeof value === 'number') {
-                    if (!cats[key]) cats[key] = new Set();
-                    cats[key].add(String(value));
+                // Handle nested 'attributes' object
+                if (key === 'attributes' && typeof value === 'object' && value !== null) {
+                    Object.entries(value).forEach(([attrKey, attrValue]) => {
+                        processValue(attrKey, attrValue);
+                    });
+                } else {
+                    processValue(key, value);
                 }
             });
         });
@@ -138,8 +150,16 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                 }
                 if (matches) {
                     for (const [key, selectedValues] of Object.entries(activeNodeFilters)) {
-                        if (selectedValues.size > 0 && !selectedValues.has(String(node[key]))) {
-                            matches = false; break;
+                        if (selectedValues.size > 0) {
+                            // Check both top-level and nested attributes
+                            const topLevelValue = node[key];
+                            const nestedValue = node.attributes?.[key];
+                            const value = topLevelValue !== undefined ? topLevelValue : nestedValue;
+
+                            if (!selectedValues.has(String(value))) {
+                                matches = false;
+                                break;
+                            }
                         }
                     }
                 }
@@ -218,6 +238,19 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                     Filtres
                 </h3>
                 <div className="flex items-center gap-2">
+                    <div className="group relative">
+                        <svg className="w-5 h-5 text-surface-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="absolute right-0 top-full mt-2 w-64 p-3 rounded-lg bg-surface-800 border border-surface-50/10 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-xs text-surface-200">
+                            <strong>Guide des Filtres:</strong>
+                            <ul className="list-disc pl-4 mt-1 space-y-1">
+                                <li>Recherchez par ID ou Label.</li>
+                                <li>Cliquez sur les tags pour filtrer par attribut.</li>
+                                <li>Utilisez l'onglet 'Topologie' pour explorer les voisins.</li>
+                            </ul>
+                        </div>
+                    </div>
                     {(searchTerm || Object.keys(activeNodeFilters).length > 0 || Object.keys(activeEdgeFilters).length > 0 || topologyMode) && (
                         <button onClick={resetFilters} className="text-xs font-medium text-primary-400 hover:text-primary-300 transition-colors">
                             Réinitialiser
@@ -333,13 +366,14 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                 </div>
 
                                 <div className="space-y-1">
-                                    <span className="text-[10px] text-surface-400 font-medium uppercase tracking-wide ml-1">Nœud Central</span>
+                                    <span className="text-[10px] text-surface-400 font-medium uppercase tracking-wide ml-1">Noeud Central</span>
                                     <input
                                         type="text"
-                                        placeholder="Entrez l'ID du nœud..."
+                                        list="node-ids"
+                                        placeholder="Selectionnez un noeud..."
                                         value={sourceNodeId}
                                         onChange={(e) => setSourceNodeId(e.target.value)}
-                                        className="w-full bg-surface-950/50 border border-surface-50/10 rounded-lg px-3 py-2.5 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/20 transition-all shadow-inner"
+                                        className="w-full bg-surface-800/50 border border-surface-50/10 rounded-lg px-3 py-2.5 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/20 transition-all"
                                     />
                                 </div>
 
@@ -410,13 +444,14 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
 
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1 space-y-1">
-                                        <span className="text-[10px] text-surface-400 font-medium uppercase tracking-wide ml-1">Départ</span>
+                                        <span className="text-[10px] text-surface-400 font-medium uppercase tracking-wide ml-1">Depart</span>
                                         <input
                                             type="text"
-                                            placeholder="ID A"
+                                            list="node-ids"
+                                            placeholder="Selectionnez..."
                                             value={sourceNodeId}
                                             onChange={(e) => setSourceNodeId(e.target.value)}
-                                            className="w-full bg-surface-950/50 border border-surface-50/10 rounded-lg px-3 py-2 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all shadow-inner text-center"
+                                            className="w-full bg-surface-800/50 border border-surface-50/10 rounded-lg px-3 py-2 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all text-center"
                                         />
                                     </div>
                                     <div className="pt-6 text-purple-400/50">
@@ -425,13 +460,14 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                                         </svg>
                                     </div>
                                     <div className="flex-1 space-y-1">
-                                        <span className="text-[10px] text-surface-400 font-medium uppercase tracking-wide ml-1">Arrivée</span>
+                                        <span className="text-[10px] text-surface-400 font-medium uppercase tracking-wide ml-1">Arrivee</span>
                                         <input
                                             type="text"
-                                            placeholder="ID B"
+                                            list="node-ids"
+                                            placeholder="Selectionnez..."
                                             value={targetNodeId}
                                             onChange={(e) => setTargetNodeId(e.target.value)}
-                                            className="w-full bg-surface-950/50 border border-surface-50/10 rounded-lg px-3 py-2 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all shadow-inner text-center"
+                                            className="w-full bg-surface-800/50 border border-surface-50/10 rounded-lg px-3 py-2 text-sm text-surface-50 placeholder-surface-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all text-center"
                                         />
                                     </div>
                                 </div>
@@ -476,6 +512,12 @@ export default function FilterPanel({ nodes, edges, onFilterChange, onClose }: F
                         : "Affichage de tous les éléments"}
                 </p>
             </div>
+
+            <datalist id="node-ids">
+                {nodes.slice(0, 2000).map(n => (
+                    <option key={n.id} value={n.id}>{n.label || n.id}</option>
+                ))}
+            </datalist>
         </div >
     );
 }

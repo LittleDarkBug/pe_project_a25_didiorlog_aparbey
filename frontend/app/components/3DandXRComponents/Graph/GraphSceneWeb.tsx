@@ -41,6 +41,7 @@ interface GraphSceneProps {
 
 export interface GraphSceneRef {
     resetCamera: () => void;
+    getCameraState: () => any;
 }
 
 const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSelect, visibleNodeIds, visibleEdgeIds, showLabels }, ref) => {
@@ -60,6 +61,21 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
                     camera.radius = 100;
                 }
             }
+        },
+        getCameraState: () => {
+            if (scene) {
+                const camera = scene.getCameraByName("camera") as ArcRotateCamera;
+                if (camera) {
+                    return {
+                        alpha: camera.alpha,
+                        beta: camera.beta,
+                        radius: camera.radius,
+                        target: { x: camera.target.x, y: camera.target.y, z: camera.target.z },
+                        position: { x: camera.position.x, y: camera.position.y, z: camera.position.z }
+                    };
+                }
+            }
+            return null;
         }
     }));
 
@@ -67,8 +83,10 @@ const GraphSceneWeb = forwardRef<GraphSceneRef, GraphSceneProps>(({ data, onSele
     useEffect(() => {
         if (scene && nodeMeshesRef.current.size > 0) {
             graphRenderer.current.updateVisibility(visibleNodeIds ?? null, visibleEdgeIds ?? null, nodeMeshesRef.current);
+            // Sync labels with visibility
+            graphRenderer.current.updateLabelVisibility(!!showLabels, nodeMeshesRef.current, scene);
         }
-    }, [visibleNodeIds, visibleEdgeIds, scene]);
+    }, [visibleNodeIds, visibleEdgeIds, scene, showLabels]);
 
     // Handle Label Visibility
     useEffect(() => {

@@ -15,6 +15,9 @@ class UserAdminView(BaseModel):
     is_active: bool
     is_superuser: bool
     role: str
+    is_elite: bool = False
+    elite_request_status: str = "NONE"
+    elite_request_date: Optional[datetime] = None
     created_at: datetime
     last_login: Optional[datetime] = None
 
@@ -28,6 +31,8 @@ class UserCreateAdmin(BaseModel):
 class UserUpdateAdmin(BaseModel):
     is_active: Optional[bool] = None
     role: Optional[str] = None
+    is_elite: Optional[bool] = None
+    elite_request_status: Optional[str] = None
 
 class ProjectAdminView(BaseModel):
     id: str
@@ -37,3 +42,8 @@ class ProjectAdminView(BaseModel):
     created_at: datetime
     node_count: int = 0
     edge_count: int = 0
+
+class ProjectUpdateAdmin(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_public: Optional[bool] = None
