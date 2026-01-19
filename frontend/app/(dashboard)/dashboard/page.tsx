@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, LayoutGrid, List } from 'lucide-react';
+import { Search, LayoutGrid, List, Download } from 'lucide-react';
 import ImportWizard from '@/app/components/dashboard/ImportWizard';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { projectsService } from '@/app/services/projectsService';
@@ -92,6 +92,33 @@ export default function DashboardPage() {
 
     const handleCardClick = (id: string) => {
         router.push(`/projects/${id}`);
+    };
+
+    const handleExportProject = async (e: React.MouseEvent, id: string, name: string) => {
+        e.stopPropagation();
+        setOpenMenuId(null);
+        try {
+            const project = await projectsService.getById(id);
+            if (!project.graph_data) {
+                alert("Aucune donnée de graphe à exporter");
+                return;
+            }
+
+            const dataStr = JSON.stringify(project.graph_data, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.download = `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Export error", error);
+            alert("Erreur lors de l'export");
+        }
     };
 
     return (
@@ -204,6 +231,12 @@ export default function DashboardPage() {
                                                         className="block w-full px-4 py-2 text-left text-sm text-surface-300 hover:bg-surface-50/5 hover:text-surface-50"
                                                     >
                                                         Ouvrir
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleExportProject(e, project.id, project.name)}
+                                                        className="block w-full px-4 py-2 text-left text-sm text-surface-300 hover:bg-surface-50/5 hover:text-surface-50"
+                                                    >
+                                                        Exporter
                                                     </button>
                                                     <button
                                                         onClick={(e) => openDeleteModal(e, project)}
@@ -325,6 +358,12 @@ export default function DashboardPage() {
                                                     className="block w-full px-4 py-2 text-left text-sm text-surface-300 hover:bg-surface-50/5 hover:text-surface-50"
                                                 >
                                                     Ouvrir
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleExportProject(e, project.id, project.name)}
+                                                    className="block w-full px-4 py-2 text-left text-sm text-surface-300 hover:bg-surface-50/5 hover:text-surface-50"
+                                                >
+                                                    Exporter
                                                 </button>
                                                 <button
                                                     onClick={(e) => openDeleteModal(e, project)}

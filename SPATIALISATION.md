@@ -41,6 +41,9 @@ C'est ici que les positions 3D sont calculées. Le système utilise la biblioth�
 
 Cette logique privilégie la qualité visuelle pour les petits graphes et la performance pour les grands. Le choix d'un algorithme spécifique est possible après l'import, via le bouton "Vues" qui permet de recalculer la spatialisation avec l'algorithme souhaité.
 
+![Logique de sélection automatique](docs/diagrams/spatialization_logic.png)
+
+
 **Conversion NetworkX vers igraph** :
 Pour optimiser les calculs, le graphe est converti de NetworkX (format Python standard) vers igraph (optimisé C). Les identifiants de nœuds sont mappés vers des indices entiers.
 
@@ -158,3 +161,6 @@ L'utilisateur peut recalculer le layout à tout moment via le bouton "Vues" :
 4. La visualisation se met à jour avec animation
 
 Le recalcul ne modifie QUE les positions (x, y, z). Les nœuds, arêtes et propriétés restent inchangés.
+
+![Flux de changement de layout](docs/diagrams/layout_change_flow.png)
+

@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant U as Utilisateur
+    participant F as Frontend (Babylon.js)
+    participant B as Backend (Python)
+    participant D as DB (MongoDB)
+
+    U->>F: Clique bouton "Vues" > Sélectionne Algo
+    F->>F: Affiche loader
+    F->>B: POST /api/project/{id}/layout (algo)
+    activate B
+    Note over B: Chargement du graphe<br/>(NetworkX)
+    B->>B: Conversion vers igraph
+    B->>B: Calcul du layout (ex: DrL, FA2)
+    B->>B: Normalisation (-0.5 à 0.5)
+    B->>D: Update positions (db.projects)
+    B-->>F: Retourne JSON {nodes: [{id, x, y, z}...]}
+    deactivate B
+    F->>F: Interpolation positions (Animation)
+    F->>F: Masque loader

@@ -1,0 +1,27 @@
+graph TD
+    Start[Analyse du Graphe] --> CheckSize{Nb Nœuds > 5000 ?}
+    CheckSize -- Oui --> DrL[DrL]
+    CheckSize -- Non --> CheckMedium{Nb Nœuds > 2000 ?}
+    
+    CheckMedium -- Oui --> CheckDensHigh{Densité < 0.01 ?}
+    CheckDensHigh -- Oui --> Sphere[Sphérique]
+    CheckDensHigh -- Non --> DrL
+
+    CheckMedium -- Non --> CheckDensLow{Densité > 0.3 ?}
+    CheckDensLow -- Oui --> KK[Kamada-Kawai]
+    CheckDensLow -- Non --> CheckSparse{Densité < 0.05 ?}
+
+    CheckSparse -- Oui --> CheckTiny{Nb Nœuds < 500 ?}
+    CheckTiny -- Oui --> Sphere
+    CheckTiny -- Non --> FR[Fruchterman-Reingold]
+
+    CheckSparse -- Non --> CheckCommunity{Modularité > 0.4 <br/>ET Communautés ≥ 3 ?}
+    CheckCommunity -- Oui --> FA[Force Atlas]
+    CheckCommunity -- Non --> FR
+
+    style Start fill:#f9f,stroke:#333,stroke-width:2px
+    style DrL fill:#bbf,stroke:#333,stroke-width:1px
+    style Sphere fill:#bbf,stroke:#333,stroke-width:1px
+    style KK fill:#bbf,stroke:#333,stroke-width:1px
+    style FR fill:#bbf,stroke:#333,stroke-width:1px
+    style FA fill:#bbf,stroke:#333,stroke-width:1px

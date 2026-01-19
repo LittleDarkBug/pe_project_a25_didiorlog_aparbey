@@ -208,7 +208,7 @@ export function Sidebar() {
             <Modal
                 isOpen={showLogoutWarning}
                 onClose={() => setShowLogoutWarning(false)}
-                title="⚠️ Attention : Compte Gratuit"
+                title="Attention : Compte Gratuit"
                 footer={
                     <div className="flex gap-2">
                         <Button

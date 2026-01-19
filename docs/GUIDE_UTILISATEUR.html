@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Guide d&apos;Utilisation - GraphXR</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="guide-dutilisation---graphxr">Guide d'Utilisation - GraphXR</h1>
+<p>Guide complet pour utiliser la plateforme de visualisation de graphes 3D/VR.</p>
+<hr>
+<h2 id="table-des-matieres">Table des Matieres</h2>
+<ol>
+<li><a href="#1-page-daccueil">Page d'Accueil</a></li>
+<li><a href="#2-authentification">Authentification</a></li>
+<li><a href="#3-tableau-de-bord">Tableau de Bord</a></li>
+<li><a href="#4-creation-dun-projet">Creation d'un Projet</a></li>
+<li><a href="#5-visualisation-3d">Visualisation 3D</a></li>
+<li><a href="#6-filtres-et-recherche">Filtres et Recherche</a></li>
+<li><a href="#7-options-et-edition">Options et Edition</a></li>
+<li><a href="#8-partage">Partage</a></li>
+<li><a href="#9-mode-vr">Mode VR</a></li>
+<li><a href="#10-galerie-publique">Galerie Publique</a></li>
+<li><a href="#11-administration">Administration</a></li>
+</ol>
+<hr>
+<h2 id="1-page-daccueil">1. Page d'Accueil</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\01_landing.webp" alt="Page d'accueil"></p>
+<p>La page d'accueil presente les fonctionnalites principales de GraphXR:</p>
+<ul>
+<li><strong>Visualisation 3D</strong>: Explorez vos graphes dans un espace tridimensionnel</li>
+<li><strong>Mode VR</strong>: Experience immersive compatible WebXR</li>
+<li><strong>Partage</strong>: Generez des liens de partage</li>
+</ul>
+<p><strong>Actions disponibles:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Bouton</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Commencer</td>
+<td>Acces a la connexion</td>
+</tr>
+<tr>
+<td>Creer un compte</td>
+<td>Inscription nouvel utilisateur</td>
+</tr>
+<tr>
+<td>Explorer la Galerie</td>
+<td>Voir les projets publics</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-authentification">2. Authentification</h2>
+<h3 id="connexion">Connexion</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\02_login.png" alt="Page de connexion"></p>
+<ol>
+<li>Entrez votre <strong>email</strong></li>
+<li>Entrez votre <strong>mot de passe</strong></li>
+<li>Cliquez sur <strong>Se connecter</strong></li>
+</ol>
+<h3 id="inscription">Inscription</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\03_register.png" alt="Page d'inscription"></p>
+<ol>
+<li>Remplissez votre <strong>nom complet</strong></li>
+<li>Entrez votre <strong>email</strong></li>
+<li>Choisissez un <strong>mot de passe</strong> (min. 8 caracteres)</li>
+<li>Confirmez le mot de passe</li>
+<li>(Optionnel) Cochez <strong>Demander un acces Elite</strong></li>
+<li>Acceptez la politique de confidentialite</li>
+<li>Cliquez sur <strong>S'inscrire</strong></li>
+</ol>
+<h3 id="types-de-comptes-et-conservation">Types de Comptes et Conservation</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Fonctionnalite</th>
+<th style="text-align:left"><strong>Plan Gratuit</strong> (Defaut)</th>
+<th style="text-align:left"><strong>Plan Elite</strong> (Sur demande)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Duree de vie</strong></td>
+<td style="text-align:left"><strong>Temporaire (6 heures)</strong></td>
+<td style="text-align:left"><strong>Illimitee</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">Suppression</td>
+<td style="text-align:left">Auto (6h ou Logout)</td>
+<td style="text-align:left">Manuelle uniquement</td>
+</tr>
+<tr>
+<td style="text-align:left">Projets prives</td>
+<td style="text-align:left">Non</td>
+<td style="text-align:left">Oui</td>
+</tr>
+<tr>
+<td style="text-align:left">Galerie</td>
+<td style="text-align:left">Consultation</td>
+<td style="text-align:left">Publication</td>
+</tr>
+</tbody>
+</table>
+<div class="markdown-alert markdown-alert-warning"><p class="markdown-alert-title"><svg class="octicon octicon-alert mr-2" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path></svg>Warning</p><p><strong>Politique de Suppression (Plan Gratuit)</strong></p>
+<ol>
+<li><strong>TTL de 6 Heures</strong>: Les projets sont supprimes automatiquement 6h apres creation.</li>
+<li><strong>Fin de Session</strong>: La deconnexion supprime tous vos projets immediatement.</li>
+<li><strong>Alertes</strong>: Un avertissement apparait 30min avant l'expiration.</li>
+</ol>
+<p>Pensez a <strong>demander l'acces Elite</strong> pour conserver vos travaux.</p>
+</div>
+<hr>
+<h2 id="3-tableau-de-bord">3. Tableau de Bord</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\04_dashboard.png" alt="Tableau de bord"></p>
+<p>Le tableau de bord affiche tous vos projets:</p>
+<ul>
+<li><strong>Recherche</strong>: Barre de recherche par nom de projet</li>
+<li><strong>Vue grille/liste</strong>: Basculer l'affichage (icones en haut a droite)</li>
+<li><strong>Nouveau Projet</strong>: Bouton bleu pour creer un projet</li>
+<li><strong>Cartes projet</strong>: Cliquez pour ouvrir la visualisation 3D</li>
+</ul>
+<hr>
+<h2 id="4-creation-dun-projet">4. Creation d'un Projet</h2>
+<h3 id="etape-1-selection-du-fichier">Etape 1: Selection du Fichier</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\05_import.png" alt="Import - Selection fichier"></p>
+<ol>
+<li>Cliquez sur <strong>Nouveau Projet</strong></li>
+<li>Glissez-deposez votre fichier ou cliquez pour parcourir</li>
+<li>Selectionnez le format: <strong>CSV</strong>, <strong>JSON</strong> ou <strong>GEXF</strong></li>
+</ol>
+<h3 id="format-json-node-link">Format JSON (Node-Link)</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\10_import_json.png" alt="Import - Format JSON"></p>
+<p>Structure attendue:</p>
+<pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;nodes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;label&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Noeud A&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;group&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;A&quot;</span> <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;links&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;source&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;target&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2&quot;</span> <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h3 id="etape-2-mapping-automatique">Etape 2: Mapping (automatique)</h3>
+<p>Le systeme detecte automatiquement:</p>
+<ul>
+<li><strong>Source</strong>: Colonne origine des liens</li>
+<li><strong>Target</strong>: Colonne destination</li>
+<li><strong>Poids</strong>: Attribut optionnel</li>
+</ul>
+<h3 id="etape-3-details-du-projet">Etape 3: Details du Projet</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\11_import_details.png" alt="Import - Details"></p>
+<ol>
+<li><strong>Nom du projet</strong>: Donnez un nom descriptif</li>
+<li><strong>Description</strong>: Description optionnelle</li>
+<li>Cliquez sur <strong>Suivant</strong></li>
+</ol>
+<h3 id="etape-4-validation">Etape 4: Validation</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\12_import_validation.png" alt="Import - Validation"></p>
+<p>Verifiez le recapitulatif:</p>
+<ul>
+<li><strong>Fichier</strong>: Nom et taille</li>
+<li><strong>Nom du projet</strong>: Votre titre</li>
+<li><strong>Visibilite</strong>: Public ou Prive</li>
+</ul>
+<p>Cliquez sur <strong>Creer le projet</strong> pour lancer le traitement.</p>
+<hr>
+<h2 id="5-visualisation-3d">5. Visualisation 3D</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\13_project_3d.png" alt="Visualisation 3D"></p>
+<h3 id="navigation-camera">Navigation Camera</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Controle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rotation</td>
+<td>Clic gauche + Glisser</td>
+</tr>
+<tr>
+<td>Zoom</td>
+<td>Molette souris</td>
+</tr>
+<tr>
+<td>Pan</td>
+<td>Clic droit + Glisser</td>
+</tr>
+<tr>
+<td>Selection noeud</td>
+<td>Clic sur un noeud</td>
+</tr>
+</tbody>
+</table>
+<h3 id="barre-de-controles">Barre de Controles</h3>
+<p>En bas de l'ecran:</p>
+<table>
+<thead>
+<tr>
+<th>Bouton</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Reset</strong></td>
+<td>Recentrer la camera</td>
+</tr>
+<tr>
+<td><strong>Layout</strong></td>
+<td>Changer l'algorithme de spatialisation</td>
+</tr>
+<tr>
+<td><strong>Labels</strong></td>
+<td>Afficher/masquer les etiquettes</td>
+</tr>
+<tr>
+<td><strong>Filtres</strong></td>
+<td>Ouvrir le panneau de filtres</td>
+</tr>
+<tr>
+<td><strong>VR</strong></td>
+<td>Activer le mode realite virtuelle</td>
+</tr>
+<tr>
+<td><strong>Editer</strong></td>
+<td>Modifier les parametres du projet</td>
+</tr>
+<tr>
+<td><strong>Export</strong></td>
+<td>Exporter les donnees</td>
+</tr>
+<tr>
+<td><strong>Partager</strong></td>
+<td>Generer un lien de partage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="algorithmes-de-layout">Algorithmes de Layout</h3>
+<table>
+<thead>
+<tr>
+<th>Algorithme</th>
+<th>Description</th>
+<th>Usage Recommande</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fruchterman-Reingold</strong></td>
+<td>Separation equilibree</td>
+<td>Graphes &lt; 1000 noeuds</td>
+</tr>
+<tr>
+<td><strong>Kamada-Kawai</strong></td>
+<td>Preserve les distances</td>
+<td>Petits graphes</td>
+</tr>
+<tr>
+<td><strong>DrL</strong></td>
+<td>Optimise grands graphes</td>
+<td>&gt; 1000 noeuds</td>
+</tr>
+<tr>
+<td><strong>Force Atlas</strong></td>
+<td>Detection communautes</td>
+<td>Clusters</td>
+</tr>
+<tr>
+<td><strong>Spherique</strong></td>
+<td>Distribution sur sphere</td>
+<td>VR immersif</td>
+</tr>
+<tr>
+<td><strong>Grille</strong></td>
+<td>Disposition reguliere</td>
+<td>Comparaison</td>
+</tr>
+<tr>
+<td><strong>Aleatoire</strong></td>
+<td>Position aleatoire</td>
+<td>Test</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-filtres-et-recherche">6. Filtres et Recherche</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\14_filter_panel.png" alt="Panneau Filtres"></p>
+<h3 id="onglets">Onglets</h3>
+<ol>
+<li><strong>Noeuds</strong>: Filtrer par attributs des noeuds</li>
+<li><strong>Liens</strong>: Filtrer par attributs des liens</li>
+<li><strong>Topologie</strong>: Navigation structurelle</li>
+</ol>
+<h3 id="recherche">Recherche</h3>
+<ul>
+<li>Tapez un ID ou label pour trouver un noeud</li>
+<li>Les resultats s'affichent en temps reel</li>
+</ul>
+<h3 id="filtres-par-attributs">Filtres par Attributs</h3>
+<ul>
+<li><strong>Group</strong>: Selectionnez les categories a afficher</li>
+<li>Les noeuds non-selectionnes sont masques</li>
+</ul>
+<h3 id="filtres-topologiques">Filtres Topologiques</h3>
+<ul>
+<li><strong>Voisinage N sauts</strong>: Affiche les noeuds a distance N</li>
+<li><strong>Chemin le plus court</strong>: Entre deux noeuds selectionnes</li>
+</ul>
+<hr>
+<h2 id="7-options-et-edition">7. Options et Edition</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\15_edit_modal.png" alt="Modal Edition"></p>
+<h3 id="onglets-1">Onglets</h3>
+<table>
+<thead>
+<tr>
+<th>Onglet</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Donnees</strong></td>
+<td>Voir les donnees brutes</td>
+</tr>
+<tr>
+<td><strong>Mapping</strong></td>
+<td>Modifier source/target/poids</td>
+</tr>
+<tr>
+<td><strong>Parametres</strong></td>
+<td>Options de visualisation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mapping">Mapping</h3>
+<p>Modifiez les colonnes utilisees:</p>
+<ul>
+<li><strong>SOURCE</strong>: Colonne origine des liens</li>
+<li><strong>CIBLE</strong>: Colonne destination</li>
+<li><strong>POIDS</strong>: Attribut de ponderation</li>
+</ul>
+<p>Cliquez sur <strong>Sauvegarder</strong> pour appliquer.</p>
+<hr>
+<h2 id="8-partage">8. Partage</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\16_share_modal.png" alt="Modal Partage"></p>
+<h3 id="options-de-partage">Options de Partage</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Acces Public</strong></td>
+<td>Lien en lecture seule</td>
+</tr>
+<tr>
+<td><strong>Lien temporaire</strong></td>
+<td>Expire a la deconnexion (Free)</td>
+</tr>
+<tr>
+<td><strong>Lien permanent</strong></td>
+<td>Ne expire pas (Elite)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="generer-un-lien">Generer un Lien</h3>
+<ol>
+<li>Cliquez sur <strong>Partager</strong> dans la barre de controles</li>
+<li>Cliquez sur <strong>Generer le lien de partage</strong></li>
+<li>Copiez l'URL generee</li>
+</ol>
+<blockquote>
+<p><strong>Note Free</strong>: Les liens expirent a la fin de session.</p>
+</blockquote>
+<hr>
+<h2 id="9-mode-vr">9. Mode VR</h2>
+<p>Activez le mode VR avec un casque compatible WebXR (Meta Quest, etc.).</p>
+<h3 id="controles-vr">Controles VR</h3>
+<table>
+<thead>
+<tr>
+<th>Controleur</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Joystick gauche</td>
+<td>Deplacement</td>
+</tr>
+<tr>
+<td>Joystick droit</td>
+<td>Rotation</td>
+</tr>
+<tr>
+<td>Trigger</td>
+<td>Selection noeud</td>
+</tr>
+<tr>
+<td>Grip</td>
+<td>Saisir le graphe</td>
+</tr>
+<tr>
+<td>A/X</td>
+<td>Menu radial</td>
+</tr>
+</tbody>
+</table>
+<h3 id="menu-radial-vr">Menu Radial VR</h3>
+<ul>
+<li>Changement de layout</li>
+<li>Recentrage camera</li>
+<li>Quitter VR</li>
+</ul>
+<hr>
+<h2 id="10-galerie-publique">10. Galerie Publique</h2>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\09_gallery.png" alt="Galerie"></p>
+<p>La galerie affiche les projets publies par les utilisateurs Elite.</p>
+<p><strong>Fonctionnalites:</strong></p>
+<ul>
+<li><strong>Recherche</strong>: Filtrer par nom</li>
+<li><strong>Apercu</strong>: Cliquez pour visualiser</li>
+</ul>
+<hr>
+<h2 id="11-administration">11. Administration</h2>
+<p><em>Accessible uniquement aux administrateurs.</em></p>
+<h3 id="dashboard-admin">Dashboard Admin</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\06_admin_dashboard.png" alt="Dashboard admin"></p>
+<p>Statistiques globales:</p>
+<ul>
+<li>Utilisateurs totaux et actifs</li>
+<li>Projets totaux et publics</li>
+</ul>
+<h3 id="gestion-utilisateurs">Gestion Utilisateurs</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\07_admin_users.png" alt="Gestion utilisateurs"></p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Valider Elite</td>
+<td>Approuver une demande</td>
+</tr>
+<tr>
+<td>Bannir</td>
+<td>Bloquer un utilisateur</td>
+</tr>
+<tr>
+<td>Supprimer</td>
+<td>Supprimer le compte</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gestion-projets">Gestion Projets</h3>
+<p><img src="file:///c:\Users\didis\Downloads\PE_Def_Project\docs\guide\08_admin_projects.png" alt="Gestion projets"></p>
+<table>
+<thead>
+<tr>
+<th>Filtre</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tous</td>
+<td>Afficher tous les projets</td>
+</tr>
+<tr>
+<td>Publics</td>
+<td>Projets en galerie</td>
+</tr>
+<tr>
+<td>Prives</td>
+<td>Projets non partages</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="raccourcis-clavier">Raccourcis Clavier</h2>
+<table>
+<thead>
+<tr>
+<th>Raccourci</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Echap</code></td>
+<td>Fermer panneau/modal</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>Reset camera</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>Ouvrir filtres</td>
+</tr>
+<tr>
+<td><code>L</code></td>
+<td>Labels on/off</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="support">Support</h2>
+<ul>
+<li><a href="../README.html">README.md</a> - Documentation technique</li>
+<li><a href="../ROADMAP.html">ROADMAP.md</a> - Fonctionnalites a venir</li>
+</ul>
+
+            
+            
+        </body>
+        </html>

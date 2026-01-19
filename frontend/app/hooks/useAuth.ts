@@ -56,6 +56,11 @@ export const useAuth = () => {
 
   const logout = useMutation({
     mutationFn: async () => {
+      try {
+        await authService.logout();
+      } catch (error) {
+        console.error("Erreur lors de la déconnexion backend", error);
+      }
       await signOut({ redirect: false });
     },
     onSuccess: () => {
